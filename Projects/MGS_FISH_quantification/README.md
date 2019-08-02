@@ -1,10 +1,13 @@
-Creator: Arnau Vich
+*Creator:* Arnau Vich
 
 
-Year: 2019
+*Year:* 2019
 
 
-Current status: Finished
+*Current status:* Finished
 
 
-Publication: NA
+*Publication:* NA
+
+
+*Link to raw data:* NA
