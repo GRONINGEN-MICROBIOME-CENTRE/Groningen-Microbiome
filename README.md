@@ -1,5 +1,5 @@
 # Groningen-Microbiome
-Microbiome Projects from the Department of Genetics, University Medical Centre Groningen 
+Microbiome Projects from the Department of Genetics & the Department of Gastroenterology and Hepatology, University Medical Centre Groningen 
 
 Projects folder contain pulished/ongoing projects
 
