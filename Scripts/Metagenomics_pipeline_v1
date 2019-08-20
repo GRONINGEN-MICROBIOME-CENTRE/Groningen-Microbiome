@@ -58,7 +58,7 @@ mv ./$SAMPLE_ID/filtering_data/*kneaddata_merged.fastq ./$SAMPLE_ID/clean_reads/
 rm -r ./$SAMPLE_ID/filtering_data/
 ```
 
-3.Taxonomical classification: You can use Metaphlan2 or DUDes or both
+3.Taxonomic classification: You can use Metaphlan2 or DUDes or both
 ----------------------------------------------------------------------
 
 Metaphlan2 
@@ -74,7 +74,36 @@ bowtie2 -x /groups/umcg-gastrocol/tmp03/metagenomic_tools/dudes_v0_07/custom_db/
 python3 /groups/umcg-gastrocol/tmp03/metagenomic_tools/dudes_v0_07/DUDes.py -s ./$SAMPLE_ID/DUDes/$SAMPLE_ID_output.sam -d /groups/umcg-gastrocol/tmp03/metagenomic_tools/dudes_v0_07/custom_db/DUDES_refseq_db.npz -t 6 -m 50 -a 0.0005 -l strain -o ./$SAMPLE_ID/DUDes/$SAMPLE_ID 
 ```
 
-4.Functional profiling / pathway identification
+4. Taxonomic classification using mOTUSv2
+------------------------------------------
+
+mOTUs2
+
+Load dependencies
+
+```
+echo Starting taxonomy profiling using mOTUs2
+
+ml SAMtools/1.5-foss-2015b
+ml BWA/0.7.15-foss-2015b
+ml Python
+mkdir ./"$sid"/mOTUs
+export PATH=\$PATH:/groups/umcg-gastrocol/tmp03/metagenomic_tools/mOTUS/mOTUs_v2
+```
+
+Profiling 
+
+```
+# Output mOTUs counts
+motus profile -f ./"$sid"/"$sid"_1_kneaddata_paired_1.fastq -r ./"$sid"/"$sid"_1_kneaddata_paired_2.fastq -o ./"$sid"/"$sid"_counts_profile.txt -q -t 6 -c -g 3 -y insert.scaled_counts
+
+# Output relative abundances
+
+motus profile -f ./"$sid"/"$sid"_1_kneaddata_paired_1.fastq -r ./"$sid"/"$sid"_1_kneaddata_paired_2.fastq -o ./"$sid"/"$sid"_abundance_profile.txt -q -t 6 -g 3 -y insert.scaled_counts
+```
+
+
+5.Functional profiling / pathway identification
 ------------------------------------------------
 
 You can run this part as a separate job, if so you can use the following parameters in the cluster: 
