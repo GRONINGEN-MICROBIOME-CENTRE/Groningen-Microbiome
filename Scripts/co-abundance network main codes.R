@@ -43,7 +43,7 @@ if(length(which(TE<quantile(TE,na.rm = T)[2]-2*IQR))>0|length(which(TE>quantile(
 } #edges without cohort specificity were recored as "-"
 
 
-###5.resampling based (shuffel cohort labels) approach to calculate FDR of heterogeneity test and cohort-specific edge (R language)
+###5.resampling based (shuffel cohort labels) approach to calculate FDR for heterogeneity test and cohort-specific edge (R language)
 lld=NULL
 fg=NULL
 ob=NULL
