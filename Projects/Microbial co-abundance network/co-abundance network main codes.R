@@ -39,7 +39,7 @@ TE=c(0.5*log((1+cor_lld)/(1-cor_lld)),0.5*log((1+cor_fg)/(1-cor_fg)),0.5*log((1+
 TEse=c(1/sqrt(lld_n-3),1/sqrt(fg_n-3),1/sqrt(ob_n-3),1/sqrt(ibd_n-3)) #calculate se of z-score, lld_n represent non-zero pairs of certatin in lld
 p_heterogeneity=metagen(TE,TEse)$pval.Q
 ##for co-occurrence (chi-square) based on odds ratio
-cor=log(((n_all_present_pair+0.5)*(n_all_absent_pair+0.5))/((n_present_absent_pair+0.5)*(n_absent_present_pair+0.5)))
+cor=log(((n_all_present_pair+0.5)*(n_all_absent_pair+0.5))/((n_present_absent_pair+0.5)*(n_absent_present_pair+0.5))) #calculate log odds ratio (plus 0.5 approach based on Valenzuela C. 1993, Rev. Med. Chil., PMID: 8085071)
 TE=c(cor_lld,cor_500fg,cor_300ob,cor_ibd) #log odds ratio of certain edge in four cohorts
 TEse=c(sqrt(1/(n_all_present_pair_lld+0.5)+1/(n_all_absent_pair_lld+0.5)+1/(n_present_absent_pair_lld+0.5)+1/(n_absent_present_pair_lld+0.5)),
        sqrt(1/(n_all_present_pair_fg+0.5)+1/(n_all_absent_pair_fg+0.5)+1/(n_present_absent_pair_fg+0.5)+1/(n_absent_present_pair_fg+0.5)),
