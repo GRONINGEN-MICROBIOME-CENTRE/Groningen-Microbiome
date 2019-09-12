@@ -64,10 +64,10 @@ for(p in threshold){
           lmf = lm(responder_p~.,data.frame(Data.train))
           tmp_val=data.frame(tmp_val)
           colnames(tmp_val)="tmp_pre"
-          test.pred=c(test.pred,cor(predict(lmf,tmp_val),responder_v,method="spearman")^2*100)
+          test.pred=c(test.pred,(1-sum((predict(lmf,tmp_val)-responder_v)^2)/sum((responder_v-mean(responder_v))^2))*100)
         }else{
           lmf = lm(responder_p~.,data.frame(Data.train,check.names = F))
-          test.pred=c(test.pred, cor(predict(lmf,tmp_val),responder_v,method="spearman")^2*100)
+          test.pred=c(test.pred,(1-sum((predict(lmf,tmp_val)-responder_v)^2)/sum((responder_v-mean(responder_v))^2))*100)
         }
       }else{test.pred=c(test.pred, NA)}
     }
