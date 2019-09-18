@@ -1,1 +1,1 @@
-contain pulished/ongoing projects (specific scripts for specific project)
+Pulished/ongoing projects (specific scripts for specific project)
