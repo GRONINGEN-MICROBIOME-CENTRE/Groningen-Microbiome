@@ -7,10 +7,10 @@ Resources
 ---
 
 
-*Projects* folder contain pulished/ongoing projects (specific scripts for specific project)
+*Projects* folder contains pulished/ongoing projects (specific scripts for specific project)
 
 
-*Scripts* folder are useful tools for mcirobiome analysis (commonly used scripts)
+*Scripts* folder contains useful tools for mcirobiome analysis (commonly used scripts)
 
 
 
