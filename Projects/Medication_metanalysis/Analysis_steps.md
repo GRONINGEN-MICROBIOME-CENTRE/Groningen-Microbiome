@@ -914,8 +914,8 @@ ggplot(x4,aes(variable2,as.numeric(as.character(value2)),fill=PPI)) + geom_boxpl
 
 
 
-12. Test stratified pathways (bacterial contribution to each pathways) and gene familes [pathways associated to drug categories in the previous steps]
----
+12.Test stratified pathways (bacterial contribution to each pathways) and gene familes (pathways associated to drug categories in the previous steps)
+----------------
 
 ```{bash}
 #Obtain stratified pathways (pathways + contributing species)
