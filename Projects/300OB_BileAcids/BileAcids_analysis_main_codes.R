@@ -72,7 +72,7 @@ for(p in threshold){
           try(tmp_val<-tmp_val[,which(coef(cv, s='lambda.min')!=0)-1],silent = T)
           Data.train = cbind(tmp_pre,responder_p)
           Data.test  = cbind(tmp_val,responder_v)
-          if(length(which(coef(cv, s='lambda.min')!=0))==1){
+          if(length(which(coef(cv, s='lambda.min')!=0))-1==1){
             lmf = lm(responder_p~.,data.frame(Data.train))
             tmp_val=data.frame(tmp_val)
             colnames(tmp_val)="tmp_pre"
