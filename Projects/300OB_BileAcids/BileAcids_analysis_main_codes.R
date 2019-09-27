@@ -68,8 +68,8 @@ for(p in threshold){
           test.pred=c(test.pred,(1-sum((predict(lmf,tmp_val)-responder_v)^2)/sum((responder_v-mean(responder_v))^2))*100)
         }else{
           try(cv<-glmnet::cv.glmnet(as.matrix(tmp_pre), responder_p, alpha=1,type.measure='mse'),silent = T)#a LASSO step is included to select microbial features (for genetic feature selection, we applied LD clumping) or lets say reduce colinearity
-          try(tmp_pre<-tmp_pre[,which(coef(cv, s='lambda.min')!=0)],silent = T)
-          try(tmp_val<-tmp_val[,which(coef(cv, s='lambda.min')!=0)],silent = T)
+          try(tmp_pre<-tmp_pre[,which(coef(cv, s='lambda.min')!=0)-1],silent = T)
+          try(tmp_val<-tmp_val[,which(coef(cv, s='lambda.min')!=0)-1],silent = T)
           Data.train = cbind(tmp_pre,responder_p)
           Data.test  = cbind(tmp_val,responder_v)
           if(length(which(coef(cv, s='lambda.min')!=0))==1){
