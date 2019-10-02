@@ -3,7 +3,7 @@ Medication Project
 
 Creator: Arnau Vich Vila & Valerie Collij
 
-Year: 2017
+Year: 2018-2019
 
 1.Raw pathaways, first, we filter the stratified pathways, keeping the information for the overall pathway. 
 ------------------------------------------------------------------------------------------------------------
