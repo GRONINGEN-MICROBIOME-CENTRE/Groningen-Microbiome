@@ -1,7 +1,7 @@
 Medication Project 
 ===================
 
-Creator: Arnau Vich
+Creator: Arnau Vich Vila & Valerie Collij
 
 Year: 2017
 
