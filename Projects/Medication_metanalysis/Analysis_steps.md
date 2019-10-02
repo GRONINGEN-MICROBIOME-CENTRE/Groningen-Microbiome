@@ -1117,3 +1117,93 @@ res_3$q.value.x=p.adjust(as.numeric(as.character(res_3$p.value.x)),method = "fdr
 res_3$q.value.y=p.adjust(as.numeric(as.character(res_3$p.value.y)),method = "fdr")
 res_3$q.value=p.adjust(as.numeric(as.character(res_3$p.value)),method = "fdr")
 ```
+13. Test medication categories to the abundances of antibiotic resistance genes derived from CARD database using ShortBRED
+------------------
+```
+# IBD
+# Subset medication categorie and compare it to participants not using any drugs 
+
+IBDtricyclic_antidepressant2 = subset (IBD, IBD$tricyclic_antidepressant==1)
+IBDtricyclic_antidepressant3 = subset (IBDtricyclic_antidepressant2, IBDtricyclic_antidepressant2$antibiotics_merged==0)
+
+m = matrix(ncol=4,nrow=125)
+rownames(m) = colnames(IBDGeenDrugs[1:125])
+colnames(m) = c("mean_IBDNoDrugs","mean_IBDtricyclic_antidepressant", "IBDtricyclic_antidepressant.pvalue", "IBDtricyclic_antidepressant.FDR")
+for (i in 1:125){
+  m[i,1] = mean(as.numeric(IBDGeenDrugs[,i]))
+  m[i,2] = mean(as.numeric(IBDtricyclic_antidepressant3[,i]))
+  m[i,3] = wilcox.test(as.numeric(IBDGeenDrugs[,i]),as.numeric(IBDtricyclic_antidepressant3[,i]))$p.value
+}
+
+m[,4] = p.adjust(m[,3],method = "BH")
+
+# LLDeep
+LLDeeptricyclic_antidepressant2 = subset (LLDeep, LLDeep$tricyclic_antidepressant==1)
+LLDeeptricyclic_antidepressant3 = subset (LLDeeptricyclic_antidepressant2, LLDeeptricyclic_antidepressant2$antibiotics_merged==0)
+
+l = matrix(ncol=4,nrow=119)
+rownames(l) = colnames(LLDeepGeenDrugs[1:119])
+colnames(l) = c("mean_LLDeepNoDrugs","mean_LLDeeptricyclic_antidepressant", "LLDeeptricyclic_antidepressant.pvalue", "LLDeeptricyclic_antidepressant.FDR")
+for (i in 1:119){
+  l[i,1] = mean(as.numeric(LLDeepGeenDrugs[,i]))
+  l[i,2] = mean(as.numeric(LLDeeptricyclic_antidepressant3[,i]))
+  l[i,3] = wilcox.test(as.numeric(LLDeepGeenDrugs[,i]),as.numeric(LLDeeptricyclic_antidepressant3[,i]))$p.value
+}
+
+l[,4] = p.adjust(l[,3],method = "BH")
+
+# MIBS
+MIBStricyclic_antidepressant2 = subset (MIBS, MIBS$tricyclic_antidepressant==1)
+MIBStricyclic_antidepressant3 = subset (MIBStricyclic_antidepressant2, MIBStricyclic_antidepressant2$antibiotics_merged==0)
+
+p = matrix(ncol=4,nrow=113)
+rownames(p) = colnames(MIBStricyclic_antidepressant3[1:113])
+colnames(p) = c("mean_MIBSNoDrugs","mean_MIBStricyclic_antidepressant", "MIBStricyclic_antidepressant.pvalue", "MIBStricyclic_antidepressant.FDR")
+for (i in 1:113){
+  p[i,1] = mean(as.numeric(MIBSGeenDrugs[,i]))
+  p[i,2] = mean(as.numeric(MIBStricyclic_antidepressant3[,i]))
+  p[i,3] = wilcox.test(as.numeric(MIBSGeenDrugs[,i]),as.numeric(MIBStricyclic_antidepressant3[,i]))$p.value
+}
+
+p[,4] = p.adjust(p[,3],method = "BH")
+
+# Merge IBD, LLDeep, MIBS
+
+stap10 = merge (m, l, by="row.names", all = TRUE)
+rownames (stap10) = stap10[,1]
+stap10 = stap10 [,2:9] 
+stap11 = merge (stap10, p, by="row.names", all = TRUE)
+write.table (stap11, "tricyclic_antidepressantARMarker2.txt")
+
+#Repeat for all drugs
+```
+14. To test medication subtypes and dosages
+----------------
+```
+# Wilcoxon test for comparing high and low dosages within a specific medication categorie
+# Same wilcoxon test used for comparing subtypes of drugs to participants not using drugs from that medication categorie
+
+x=0
+my_res=matrix(,ncol = 10, nrow = length(colnames(test)[19:ncol(test)]))
+
+for (i in 19:ncol(test)){
+  x=x+1
+  my_res[x,2]=median(test[,i][test$PPI_20rest=="1_Low"])
+  my_res[x,3]=median(test[,i][test$PPI_20rest=="2_High"])
+  my_res[,4]=sum(test$PPI_20rest=="1_Low")
+  my_res[,5]=sum(test$PPI_20rest=="2_High")
+  my_res[x,6]=sum(test[,i][test$PPI_20rest=="1_Low"]!=0)
+  my_res[x,7]=sum(test[,i][test$PPI_20rest=="2_High"]!=0)
+  #Wilcoxon effect size
+  my_res[x,8]=statistic(wilcox_test(test[,i]~as.factor(test$PPI_20rest), conf.int=TRUE))
+  my_res[x,9]=statistic(wilcox_test(test[,i]~as.factor(test$PPI_20rest), conf.int=TRUE)) / sqrt (nrow(test))
+  asoc=wilcox.test(test[,i]~test$PPI_20rest)
+  my_res[x,1]=colnames(test)[i]
+  my_res[x,10]=asoc$p.value
+}
+my_res2=as.data.frame(my_res[my_res[,4]!="NaN", ])
+colnames(my_res2)=c("Path","Median_Users","Median_Non_Users", "Number_users", "Number_non-users", "Non_zeros_User", "Non_zeros_Non_Users", "Wilcoxon Z (Users vs Non-users)","Wilcoxon effect size","p.value")
+my_res2$q.value=p.adjust(as.numeric(as.character(my_res2$p.value)),method = "fdr")
+my_res2$cohort="LLD"
+res_PPIPath=my_res2
+```
