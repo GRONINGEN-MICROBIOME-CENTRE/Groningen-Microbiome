@@ -68,3 +68,6 @@ done
 
 
 ################Part2
+module load Python/2.7.11-foss-2015b
+/groups/umcg-gastrocol/tmp04/metagenomic_tools/panphlan/panphlan/panphlan_profile.py -c r39BFAA -i ./ --o_dna result_gene_presence_absence_r39FAA.txt --i_bowtie2_indexes /groups/umcg-gastrocol/tmp04/metagenomic_tools/panphlan_DB --add_strains --verbose
+
