@@ -9,19 +9,6 @@ library(caret)
 library(plotROC)
 library(pROC)
 
-# do train & testing, make confusion matrices
-
-doTrainTest <- function(dataI,mdl,trainPerc=0.7) {
-  inTrain <- createDataPartition(y=dataI$Diagnosis,p=trainPerc,list=F)
-  trainSet <-dataI[inTrain,]
-  testSet <- dataI[-inTrain,]
-  t <- train(Diagnosis ~ ., data=trainSet, method=mdl)
-  cTest <- confusionMatrix(predict(t,testSet),testSet$Diagnosis)
-  cTrain <- confusionMatrix(predict(t,trainSet),trainSet$Diagnosis)
-  return (list(t,cTrain,cTest))
-}
-
-
 # ============================
 #
 # plot all learning curves
@@ -87,323 +74,6 @@ plotAllLearningCurves <- function(dataI,dataName="",dataNameShort="",
     return(outTbl)
   }
 }
-
-# ===============================================================================
-# generate ROC based on RF trained on given model (70% of data)
-#
-# ===============================================================================
-generateROC <- function(dataModel,trSet=0.7,klasses=c("IBS","HC"),tit="") {
-  inTrain <- createDataPartition(y=dataModel$Diagnosis,p=trSet,list=F)
-  trainSet <-dataModel[inTrain,]
-  testSet <- dataModel[-inTrain,]
-  fittedModel <- train(Diagnosis ~ ., data=trainSet,method="rf",metric="ROC",
-                trControl=trainControl(savePrediction=T,classProbs=T,summaryFunction=twoClassSummary))
-  sI <- fittedModel$pred$mtry == fittedModel$bestTune$mtry
-  
-  grug <- fittedModel$pred[sI,grep(klasses[1],colnames(fittedModel$pred))]
-  g <- ggplot(fittedModel$pred[sI,], aes(m=grug, d=factor(obs, levels = klasses))) + 
-    style_roc(xlab = "1 - Specificity / False Positive rate",
-              ylab = "Sensitivity / True Positive rate") + 
-    geom_roc(n.cuts = 0,color="blue",size=1.5) + 
-    coord_equal() 
-  auc <- fittedModel$results[fittedModel$results$mtry==fittedModel$bestTune$mtry,]$ROC
-  g <- g + annotate("text", x=0.70, y=0.3, label=paste("AUC =", round(auc, 3)))
-  g <- g + ggtitle(tit)
-  g
-}
-
-# ===============================================================================
-# generate ROC for listed model (mdl) and testSet (testSet)
-# positive class is inputed one (posClass), other class is considered to be negative
-# ===============================================================================
-generateMdlROC <- function(mdl,testSet,posClass="IBS",tit="") {
-  predP <- predict(mdl,testSet,type="prob")
-  r <- roc(testSet$Diagnosis,predP[[posClass]],auc=T,percent=F)
-  #cir <- ci(r,of="se", sp = seq(0, 100, 5), boot.n=100)
-  #plot(r,print.auc=T,col="darkgreen")
-  
-  g <- pROC::ggroc(r,col="darkblue",size=1.5,alpha=0.75) +
-  annotate("text", x = .75, y = .25, label = paste("AUC =",round(r$auc[1],2) )) +
-    ggtitle(tit)
-
-}
-# ===============================================================================
-# generate ROC for listed model (mdl) and testSet (testSet) + trainSet (trainSet)
-# positive class is inputed one (posClass), other class is considered to be negative
-# ===============================================================================
-generateMdlROCTrainTest <- function(mdl,trainSet,testSet,posClass="IBS",tit="",doSmooth=F) {
-  
-  predTr <- predict(mdl,trainSet,type="prob")
-  rTr <- roc(trainSet$Diagnosis,predTr[[posClass]],auc=T,percent=F)
-  
-  predTst <- predict(mdl,testSet,type="prob")
-  rTst <- roc(testSet$Diagnosis,predTst[[posClass]],auc=T,percent=F)
-  
-  #g <- pROC::ggroc(r,col="darkblue",size=1.5,alpha=0.75) +
-  #  annotate("text", x = .75, y = .25, label = paste("AUC =",round(r$auc[1],2) )) +
-  #  ggtitle(tit)  
-  if (doSmooth) {
-    g <- pROC::ggroc(list(Train=rTr,Test=rTst), size=1.25,alpha=0.0) + geom_smooth(size=1.5,alpha=0.08)
-  } else { 
-    g <- pROC::ggroc(list(Train=rTr,Test=rTst), size=1.25,alpha=1.0) 
-  }
-  g <- g + 
-    annotate("segment", x = 1, xend = 0, y = 0, yend = 1,colour = "gray",size=1.25,linetype="longdash") +
-    ggtitle(tit) + xlab("Specificity") + ylab("Sensitivity") +
-    style_roc() +
-    scale_y_continuous(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0, 1, 0.1)) +
-    scale_x_reverse(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0,1,0.1)) +
-    annotate("text", x = .45, y = .23, label = paste("Training Set AUC =",round(rTr$auc[1],2)),hjust = 0) +
-    annotate("text", x = .45, y = .30, label = paste("Test Set AUC =",round(rTst$auc[1],2) ),hjust = 0) +
-    geom_abline(slope = 1,intercept = 1,col="grey") +
-    ggtitle(tit) + xlab("Specificity") + ylab("Sensitivity") +
-    labs(color='Dataset')  
-  g
-}
-# ===============================================================================
-# generator of comparative ROC for MULTIPLE MODELS and ONE DATASET (test set)
-# ===============================================================================
-generateMdlROCComparative <- function(mdls,modelNames,testSet,posClass="IBS",tit="",doSmooth=F) {
-  rocs = list()
-  c = 0
-  for (m in mdls) {
-    c = c + 1
-    namen = modelNames[c]
-    pr <- predict(m,testSet,type="prob")
-    rocs[[namen]] <- roc(testSet$Diagnosis,pr[[posClass]],auc=T,percent=F)
-  }
-  
-  if (doSmooth) {
-  g <- pROC::ggroc(rocs, size=1.25,alpha=0.0) + geom_smooth(size=1.5,alpha=0.08)
-  } else { 
-    g <- pROC::ggroc(rocs, size=1.25,alpha=1.0) 
-  }
-  g <- g + 
-    annotate("segment", x = 1, xend = 0, y = 0, yend = 1,colour = "gray",size=1.25,linetype="longdash") +
-    ggtitle(tit) + xlab("Specificity") + ylab("Sensitivity") +
-    style_roc() +
-    scale_y_continuous(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0, 1, 0.1)) +
-    scale_x_reverse(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0,1,0.1)) +
-    geom_abline(slope = 1,intercept = 1,col="grey") +
-    labs(color='Dataset') 
-  # annotate w auc
-  c = 0.0
-  for (i in order(modelNames,decreasing = T)) {
-    c = c + 1.0
-    g <- g + annotate("text", x = .35, y = 0.00+0.06*c, label = paste(modelNames[i],"AUC =",round(rocs[[modelNames[i] ]]$auc[1],2)),hjust = 0)
-    #annotate("text", x = .5, y = .30, label = paste("AUC =",round(rTst$auc[1],2) ),hjust = 0) +
-    #
-  }
-  g
-}
-# ===============================================================================
-# generator of comparative ROC for MULTIPLE DATASETS and ONE MODEL
-# ===============================================================================
-generateMdlROCCompareData <- function(mdl,testSetNames,testSets,posClass="IBS",tit="",doSmooth=F) {
-  rocs = list()
-  c = 0
-  m <- mdl
-  for (testSet in testSets) {
-    c = c + 1
-    namen = testSetNames[c]
-    pr <- predict(m,testSet,type="prob")
-    rocs[[namen]] <- roc(testSet$Diagnosis,pr[[posClass]],auc=T,percent=F)
-  }
-  
-  if (doSmooth) {
-    g <- pROC::ggroc(rocs, size=1.25,alpha=0.0) + geom_smooth(size=1.5,alpha=0.08)
-  } else { 
-    g <- pROC::ggroc(rocs, size=1.25,alpha=1.0) 
-  }
-  g <- g + 
-    annotate("segment", x = 1, xend = 0, y = 0, yend = 1,colour = "gray",size=1.25,linetype="longdash") +
-    ggtitle(tit) + xlab("Specificity") + ylab("Sensitivity") +
-    style_roc() +
-    scale_y_continuous(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0, 1, 0.1)) +
-    scale_x_reverse(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0,1,0.1)) +
-    geom_abline(slope = 1,intercept = 1,col="grey") +
-    labs(color='Dataset') 
-  # annotate w auc
-  c = 0.0
-  for (i in order(testSetNames,decreasing = T)) {
-    c = c + 1.0
-    g <- g + annotate("text", x = .35, y = 0.00+0.06*c, label = paste(testSetNames[i],"AUC =",round(rocs[[testSetNames[i] ]]$auc[1],2)),hjust = 0)
-    #annotate("text", x = .5, y = .30, label = paste("AUC =",round(rTst$auc[1],2) ),hjust = 0) +
-    #
-  }
-  g
-}
-
-# ===============================================================================
-# compares model performance on different datasets
-# ===============================================================================
-compareMdlDatasets <- function(mdl,dataSets,dataSetNames,posClass="IBS",roc.smooth=F,tit="",
-                               response="Diagnosis",roc.conf = T,roc.conf.boot = 100,target = F) {
-  trainedModels <- list()
-  c = 0
-  # list of ROC curves
-  rocs = list()
-  # data frame of predictions
-  predDF <- data.frame("DataModel"=as.character(),"Metric"=as.character(),"Value"=as.numeric(),stringsAsFactors=F)
-  # generate results for each dataset
-  for (ds in dataSets) {
-    c = c + 1
-    testSet <- ds
-    fittedModel <- mdl
-    trainedModels[[c]] <- fittedModel
-    pr <- predict(fittedModel,newdata = testSet,type="prob")
-    namen = dataSetNames[c]
-    if (roc.smooth) {
-      rocs[[namen]] <- smooth(roc(testSet$Diagnosis,pr[[posClass]],auc=T,percent=F))
-    } else {
-      rocs[[namen]] <- roc(testSet$Diagnosis,pr[[posClass]],auc=T,percent=F)
-    }
-    pr2 <- predict(fittedModel,testSet)
-    conf <- confusionMatrix(pr2,testSet[[response]])
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="Acc","Value"=conf$overall[["Accuracy"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="Kappa","Value"=conf$overall[["Kappa"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="Sensitivity","Value"=conf$byClass[["Sensitivity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="Specificity","Value"=conf$byClass[["Specificity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="PPV","Value"=conf$byClass[["Pos Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="NPV","Value"=conf$byClass[["Neg Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="B.Acc","Value"=conf$byClass[["Balanced Accuracy"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataSet"=namen,"Metric"="F1","Value"=conf$byClass[["F1"]],stringsAsFactors=F))
-    #predDF <- rbind.data.frame(predDF,
-    #                           data.frame("DataSet"=namen,"Metric"="Prevalence","Value"=conf$byClass[["Prevalence"]],stringsAsFactors=F))
-  }
-  
-  # extract coordinates
-  if (!roc.conf) {
-    rocsDFprecalc = NULL
-    rocStep = 0.01
-    for (i in seq(1,length(rocs))) {
-      if (class(rocsDFprecalc) != "data.frame") {
-        if (!roc.smooth) {
-          rocsDFprecalc <- as.data.frame(t(coords(rocs[[i]],x="all",ret= c("specificity","sensitivity"))))
-          rownames(rocsDFprecalc) <- NULL
-        } else {
-          rocsDFprecalc <- as.data.frame(t(coords(rocs[[i]],x=c(seq(0,0.1,rocStep/10),seq(0.1,1,rocStep)),ret= c("specificity","sensitivity"))))
-          rownames(rocsDFprecalc) <- NULL
-        }
-        rocsDFprecalc$Dataset <- names(rocs)[i]
-        rocsDFprecalc$sz = 1
-      } else {
-        if (!roc.smooth) {
-          rocsDFprecalctmp <- as.data.frame(t(coords(rocs[[i]],x="all",ret= c("specificity","sensitivity"))))
-          rownames(rocsDFprecalctmp) <- NULL
-        } else {
-          rocsDFprecalctmp <- as.data.frame(t(coords(rocs[[i]],x=c(seq(0,0.1,rocStep/10),seq(0.1,1,rocStep)),ret= c("specificity","sensitivity"))))
-          rownames(rocsDFprecalctmp) <- NULL
-        }
-        rocsDFprecalctmp$Dataset <- names(rocs)[i]
-        rocsDFprecalctmp$sz = 1
-        rocsDFprecalc <- rbind(rocsDFprecalc, rocsDFprecalctmp)
-        rownames(rocsDFprecalc) <- NULL
-      }
-    }
-  }
-  
-  if (roc.conf) {
-    rocDFConf <- F
-    rocStep = 0.01
-    boots = roc.conf.boot
-    meanConf <- F
-    for (i in seq(1,length(rocs))) {
-      if (roc.smooth) {
-        sens.ci <- ci.sp(smooth(rocs[[i]]), sensitivities =c(seq(0,0.1,rocStep/10),seq(0.1, 1, rocStep)),
-                         conf.level=0.66,boot.n = boots,progress = "none")
-      } else {
-        sens.ci <- ci.sp((rocs[[i]]), sensitivities=c(seq(0,0.1,rocStep/10),seq(0.1, 1, rocStep)),
-                         conf.level=0.66,boot.n = boots,progress="none")
-      }
-      rocConf <- as.data.frame(sens.ci)
-      rocConf$sensitivity <- as.numeric(rownames(rocConf))
-      colnames(rocConf) <- c("sp.low","specificity","sp.high","sensitivity")
-      rocConf$Dataset <- names(rocs)[i]
-      rocConf$sz = 1.0
-      rownames(rocConf) <- NULL
-      if (class(meanConf) != "data.frame") {
-        meanConf <- rocConf[,c(4,1,2,3)]
-      } else {
-        meanConf <- cbind(meanConf,rocConf[,c(1,2,3)])
-      }
-      if (class(rocDFConf) != "data.frame") {
-        rocDFConf <- rocConf
-      } else {
-        rocDFConf <- rbind.data.frame(rocDFConf,rocConf)
-      }
-      if (!roc.smooth) {
-        rocDFConf <- rbind.data.frame(rocDFConf,data.frame(sp.low=0,specificity=0,sp.high=0,sensitivity=1,Dataset=names(rocs)[i],sz=1))
-      }
-    }
-    rocsDFprecalc <- rocDFConf
-  }
-  
-  if (roc.conf) {
-    rocsDFprecalc <- rocsDFprecalc[order(rocsDFprecalc$specificity,decreasing = F),]
-    g <- ggplot(rocsDFprecalc,aes(y=specificity,x=sensitivity,col=Dataset)) +
-      geom_ribbon(data=rocsDFprecalc,aes(ymin=sp.low,ymax=sp.high,fill=Dataset),alpha=0.2,colour=NA) + geom_line(size=1.25)
-  } else {
-    rocsDFprecalc <- rocsDFprecalc[order(rocsDFprecalc$sensitivity,decreasing = F),]
-    g <- ggplot(rocsDFprecalc,aes(y=specificity,x=sensitivity,col=Dataset)) + geom_line(size=1.25) #pROC::ggroc(rocs) + geom_line(size=1.25)
-  }
-  g <- g + 
-    annotate("segment", x = 1, xend = 0, y = 0, yend = 1,colour = "gray",size=1) +
-    ggtitle(paste(tit,"ROC") ) + xlab("Specificity") + ylab("Sensitivity") +
-    style_roc() +  
-    scale_y_continuous(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0, 1, 0.1)) +
-    scale_x_reverse(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0,1,0.1)) +
-    labs(color='Dataset') 
-  # annotate w auc
-  c = 0.0
-  for (i in order(dataSetNames,decreasing = T)) {
-    c = c + 1.0
-    g <- g + annotate("text", x = .5, y = 0.00+0.06*c, label = paste(dataSetNames[i],"AUC =",round(rocs[[dataSetNames[i] ]]$auc[1],2)),hjust = 0)
-    #annotate("text", x = .5, y = .30, label = paste("AUC =",round(rTst$auc[1],2) ),hjust = 0) +
-    #
-  }
-  # targets
-  tarDF <- F  
-  if (target) {
-    for (u in unique(predDF$DataSet )) {
-      if (u != "multi.class") {
-        if (class(tarDF) != "data.frame") {
-          tarDF <- data.frame(DataSet=u,
-                              Sensitivity=predDF[predDF$DataSet==u & predDF$Metric=="Sensitivity",]$Value,
-                              Specificity=predDF[predDF$DataSet==u & predDF$Metric=="Specificity",]$Value,
-                              F1=predDF[predDF$DataSet==u & predDF$Metric=="F1",]$Value,
-                              B.Acc=predDF[predDF$DataSet==u & predDF$Metric=="B.Acc",]$Value
-          )
-        } else {
-          tarDF <- rbind.data.frame(tarDF,data.frame(DataSet=u,
-                                                     Sensitivity=predDF[predDF$DataSet==u & predDF$Metric=="Sensitivity",]$Value,
-                                                     Specificity=predDF[predDF$DataSet==u & predDF$Metric=="Specificity",]$Value,
-                                                     F1=predDF[predDF$DataSet==u & predDF$Metric=="F1",]$Value,
-                                                     B.Acc=predDF[predDF$DataSet==u & predDF$Metric=="B.Acc",]$Value))
-        }
-      }
-    }
-    g <- g + geom_point(data=tarDF,aes(x=Specificity,y=Sensitivity,col=DataSet),size=4,shape=4,stroke=2)
-  }
-  
-  # do metrics plot
-  unik <- length(dataSets)
-  gg2 <- ggplot(data=predDF,aes(col=Metric,y=Value,x=DataSet,shape=Metric)) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4)) + theme_minimal() + ylim(0.0,1) + 
-    scale_shape_manual(values = c(0,1,2,3,4,5,6,7,9,10,12,13)) +  ggtitle(paste(tit,"Prediction metrics") ) +
-    geom_vline(xintercept =  c(1:length(dataSetNames)) ,size=max(35,130-unik*20),alpha=0.05) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4))
-  list(g,gg2,predDF)
-}
-
 
 # ===============================================================================
 # compares training CV of multiple trained models
@@ -543,224 +213,6 @@ compareModelsTrainingCV <- function(fittedMdls,modelNames,mtd="glm",posClass="IB
   }
   #return plot
   g
-}
-
-# ===============================================================================
-# compares multiple data models - each one is built from its own dataset
-# does the model training
-# -> dataMdls should be list( dataframes(Diagnosis ~ covariate) )
-# -> note: models should predict Diagnosis, with positive class = posClass
-# ===============================================================================
-trainCompareModels <- function(dataMdls,modelNames,mtd="glm",posClass="IBS",doSmooth=F,trSet=0.7,tit="") {
-  c = 0
-  rocs = list()
-  predDF <- data.frame("DataModel"=as.character(),"Metric"=as.character(),"Value"=as.numeric(),stringsAsFactors=F)
-  #trainedModels = list()
-  for (m in dataMdls) {
-    c = c + 1
-    inTrain <- createDataPartition(y=m$Diagnosis,p=trSet,list=F)
-    trainSet <- m[inTrain,]
-    testSet <- m[-inTrain,]
-    fittedModel <- train(Diagnosis ~ ., data=trainSet,method=mtd,metric="Kappa")
-    pr <- predict(fittedModel,testSet,type="prob")
-    namen = modelNames[c]
-    rocs[[namen]] <- roc(testSet$Diagnosis,pr[[posClass]],auc=T,percent=F)
-    pr2 <- predict(fittedModel,testSet)
-    conf <- confusionMatrix(pr2,testSet$Diagnosis)
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Acc","Value"=conf$overall[["Accuracy"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Kappa","Value"=conf$overall[["Kappa"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Sensitivity","Value"=conf$byClass[["Sensitivity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Specificity","Value"=conf$byClass[["Specificity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="PPV","Value"=conf$byClass[["Pos Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="NPV","Value"=conf$byClass[["Neg Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="B.Acc","Value"=conf$byClass[["Balanced Accuracy"]],stringsAsFactors=F))
-    #predDF <- rbind.data.frame(predDF,
-    #                           data.frame("DataModel"=modelNames[c],"Metric"="Det.Rate","Value"=conf$byClass[["Detection Rate"]],stringsAsFactors=F))
-    #predDF <- rbind.data.frame(predDF,
-    #                           data.frame("DataModel"=modelNames[c],"Metric"="Prevalence","Value"=conf$byClass[["Prevalence"]],stringsAsFactors=F))
-  }
-  # do combined ROC plot
-  if (doSmooth) {
-    g <- pROC::ggroc(rocs, size=1.25,alpha=0.0) + geom_smooth(size=1.5,alpha=0.08)
-  } else { 
-    g <- pROC::ggroc(rocs, size=1.25,alpha=1.0) 
-  }
-  g <- g + 
-    annotate("segment", x = 1, xend = 0, y = 0, yend = 1,colour = "gray",size=1.25,linetype="longdash") +
-    ggtitle(paste(tit,"ROC (",mtd,")") ) + xlab("Specificity") + ylab("Sensitivity") +
-    style_roc() +
-    scale_y_continuous(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0, 1, 0.1)) +
-    scale_x_reverse(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0,1,0.1)) +
-    labs(color='Data Model') 
-  # annotate w auc
-  c = 0.0
-  for (i in order(modelNames,decreasing = T)) {
-    c = c + 1.0
-    g <- g + annotate("text", x = .35, y = 0.00+0.06*c, label = paste(modelNames[i],"AUC =",round(rocs[[modelNames[i] ]]$auc[1],2)),hjust = 0)
-    #annotate("text", x = .5, y = .30, label = paste("AUC =",round(rTst$auc[1],2) ),hjust = 0) +
-    #
-  }
-  # do metrics plot
-  gg2 <- ggplot(data=predDF,aes(col=Metric,y=Value,x=DataModel,shape=Metric)) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4)) + theme_minimal() + ylim(0.0,1) + xlab("Data Model") +
-    scale_shape_manual(values = c(0,1,2,3,4,5,6,7,9,10,12,13)) +  ggtitle(paste(tit,"Prediction metrics (",mtd,")") ) +
-    geom_vline(xintercept =  c(1:length(modelNames)) ,size=40,alpha=0.05) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4))
-  list(g,gg2,predDF)
-}
-
-
-
-
-# ===============================================================================
-# compares multiple models on multiple test datasets
-# (each model with paired with appropriate test-set in order they are entered)
-# does not do model training
-# -> fittedMdls should be list( fitted models ) generated by caret train
-# ===============================================================================
-compareModelsOnDatasets <- function(fittedMdls,testSets,modelNames,mtd="glm",posClass="IBS",doSmooth=F,tit="",annotateAUConly=F) {
-  c = 0
-  rocs = list()
-  predDF <- data.frame("DataModel"=as.character(),"Metric"=as.character(),"Value"=as.numeric(),stringsAsFactors=F)
-  for (m in fittedMdls) {
-    c = c + 1
-    #trainedModels[[c]] <- m
-    pr <- predict(m,testSets[[c]],type="prob")
-    namen = modelNames[c]
-    rocs[[namen]] <- roc(testSets[[c]]$Diagnosis,pr[[posClass]],auc=T,percent=F)
-    pr2 <- predict(m,testSets[[c]])
-    conf <- confusionMatrix(pr2,testSets[[c]]$Diagnosis)
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Acc","Value"=conf$overall[["Accuracy"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Kappa","Value"=conf$overall[["Kappa"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Sensitivity","Value"=conf$byClass[["Sensitivity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Specificity","Value"=conf$byClass[["Specificity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="PPV","Value"=conf$byClass[["Pos Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="NPV","Value"=conf$byClass[["Neg Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="B.Acc","Value"=conf$byClass[["Balanced Accuracy"]],stringsAsFactors=F))
-    #predDF <- rbind.data.frame(predDF,
-    #                           data.frame("DataModel"=modelNames[c],"Metric"="Det.Rate","Value"=conf$byClass[["Detection Rate"]],stringsAsFactors=F))
-    #predDF <- rbind.data.frame(predDF,
-    #                           data.frame("DataModel"=modelNames[c],"Metric"="Prevalence","Value"=conf$byClass[["Prevalence"]],stringsAsFactors=F))
-  }
-  
-  # do combined ROC plot
-  if (doSmooth) {
-    g <- pROC::ggroc(rocs, size=1.25,alpha=0.0) + geom_smooth(size=1.5,alpha=0.08)
-  } else { 
-    g <- pROC::ggroc(rocs, size=1.25,alpha=1.0) 
-  }
-  g <- g + 
-    annotate("segment", x = 1, xend = 0, y = 0, yend = 1,colour = "gray",size=1.25,linetype="longdash") +
-    ggtitle(paste(tit,"(",mtd,")") ) + xlab("Specificity") + ylab("Sensitivity") +
-    style_roc() +
-    scale_y_continuous(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0, 1, 0.1)) +
-    scale_x_reverse(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0,1,0.1)) +
-    labs(color='Dataset') 
-  # annotate w auc
-  c = -1.0
-  for (i in order(modelNames,decreasing = T)) {
-    c = c + 1.0
-    if (annotateAUConly) {
-      g <- g + annotate("text", x = .35, y = 0.00+0.06*c, label = paste(modelNames[i],"AUC =",round(rocs[[modelNames[i] ]]$auc[1],2)),hjust = 0)
-    } else {
-      g <- g + annotate("text", x = .5, y = 0.00+0.06*c, label = paste(modelNames[i]," AUC = ",round(rocs[[modelNames[i] ]]$auc[1],2),
-                                                                     "; Kappa = ",round(predDF[predDF$DataModel==modelNames[i] & predDF$Metric=="Kappa",]$Value,2),
-                                                                     "; ACC = ",round(predDF[predDF$DataModel==modelNames[i] & predDF$Metric=="Acc",]$Value,1),sep=""),hjust = 0)
-    }
-    #annotate("text", x = .5, y = .30, label = paste("AUC =",round(rTst$auc[1],2) ),hjust = 0) +
-    #
-  }
-  # do metrics plot
-  gg2 <- ggplot(data=predDF,aes(col=Metric,y=Value,x=DataModel,shape=Metric)) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4)) + theme_minimal() + ylim(0.0,1) + 
-    scale_shape_manual(values = c(0,1,2,3,4,5,6,7,9,10,12,13)) +  ggtitle(paste(tit,"(",mtd,")") ) +
-    geom_vline(xintercept =  c(1:length(modelNames)) ,size=40,alpha=0.05) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4))
-  list(g,gg2,predDF)
-}
-
-
-
-# ===============================================================================
-# compares multiple models on one dataset
-# does not do model training
-# -> fittedMdls should be list( fitted models ) generated by caret train
-# ===============================================================================
-compareModelsOnDataset <- function(fittedMdls,testSet,modelNames,mtd="glm",posClass="IBS",doSmooth=F,tit="") {
-  #trainedModels <- list()
-  c = 0
-  rocs = list()
-  predDF <- data.frame("DataModel"=as.character(),"Metric"=as.character(),"Value"=as.numeric(),stringsAsFactors=F)
-  for (m in fittedMdls) {
-    c = c + 1
-    #trainedModels[[c]] <- m
-    pr <- predict(m,testSet,type="prob")
-    namen = modelNames[c]
-    rocs[[namen]] <- roc(testSet$Diagnosis,pr[[posClass]],auc=T,percent=F)
-    pr2 <- predict(m,testSet)
-    conf <- confusionMatrix(pr2,testSet$Diagnosis)
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Acc","Value"=conf$overall[["Accuracy"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Kappa","Value"=conf$overall[["Kappa"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Sensitivity","Value"=conf$byClass[["Sensitivity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="Specificity","Value"=conf$byClass[["Specificity"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="PPV","Value"=conf$byClass[["Pos Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="NPV","Value"=conf$byClass[["Neg Pred Value"]],stringsAsFactors=F))
-    predDF <- rbind.data.frame(predDF,
-                               data.frame("DataModel"=modelNames[c],"Metric"="B.Acc","Value"=conf$byClass[["Balanced Accuracy"]],stringsAsFactors=F))
-    #predDF <- rbind.data.frame(predDF,
-    #                           data.frame("DataModel"=modelNames[c],"Metric"="Det.Rate","Value"=conf$byClass[["Detection Rate"]],stringsAsFactors=F))
-    #predDF <- rbind.data.frame(predDF,
-    #                           data.frame("DataModel"=modelNames[c],"Metric"="Prevalence","Value"=conf$byClass[["Prevalence"]],stringsAsFactors=F))
-  }
-  
-  # do combined ROC plot
-  if (doSmooth) {
-    g <- pROC::ggroc(rocs, size=1.25,alpha=0.0) + geom_smooth(size=1.5,alpha=0.08)
-  } else { 
-    g <- pROC::ggroc(rocs, size=1.25,alpha=1.0) 
-  }
-  g <- g + 
-    annotate("segment", x = 1, xend = 0, y = 0, yend = 1,colour = "gray",size=1.25,linetype="longdash") +
-    ggtitle(paste(tit,"ROC (",mtd,")") ) + xlab("Specificity") + ylab("Sensitivity") +
-    style_roc() +
-    scale_y_continuous(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0, 1, 0.1)) +
-    scale_x_reverse(minor_breaks = c(seq(0,0.8,0.1),seq(0.75,0.9,0.05),seq(0.91,1,0.01)), breaks = seq(0,1,0.1)) +
-    labs(color='Dataset') 
-  # annotate w auc
-  c = 0.0
-  for (i in order(modelNames,decreasing = T)) {
-    c = c + 1.0
-    g <- g + annotate("text", x = .35, y = 0.00+0.06*c, label = paste(modelNames[i],"AUC =",round(rocs[[modelNames[i] ]]$auc[1],2)),hjust = 0)
-    #annotate("text", x = .5, y = .30, label = paste("AUC =",round(rTst$auc[1],2) ),hjust = 0) +
-    #
-  }
-  # do metrics plot
-  gg2 <- ggplot(data=predDF,aes(col=Metric,y=Value,x=DataModel,shape=Metric)) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4)) + theme_minimal() + ylim(0.0,1) + 
-    scale_shape_manual(values = c(0,1,2,3,4,5,6,7,9,10,12,13)) +  ggtitle(paste(tit,"Prediction metrics (",mtd,")") ) +
-    geom_vline(xintercept =  c(1:length(modelNames)) ,size=40,alpha=0.05) +
-    geom_point(stroke=2,size=3,position=position_dodge(width=0.4))
-  list(g,gg2,predDF)
 }
 
 # ===============================================================================
@@ -1448,7 +900,9 @@ divideBySdevCenterNormalise <- function(mN,norTaxa=T,norPWY=T) {
   mN
 }
 
+# ==============================================================
 # do linear correction for phenotypes
+# ==============================================================
 linearCorrectMGPwy <- function (iData,corrNames,corrMG=TRUE,corrPWY=TRUE,corrVFDB=T,corrCARD=T,
                                 correctZeros=F,removeCorCol=T,negIsZero=F,verbose=T,debug=F) {
   
@@ -1582,7 +1036,9 @@ prepData <- function(inData,covars) {
   mdl
 }
 
+# ==============================================================
 # >>> MODEL PREP
+# ==============================================================
 prepModel <- function(dFrame,mdl) {
   if (mdl=="MG_PWY") {
     dFrame <- purgeMGNames(dFrame[,c(grep('Diagnosis',colnames(dFrame)),grep('k__',colnames(dFrame)),grep('PWY',colnames(dFrame)) )])
@@ -1627,9 +1083,7 @@ prepModel <- function(dFrame,mdl) {
 #' =================================================================================
 #' dataModelOptimiseRFE function
 #' ===============================================================================
-#' 
 #'\code{dataModelOptimiseRFE} optimises data model using Recursive Feature Elimination algorithm
-#'
 #'@param responseVar : what is to be predicted [def: Diagnosis]
 #'@param trP : percentage of data to put into in training sets [def: 0.75]
 #'@param positive : what value is considered "positive" [def: 'IBD']
@@ -1639,8 +1093,8 @@ prepModel <- function(dFrame,mdl) {
 #'@param xvreps : how many times to repeat x-validation [def=1]
 #'@param parallel : if parallel processing allowed [def=T]
 #'@param verb : should it prints out debug info [def=T]
+
 #'@return list of 1) max accuracy vars, 2) 2% tolerance vars, 3) 5% tolerance vars, 4) test set ROCs, 5) x-validation ROCs, 6) RFE plot
-#'}
 # =================================================================================
 dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",trP=0.75,positive="IBD",rfeMethod="glm",
                                  testMethod="glm",xvnr=5,xvreps=1,parallel=T,verb=T,szs=F,trainMethod="repeatedcv") {
@@ -1714,7 +1168,7 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
 # ===============================================================================
 compareMdlsDatasets <- function(mdls,dataSets,mdNames,posClass="IBS",roc.smooth=F,tit="",specSensAnnot=T,
                                 response="Diagnosis",roc.conf = T,roc.conf.boot = 10,target = F,conf.lvl=0.66,
-                                textSize=15,annotS=4,removeLegend=F) {
+                                textSize=15,annotS=5,removeLegend=F) {
   
   nrModels <- length(mdls)
   nrDataSets <- length(dataSets)
@@ -1893,9 +1347,9 @@ compareMdlsDatasets <- function(mdls,dataSets,mdNames,posClass="IBS",roc.smooth=
   
   # extract coordinates
   if (!roc.conf) {
-    rocStep = 0.01
     senses <- c(seq(0,0.1,rocStep/10),seq(0.1,1,rocStep))
     rocsDFprecalc = NULL
+    rocStep = 0.01
     for (i in seq(1,length(rocs))) {
       if (class(rocsDFprecalc) != "data.frame") {
         if (!roc.smooth) {
@@ -2071,6 +1525,7 @@ doMLModelling <- function(outFolderName,
                         saveMdls = T,   # save fitted models
                         smoothROCs = T, # if T, make smooth ROC curves
                         mtds = c("glm","svmRadial")
+                        
 ) 
 {
   # root output folder, create/clean as necessary
@@ -2246,7 +1701,7 @@ doMLModelling <- function(outFolderName,
           # debug
           #dModel=allDM[[c]];xvnr=xvn;xvreps = xvr; rfeMethod = mtd; parallel = T;testMethod = mtd; dModelName=allDMn[[c]];positive = posC
           rfeRes <- dataModelOptimiseRFE(dModel=inData,xvnr=xvn,xvreps = xvr, rfeMethod = mtd,parallel = T,
-                                         testMethod = mtd, dModelName=allDMn[[c]],positive = posC,responseVar = responseVar)
+                                         testMethod = mtd, dModelName=allDMn[[c]],positive = posC)
           print('RFE done!')
           write.table(rfeRes[[1]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_vmax.csv"),row.names = F,col.names = F)
           write.table(rfeRes[[2]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v2.csv"),row.names = F,col.names = F)
@@ -2305,10 +1760,10 @@ doMLModelling <- function(outFolderName,
           optVars <- read.table(inFile,header= F,stringsAsFactors = F)
           optVarsV <- optVars$V1
           #print (paste('building optimised model for',allDMn[[c]],'; method:',mtd))
-          dmOpt <- dm[,c(responseVar,optVarsV)]
+          dmOpt <- dm[,c("Diagnosis",optVarsV)]
           print (paste('prepping learning curve for',mN,'; method:',mtd))
           lCurve <- prepLearningCurve(dataIn = dmOpt,mdl = mtd,boots = lcB,trBoot = trB,trNumber = trRep,trainType="cv",trSet = 0.75,
-                                      saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 10,samStep = 1.5)
+                                      saveVarImp = F,responseVar = "Diagnosis",posClass = posC,minSam = 10,samStep = 1.5)
           lp <- plotLearningCurves(lCurve,tit=paste('Opt learning curve (',mN,' [',ncol(dmOpt)-1,'f], ',mtd,')',sep=''),metrics = c("Kappa"))
           ggsave(plot = lp,paste(outFolderName,"/opt_lcurves/lc_",mtd,"_",mN,'_k.png',sep=''),width = 8,height = 6)
           lp <- plotLearningCurves(lCurve,tit=paste('Opt learning curve (',mN,' [',ncol(dmOpt)-1,'f], ',mtd,')',sep=''),metrics = c("Sensitivity","Specificity","ACC"))
@@ -2367,7 +1822,7 @@ doMLModelling <- function(outFolderName,
         if (inTrainP != 1) {
           compTest <- compareMdlsDatasets(mdls=list(fitRaw[[c]]),dataSets=list(tstSet),mdNames=c("test"),
                                           posClass=posC,tit = paste0(posC," Mdl <test set> (",allDMn[[c]],", ",mtd,")"),
-                                          roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
+                                          roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T)
           # save it
           ggsave(plot = compTest[[1]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test.png',sep = ''),width = 8,height = 6)
           ggsave(plot = compTest[[2]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test_val.png',sep = ''),width = 8,height = 6)
@@ -2447,7 +1902,7 @@ doMLModelling <- function(outFolderName,
           if (inTrainP != 1) {
             compTest <- compareMdlsDatasets(mdls=list(fit),dataSets=list(tstSet),mdNames=c("test"),
                                             posClass=posC,tit = paste0(posC," v2 opt mdl [",length(optVars),"f] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
+                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T)
             # save it
             ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test.png',sep = ''),width = 8,height = 6)
             ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test_val.png',sep = ''),width = 8,height = 6)
@@ -2495,7 +1950,7 @@ doMLModelling <- function(outFolderName,
           if (inTrainP != 1) {
             compTest <- compareMdlsDatasets(mdls=list(fit),dataSets=list(tstSet),mdNames=c("test"),
                                             posClass=posC,tit = paste0(posC," max opt mdl [",length(optVars),"f] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
+                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T)
             # save it
             ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test.png',sep = ''),width = 8,height = 6)
             ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test_val.png',sep = ''),width = 8,height = 6)
@@ -2549,15 +2004,15 @@ doMLModelling <- function(outFolderName,
           if (!is.null(fitOpt2) & !is.null(fitOptM)) {
             compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOptM,fitOpt2),dataSets=list(tstSet),mdNames=c("Raw","Opt[2]","Opt[M]"),
                                             posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),",",length(predictors(fitOptM)),"] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
+                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F)
           } else if (is.null(fitOpt2) & !is.null(fitOptM)) {
             compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOptM),dataSets=list(tstSet),mdNames=c("Raw","Opt[M]"),
                                             posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOptM)),"] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
+                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F)
           } else if (!is.null(fitOpt2) & is.null(fitOptM)) {
             compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOpt2),dataSets=list(tstSet),mdNames=c("Raw","Opt[2]"),
                                             posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),"] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
+                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F)
           }
           # save it
           ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_test.png',sep = ''),width = 8,height = 6)
