@@ -5,6 +5,157 @@
 # =========================================================
 library(pheatmap)
 
+# summary of one dataframe feature VS response
+#TODO: extend to categorical variables
+# ========================================================
+makeOneSummaryByResponse <- function(inDF,ftr,response) {
+  ret = data.frame()
+  for (rv in unique(inDF[[response]])) {
+    if (class(inDF[[ftr]]) == "numeric") {
+      mn <-  mean(inDF[inDF[[response]]==rv,][[ftr]])
+      sd <-  sd(inDF[inDF[[response]]==rv,][[ftr]])
+      md <-  median(inDF[inDF[[response]]==rv,][[ftr]])
+      min <- min(inDF[inDF[[response]]==rv,][[ftr]])
+      q1  <- quantile(inDF[inDF[[response]]==rv,][[ftr]])[[2]]
+      q3  <- quantile(inDF[inDF[[response]]==rv,][[ftr]])[[4]]
+      max <- max(inDF[inDF[[response]]==rv,][[ftr]])
+      nr <- sum(inDF[[response]]==rv)
+      nonzero <- sum(inDF[inDF[[response]]==rv,][[ftr]]!=0)
+      prev <- nonzero/nr
+      if (is.na(prev)) {prev = 0.0}
+      print(paste0(' > ',response,' = ',rv,'; mean(',ftr,') = ',mn,'; sd = ',sd,'| median = ',md,' Q1 = ',q1,' Q3 = ',q3))
+      ret <- rbind.data.frame(ret,data.frame(Var=ftr,Group=rv,Mean=mn,SD=sd,Min=min,Q1=q1,Median=md,Q3=q3,Max=max,
+                                             NR=nr,nonzero=nonzero,prevalence=prev,
+                                             niceOut=paste0(md,' [',q1,';',q3,']')  ))
+    } else if (class(inDF[[ftr]]) == "factor") {
+      
+    }
+  }
+  ret
+}
+
+# ============= makes summary of one vector ==============
+# ========================================================
+# NOTES:
+# > fixer: if T, tries to fix some 'common' problems, such as spaces-only input being counted as valid data
+#
+#
+makeOneSummary <- function(ftr,varName='',fixer=T,infnullIsNA=T,nothingIsNA=T,nrClassesToList=5) {
+  ret = data.frame()
+  if (fixer) {
+    backToFac <- F
+    if (class(ftr) == "factor") {
+      ftr <- as.character(ftr)
+      backToFac <- T
+      ftr <- trimws(ftr)
+      ftr[ftr == " "] <- ""
+      ftr[ftr == "  "] <- ""
+      ftr[ftr == "   "] <- ""
+      ftr[ftr == "    "] <- ""
+      ftr[ftr == "     "] <- ""
+      ftr[ftr == "na"] <- NA
+      ftr[ftr == "n/a"] <- NA
+      ftr[ftr == "NA"] <- NA
+      ftr[ftr == "N/A"] <- NA
+      if (infnullIsNA) {
+        ftr[ftr == "null"] <- NA
+        ftr[ftr == "inf"] <- NA
+        ftr[ftr == "NULL"] <- NA
+        ftr[ftr == "INF"] <- NA
+        ftr[is.infinite(ftr)] <- NA
+        ftr[is.null(ftr)] <- NA
+      }
+      if (nothingIsNA) {
+        ftr[ftr == ""] <- NA
+      }
+      ftr <- as.factor(ftr)
+    }
+    if (class(ftr) == "integer") {
+      ftr <- as.numeric(ftr)
+    }
+    if (class(ftr) == "numeric") {
+      if (infnullIsNA) {
+        ftr[is.infinite(ftr)] <- NA
+        ftr[is.null(ftr)] <- NA
+      }
+    }
+  }
+  if (class(ftr) == "numeric") {
+      mn <-  mean(ftr,na.rm = T)
+      sd <-  sd(ftr,na.rm = T)
+      md <-  median(ftr,na.rm = T)
+      min <- min(ftr,na.rm = T)
+      q1  <- quantile(ftr,na.rm = T)[[2]]
+      q3  <- quantile(ftr,na.rm = T)[[4]]
+      max <- max(ftr,na.rm = T)
+      nr <- length(ftr)
+      nonzero <- sum(ftr!=0,na.rm = T)
+      prev <- nonzero/nr
+      nas <- sum(is.na(ftr))
+      naprev <- nas/nr
+      if (is.na(prev)) {prev = 0.0}
+      if (is.na(naprev)) {naprev = 0.0}
+      ret <- data.frame(Var=varName,dataType=class(ftr),NR=nr,Mean=mn,SD=sd,Min=min,Q1=q1,Median=md,Q3=q3,Max=max,
+                        NrNonZero=nonzero,propNonZero=prev,NrNAs=nas,propNAs=naprev)
+      
+  } else if (class(ftr) == "factor") {
+    nr <- length(ftr)
+    nas <- sum(is.na(ftr))
+    naprev <- nas/nr
+    something <- sum(!is.na(ftr))
+    somethingPrev <- something/nr
+    nrClasses <- length(levels(ftr))
+    if (is.na(somethingPrev)) {somethingPrev = 0.0}
+    if (is.na(naprev)) {naprev = 0.0}
+    ret <- data.frame(Var=varName,dataType=class(ftr),NR=nr,NrClasses=nrClasses,  
+                      NrNonNA=something,propNonNA=somethingPrev,
+                      NrNAs=nas,propNAs=naprev)
+    if (nrClassesToList > 0) {
+      ftrNRs <- as.data.frame(table(ftr))
+      ftrNRs <- ftrNRs[order(ftrNRs$Freq,decreasing = T),]
+      for (nrC in c(1:nrClassesToList)) {
+        if (nrC <= nrow(ftrNRs)) {
+          toAddDF <- data.frame(A=ftrNRs$ftr[nrC],
+                               B=ftrNRs$Freq[nrC],
+                               C=ftrNRs$Freq[nrC]/nr)
+          
+        } else {
+          toAddDF <- data.frame(A=NA,B=NA,C=NA)
+        }
+        colnames(toAddDF) <- c(paste0('C_',nrC,'_VALUE'),paste0('C_',nrC,'_NR'),paste0('C_',nrC,'_Prop'))
+        ret <- cbind.data.frame(ret,toAddDF)
+      }
+    }
+  }
+  ret
+}
+
+# count taxa & pwys
+# ===================================
+countMicrobiomeFeatures <- function(inDF) {
+  res <- data.frame()
+  taxa <- purgeMGNames(subsetMicrobiomeDF(inDF = inDF,verbose = F,getTaxa = T,getPWYs = F,getVFs = F,getCARDs = F,getPhenos = F,getDivs = F))
+  sumTaxa <- 0
+  print ('---- TAXA -----------------------')
+  for (tn in c("t__","s__","g__","f__","c__","o__","p__")) {
+    nrTaxa <- sum(grepl(paste0("^",tn),colnames(taxa)))
+    print(paste0(tn,' NR = ', nrTaxa))
+    sumTaxa <- sumTaxa + nrTaxa
+  }
+  print (paste0(' TOTAL TAXA: ',sumTaxa))
+  print ('---------------------------------')
+  
+  print ('---- PWYs -----------------------')
+  pwys <- subsetMicrobiomeDF(inDF = inDF,verbose = F,getTaxa = F,getPWYs = T,getVFs = F,getCARDs = F,getPhenos = F,getDivs = F)
+  print (paste0(' TOTAL PWYs: ',length(colnames(pwys))))
+  
+  taxa <- subsetMicrobiomeDF(inDF = inDF,verbose = F,getTaxa = T,getPWYs = F,getVFs = F,getCARDs = F,getPhenos = F,getDivs = F)
+  taxa <- subsetMicrobiomeDF(inDF = inDF,verbose = F,getTaxa = T,getPWYs = F,getVFs = F,getCARDs = F,getPhenos = F,getDivs = F)
+  taxa <- subsetMicrobiomeDF(inDF = inDF,verbose = F,getTaxa = T,getPWYs = F,getVFs = F,getCARDs = F,getPhenos = F,getDivs = F)
+  
+}
+
+
 # make ordination plot
 plotOrdination <- function(inDF,responseVar,doCentroids=F) {
   # ordinate on the distance matrix
@@ -657,21 +808,3 @@ testFeaturesPrev <- function(inDFf,featureType='taxa',response='Diagnosis',plots
   }
   resAbZ
 }
-
-makeOneSummaryByResponse <- function(inDF,ftr,response) {
-  ret = data.frame()
-  for (rv in unique(inDF[[response]])) {
-    mn <-  mean(inDF[inDF[[response]]==rv,][[ftr]])
-    sd <-  sd(inDF[inDF[[response]]==rv,][[ftr]])
-    md <-  median(inDF[inDF[[response]]==rv,][[ftr]])
-    min <- min(inDF[inDF[[response]]==rv,][[ftr]])
-    q1  <- quantile(inDF[inDF[[response]]==rv,][[ftr]])[[2]]
-    q3  <- quantile(inDF[inDF[[response]]==rv,][[ftr]])[[4]]
-    max <- max(inDF[inDF[[response]]==rv,][[ftr]])
-    print(paste0(' > ',response,' = ',rv,'; mean(',ftr,') = ',mn,'; sd = ',sd,'| median = ',md,' Q1 = ',q1,' Q3 = ',q3))
-    ret <- rbind.data.frame(ret,data.frame(Feature=ftr,Response=rv,Mean=mn,SD=sd,Min=min,Q1=q1,Median=md,Q3=q3,Max=max ))
-    
-  }
-  ret
-}
-
