@@ -60,7 +60,7 @@ findCorrelationsR <- function(corMat,cutoff=0.5) {
 #
 #
 # ================================================================================
-filterHumannDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,minMedRelAb=0.0,minSum=90.0, rescale=T,verbose=T) {
+filterHumannDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,minMedRelAb=0.0,minSum=90.0, rescale=T,verbose=T,type='MetaCyc') {
   
   nonPWYpwys <- c("ARG+POLYAMINE-SYN: superpathway of arginine and polyamine biosynthesis",
      "CHLOROPHYLL-SYN: chlorophyllide a biosynthesis I (aerobic, light-dependent)",
@@ -76,12 +76,47 @@ filterHumannDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,minMedRelAb=0.
      "TCA: TCA cycle I (prokaryotic)")
   
   colnames(inDF)[colnames(inDF) %in% nonPWYpwys] <- paste0('PWY_',colnames(inDF)[colnames(inDF) %in% nonPWYpwys])
-  nonPWYdf <- as.data.frame(inDF[,-grep('PWY',colnames(inDF))])
-  cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('PWY',colnames(inDF))] ])
-  colnames(nonPWYdf) <- cnsNonPWYdf
   
-  yesPWYdf <- as.data.frame(inDF[,grep('PWY',colnames(inDF))])
-  cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('PWY',colnames(inDF))] ])
+  if (type=='MetaCyc') {
+    nonPWYdf <- as.data.frame(inDF[,-grep('PWY',colnames(inDF))])
+    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('PWY',colnames(inDF))] ])
+  } else if (type=='EC') {
+    nonPWYdf <- as.data.frame(inDF[,-grep('^EC_',colnames(inDF))])
+    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^EC_',colnames(inDF))] ])
+  } else if (type=='RXN') {
+    nonPWYdf <- as.data.frame(inDF[,-grep('RXN',colnames(inDF))])
+    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('RXN',colnames(inDF))] ])
+  } else if (type=='PFAM') {
+    nonPWYdf <- as.data.frame(inDF[,-grep('^PF[01]',colnames(inDF))])
+    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^PF[01]',colnames(inDF))] ])
+  } else if (type=='GO') {
+    nonPWYdf <- as.data.frame(inDF[,-grep('^GO',colnames(inDF))])
+    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^GO]',colnames(inDF))] ])
+  } else if (type=='KEGG') {
+    nonPWYdf <- as.data.frame(inDF[,-grep('^K[012]',colnames(inDF))])
+    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^K[012]',colnames(inDF))] ])
+  }
+  colnames(nonPWYdf) <- cnsNonPWYdf
+  if (type=='MetaCyc') {
+    yesPWYdf <- as.data.frame(inDF[,grep('PWY',colnames(inDF))])
+    cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('PWY',colnames(inDF))] ])
+  } else if (type=='EC') {
+    yesPWYdf <- as.data.frame(inDF[,grep('^EC_',colnames(inDF))])
+    cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('^EC_',colnames(inDF))] ])
+  } else if (type=='RXN') {
+    yesPWYdf <- as.data.frame(inDF[,grep('RXN',colnames(inDF))])
+    cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('RXN',colnames(inDF))] ])
+  } else if (type=='PFAM') {
+    yesPWYdf <- as.data.frame(inDF[,grep('^PF[01]',colnames(inDF))])
+    cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('^PF[01]',colnames(inDF))] ])
+  } else if (type=='GO') {
+    yesPWYdf <- as.data.frame(inDF[,grep('^GO',colnames(inDF))])
+    cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('^GO',colnames(inDF))] ])
+  } else if (type=='KEGG') {
+    yesPWYdf <- as.data.frame(inDF[,grep('^K[012]',colnames(inDF))])
+    cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('^K[012]',colnames(inDF))] ])
+  }
+  
   # replaces NAs with 0s
   for (c in colnames(yesPWYdf)) {
     yesPWYdf[,c][is.na(yesPWYdf[,c])] <- 0.0
