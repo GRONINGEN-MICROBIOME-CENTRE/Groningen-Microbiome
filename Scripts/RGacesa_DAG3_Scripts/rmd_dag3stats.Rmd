@@ -1,0 +1,259 @@
+<style type="text/css">
+.main-container {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE,message=FALSE,
+                      fig.width=8, fig.height=6)
+
+```
+
+
+[QC](./dag3stats.html) [Geography](./mappen_example.html) [Microbiome](./mappen_example.html)
+
+----
+
+## Current state of DAG3 Project:
+
+```{r, echo=FALSE, fig.cap="", out.width = '130%',fig.width=16, fig.height=9}
+knitr::include_graphics("stuff/DAG3_schematic.png")
+```
+
+
+```{r}
+# LOAD LIBS & STUFF
+library(vegan)
+library(plyr)
+library(ggplot2)
+library(venn)
+library(scales)
+library("fastqcr")
+library(plotly)
+#packageVersion('plotly')
+source('dag3helper.R')
+setwd('~/UMCG/DAG3_stats/')
+```
+
+## DAG3 data quality control results
+
+----
+
+```{r}
+# load QC
+inFile <- 'data_processed/DAG3_all_summary_reads_gc.csv'
+qcData <- read.table(inFile,sep=',',header=T)
+nrS <- nrow(qcData)
+nrS.F <- sum(qcData$status=="FAIL")
+nrS.P <- sum(qcData$status=="PROB")
+nrS.W <- sum(qcData$status=="WARN")
+qcReadsM <- mean(qcData$postclean.reads)
+qcReadsSD <- sd(qcData$postclean.reads)
+```
+
+* Total samples processed: `r nrS`
+* Sample QC results: 
+  + Failed : `r nrS.F` / `r nrS ` (`r formatC(nrS.F/nrS*100.0, digits = 2, format = "f")` %)
+  + Low quality : `r (nrS.P+nrS.W)` / `r nrS ` (`r formatC(nrS.W/nrS*100.0, digits = 2, format = "f")` %)
+
+
+### Read number:
+
+* Samples have `r formatNtoM(qcReadsM)` Mil reads (`r formatNtoM(qcReadsM*150)`Mb) +/- `r formatNtoM(qcReadsSD)` Mil reads (`r formatNtoM(qcReadsSD*150)` Mb)
+
+```{r}
+p <- plot_ly(qcData,x = ~postclean.reads, type = "histogram") %>%
+  layout(xaxis = list(range = c(10000000, 50000000)))
+
+p
+```
+
+### GC content:
+
+* Samples have GC content = `r formatNtoPerc(mean(qcData$postclean.gc/100))` +/- `r formatNtoPerc(sd(qcData$postclean.gc/100))`
+
+```{r}
+p <- plot_ly(qcData,x = ~postclean.gc, type = "histogram") 
+p
+```
+
+----
+
+## DAG3 Microbiome summary - Rarefaction curves
+
+```{r}
+rareS <- read.table('data_processed/S_rarefaction_0000.csv',sep=',',header=T)
+p <- plot_ly(rareS,x=~nr,y=~spec.nr.mn, type='scatter', mode = 'lines+markers',
+             error_y =~list(array=spec.nr.sd,color='#000000'),
+             hoverinfo='text', 
+             text = ~paste('Samples: ', nr,' <br>',
+                      'Species: ', round(spec.nr.mn),'+/-',format2D(spec.nr.sd))
+             ) %>%
+  layout(
+    title='DAG3 Rarefaction curve (Species)',
+    xaxis = list(title = "Number of Samples",zeroline = FALSE),
+    yaxis = list(title = "Species identified",zeroline = FALSE)
+  )
+p
+  
+```
+
+"\
+
+"
+
+```{r}
+rareG <- read.table('data_processed/G_rarefaction_0000.csv',sep=',',header=T)
+p <- plot_ly(rareG,x=~nr,y=~spec.nr.mn, type='scatter', mode = 'lines+markers',
+             error_y =~list(array=spec.nr.sd,color='#000000'),
+             hoverinfo='text', 
+             text = ~paste('Samples: ', nr,' <br>',
+                      'Genera: ', round(spec.nr.mn),'+/-',format2D(spec.nr.sd))
+             ) %>%
+  layout(
+    title='DAG3 Rarefaction curve (Genera)',
+    xaxis = list(title = "Number of Samples",zeroline = FALSE),
+    yaxis = list(title = "Genera identified",zeroline = FALSE)
+  )
+p
+  
+```
+
+----
+
+## DAG3 Microbiome summary - Microbiome composition
+
+```{r}
+dataP <- prepData('data/DAG3_metaphlan_merged.txt',getLevel = 'P',minBac = 0.95)
+phyla.m <- apply(dataP,MARGIN = 2,FUN=function(x) {mean(x,na.rm = T)} )
+phyla.sd <- apply(dataP,MARGIN = 2,FUN=function(x) {sd(x,na.rm = T)} )
+phylaDF <- data.frame(Taxon=names(phyla.m),Rel.Abundance=phyla.m,Rel.Abundance.SD=phyla.sd)
+rownames(phylaDF) <- NULL
+
+p <- plot_ly(phylaDF, labels = ~shortenNames2(Taxon), values = ~Rel.Abundance, type = 'pie',
+        #textposition = 'inside',
+        textinfo = 'label+percent',
+        insidetextfont = list(color = '#FFFFFF'),
+        hoverinfo = 'text',
+        text = ~paste('Phylum:', shortenNames2(Taxon), '<br> Relative Abundance:',format2D(Rel.Abundance),'+/-',format2D(Rel.Abundance.SD)),
+        marker = list(colors = colors,
+                      line = list(color = '#FFFFFF', width = 1)),
+                      #The 'pull' attribute can also be used to create space between the sectors
+        showlegend = FALSE) %>%
+        #add_pie(hole = 0.2) %>%
+  layout(title = 'DAG3 samples, Phylum-level composition',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+p
+
+```
+
+```{r}
+
+dataG <- prepData('data/DAG3_metaphlan_merged.txt',getLevel = 'G',minBac = 0.95)
+genera.m <- apply(dataG,MARGIN = 2,FUN=function(x) {mean(x,na.rm = T)} )
+genera.sd <- apply(dataG,MARGIN = 2,FUN=function(x) {sd(x,na.rm = T)} )
+generaDF <- data.frame(Taxon=names(genera.m),Rel.Abundance=genera.m,Rel.Abundance.SD=genera.sd)
+generaDF$Taxon <- shortenNames2(generaDF$Taxon)
+rownames(generaDF) <- NULL
+generaDF <- generaDF[order(generaDF$Rel.Abundance,decreasing = T),]
+generaDF <- generaDF[1:10,]
+
+p <- plot_ly(generaDF, labels = ~shortenNames2(Taxon), values = ~Rel.Abundance, type = 'pie',
+        #textposition = 'inside',
+        textinfo = 'label',
+        insidetextfont = list(color = '#FFFFFF'),
+        hoverinfo = 'text',
+        text = ~paste('Genus:', shortenNames2(Taxon), '<br> Relative Abundance:',format2D(Rel.Abundance),'+/-',format2D(Rel.Abundance.SD)),
+        marker = list(colors = colors,
+                      line = list(color = '#FFFFFF', width = 1)),
+                      #The 'pull' attribute can also be used to create space between the sectors
+        showlegend = FALSE) %>%
+        #add_pie(hole = 0.2) %>%
+  layout(title = 'DAG3 samples, top-10 Genera',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+p
+
+
+```
+
+```{r}
+
+dataS <- prepData('data/DAG3_metaphlan_merged.txt',getLevel = 'S',minBac = 0.95)
+species.m <- apply(dataS,MARGIN = 2,FUN=function(x) {mean(x,na.rm = T)} )
+species.sd <- apply(dataS,MARGIN = 2,FUN=function(x) {sd(x,na.rm = T)} )
+speciesDF <- data.frame(Taxon=names(species.m),Rel.Abundance=species.m,Rel.Abundance.SD=species.sd)
+speciesDF$Taxon <- shortenNames2(speciesDF$Taxon)
+rownames(speciesDF) <- NULL
+speciesDF <- speciesDF[order(speciesDF$Rel.Abundance,decreasing = T),]
+speciesDF <- speciesDF[1:10,]
+
+p <- plot_ly(speciesDF, labels = ~shortenNames2(Taxon), values = ~Rel.Abundance, type = 'pie',
+        #textposition = 'inside',
+        textinfo = 'label+percent',
+        insidetextfont = list(color = '#FFFFFF'),
+        hoverinfo = 'text',
+        text = ~paste('Species:', shortenNames2(Taxon), '<br> Relative Abundance:',format2D(Rel.Abundance),'+/-',format2D(Rel.Abundance.SD)),
+        marker = list(colors = colors,
+                      line = list(color = '#FFFFFF', width = 1)),
+                      #The 'pull' attribute can also be used to create space between the sectors
+        showlegend = FALSE) %>%
+        #add_pie(hole = 0.2) %>%
+  layout(title = 'DAG3 samples, top-10 Species',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+p
+
+
+```
+
+----
+
+## Microbiome composition across Dutch Provinces
+
+### NOTE: This data is not properly linked yet, plot is for demonstration only!
+
+```{r}
+library(tidyr)
+#WARNING: FAKE DATA for demonstration purposes
+metaphlanDF <- read.table('data_fake/fake_DAG3_results_metaphlan.csv',sep=',',header=T)
+# prep phyla, normalise to 1
+metaphlanDF <- metaphlanDF[,-grep('c__',colnames(metaphlanDF))]
+metaphlanDF$k__Bacteria <- NULL
+meanAbTaxa <- sort(colMeans(metaphlanDF[,grep('__',colnames(metaphlanDF))]),decreasing = T)
+metaphlanDF <- metaphlanDF[,c("ID",names(meanAbTaxa)[1:5])]
+
+metaphlanDF[,grep('__',colnames(metaphlanDF))] <- metaphlanDF[,grep('__',colnames(metaphlanDF))] /
+  rowSums(metaphlanDF[,grep('__',colnames(metaphlanDF))])
+# merge with samples
+sampleLocation <- read.table('data_fake/fake_KEY_DAG3id_to_Location.csv',sep=',',header=T)
+# count samples per province
+sPL <- table(sampleLocation$PROVINCE)
+locs <- names(sPL[sPL > 10])
+metaPhlanWLoc <- merge(metaphlanDF,sampleLocation,by="ID")
+metaPhlanWLoc <- metaPhlanWLoc[metaPhlanWLoc$PROVINCE %in% locs,]
+metaPhlanWLoc$PROVINCE <- as.factor(as.character(metaPhlanWLoc$PROVINCE))
+
+metaPhlanWLoc$LOCATION <- NULL
+metaPhlanWLoc$ID <- NULL
+metaPhlanWLocL <- gather(metaPhlanWLoc, Taxon, Abundance, 1:5, factor_key=TRUE)
+metaPhlanWLocL$Taxon <- shortenNames2(metaPhlanWLocL$Taxon)
+metaPhlanWLocL$PROVINCE <- as.factor(as.character(metaPhlanWLocL$PROVINCE))
+
+
+p <- plot_ly(metaPhlanWLocL, x = ~round(asin(sqrt(Abundance)),4) , y = ~PROVINCE, color = ~Taxon, type = "box") %>%
+  layout(boxmode = "group",
+         xaxis = list(title = "Normalised relative abundance",zeroline = FALSE),
+         yaxis = list(title = "Province",zeroline = FALSE))
+p
+
+```
+
+## DAG3 Bacterial pathways data summary
+
+
