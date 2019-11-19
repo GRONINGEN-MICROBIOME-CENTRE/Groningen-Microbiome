@@ -866,13 +866,13 @@ colnames(adonis_LLD) = c("Df", "R2", "Pr(>F)")
 
 ```{R}
 #Figures 
-#Figure1
+#Figure3
 xx <- read.delim(".counts_results.txt")
 ggplot(xx,aes(Meds,value,fill=Cohort)) + geom_bar(stat="identity", position=position_dodge()) + theme_minimal() + scale_fill_manual(values=c('red','black','gray46','gray72' )) + facet_grid(Test~Feature, drop=T, scales = "free") + coord_flip() + scale_x_discrete(limits = rev(levels(xx$Meds)))
 
 
 
-#Figure2
+#Figure4
 lld <- read.delim("./fig2/lld.txt", row.names=1, check.names = F)
 mibs<- read.delim("./fig2/mibs.txt", row.names=1, check.names = F)
 ibd<- read.delim("./fig2/ibd.txt", row.names=1, check.names = F)
@@ -909,6 +909,12 @@ x4=melt(x3,id.vars = c("Row.names","cohort","PPI"))
 x4$variable2=gsub(".*s__","",x4$variable)
 x4[x4$variable=="PWY0-1297:_superpathway_of_purine_deoxyribonucleosides_degradation|unclassified",]$variable2="unclassified"
 ggplot(x4,aes(variable2,as.numeric(as.character(value2)),fill=PPI)) + geom_boxplot(outlier.size = 0.2)+facet_grid(cohort2~.) + theme_minimal()+ theme(axis.text.x = element_text(angle = 90, hjust = 1)) + ylab("Relative contribution to Purine deoxyribonucleosides degradation (PWY0-1297)") + xlab("")
+
+
+#Figure 2
+#import source data as yy
+ggscatter(yy, x="s__Methanobrevibacter_smithii",y="abundance", color="Cohort", add="reg.line", palette = "jco") + stat_cor(aes(color=Cohort),method = "spearman",size=2) + xlab("M.smithii relative abundance") + ylab ("Pathways abundance (RPK)") + facet_wrap(~pathway, ncol=2) 
+
 
 ```
 
@@ -1117,7 +1123,7 @@ res_3$q.value.x=p.adjust(as.numeric(as.character(res_3$p.value.x)),method = "fdr
 res_3$q.value.y=p.adjust(as.numeric(as.character(res_3$p.value.y)),method = "fdr")
 res_3$q.value=p.adjust(as.numeric(as.character(res_3$p.value)),method = "fdr")
 ```
-13. Test medication categories to the abundances of antibiotic resistance genes derived from CARD database using ShortBRED
+13.Test medication categories to the abundances of antibiotic resistance genes derived from CARD database using ShortBRED
 ------------------
 ```
 # IBD
@@ -1177,8 +1183,9 @@ write.table (stap11, "tricyclic_antidepressantARMarker2.txt")
 
 #Repeat for all drugs
 ```
-14. To test medication subtypes and dosages
+14.Test medication subtypes and dosages
 ----------------
+
 ```
 # Wilcoxon test for comparing high and low dosages within a specific medication categorie
 # Same wilcoxon test used for comparing subtypes of drugs to participants not using drugs from that medication categorie
