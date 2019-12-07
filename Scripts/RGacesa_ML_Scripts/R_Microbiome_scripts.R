@@ -20,6 +20,11 @@ purgeMGNames <- function(dF) {
   dF
 }
 
+purgeMGNameOne <- function(oneName) {
+  cn <- strsplit(x = oneName,split = '\\.')[[1]][length(strsplit(x = oneName,split = '\\.')[[1]])]
+  cn
+}
+
 purgeMGNamesRaw <- function(dF) {
   cn <- colnames(dF)
   cnt = 1
@@ -91,7 +96,7 @@ filterHumannDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,minMedRelAb=0.
     cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^PF[01]',colnames(inDF))] ])
   } else if (type=='GO') {
     nonPWYdf <- as.data.frame(inDF[,-grep('^GO',colnames(inDF))])
-    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^GO]',colnames(inDF))] ])
+    cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^GO',colnames(inDF))] ])
   } else if (type=='KEGG') {
     nonPWYdf <- as.data.frame(inDF[,-grep('^K[012]',colnames(inDF))])
     cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('^K[012]',colnames(inDF))] ])
@@ -373,11 +378,11 @@ reorderMicrobiomeDF <- function(inDF,verbose=T) {
 # ====================================================
 # > Subsets stuff from merged microbiome dataframe
 # ====================================================
-subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCARDs=F,getPhenos=T,getDivs=F) {
+subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCARDs=F,getPhenos=T,getDivs=F,pwyType="All") {
   if (verbose) {print ("SUBSETTING Mergerd Microbiome Dataframe  ...")
     if (getPhenos) {print("  > getting phenotypes")}
     if (getTaxa) {print("  > getting taxa")}
-    if (getPWYs) {print("  > getting pathways")}
+    if (getPWYs) {print(paste0("  > getting pathways [",pwyType,"]"))}
     if (getCARDs) {print("  > getting CARDs")}
     if (getVFs) {print("  > getting VFs")}
     if (getDivs) {print("  > getting Diversities")}
@@ -389,7 +394,25 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
     toGet <- nonPhenoColsTaxa
     if (verbose) {print(paste0(' > FOUND ',length(nonPhenoColsTaxa),' TAXA'))}
   }
-  nonPhenoColsPWYs <- c(grep("PWY",colnames(inDF)))
+  nonPhenoColsPWYs <- c()
+  if (pwyType=='MetaCyc' | pwyType=='All' | pwyType=='Metacyc') {
+    nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("PWY",colnames(inDF)))
+  }
+  if (pwyType=='EC' | pwyType=='All') {
+    nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("^EC_",colnames(inDF)))
+  }
+  if (pwyType=='RXN' | pwyType=='All') {
+    nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("RXN",colnames(inDF)))
+  }
+  if (pwyType=='PFAM' | pwyType=='All' | pwyType=='Pfam') {
+    nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("^PF[01]",colnames(inDF)))
+  }
+  if (pwyType=='GO' | pwyType=='All') {
+    nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("^GO",colnames(inDF)))
+  }
+  if (pwyType=='KEGG' | pwyType=='All' | pwyType=='Kegg') {
+    nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("^K[012]",colnames(inDF)))
+  }
   if (getPWYs) {
     toGet <- c(toGet,nonPhenoColsPWYs)
     if (verbose) {print(paste0(' > FOUND ',length(nonPhenoColsPWYs),' PWYs'))}
@@ -431,7 +454,8 @@ calcDIVMetrics <- function(inDF,ID="RN",metrics=c("shannon","simpson","invsimpso
   for (l in DIVlvls) {
     if (l=="taxS") {
       inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = T,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = F))
-      inDFf <-inDFf[,grep('s__',colnames(inDFf))]
+      inDFf <- filterMetaGenomeDF(filterMetaGenomeDF(inDFt,presPerc = -1,minMRelAb = -1,minMedRelAb = -1,rescaleTaxa = T,verbose = T,
+                                                     keepDomains = "All",keepLevels = c("P","C","O","F","G","S")))
       for (m in metrics) {
         dv <- diversity(inDFf,index = m)
         DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
@@ -537,13 +561,9 @@ calcDIVMetrics <- function(inDF,ID="RN",metrics=c("shannon","simpson","invsimpso
 # ================================================================================
 
 #TODO: implement keepDomains
-
-
 filterMetaGenomeDF <- function(inDF,presPerc = 0.1,minMRelAb = 0.01,minMedRelAb=0.0, rescaleTaxa=F,verbose=T,
                              keepDomains=c('Bacteria'),
                              keepLevels=c('T','S','G','F','O','C','P')) {
-  
-  
   
   tCols = grep('k__',colnames(inDF)) # colums with microbiome
   tColsNMG = grep('k__',colnames(inDF),invert = T) # colums with microbiome
@@ -558,9 +578,9 @@ filterMetaGenomeDF <- function(inDF,presPerc = 0.1,minMRelAb = 0.01,minMedRelAb=
   for (c in tCols) {
     nrnZ = as.numeric(sum(inDF[,c]!=0.0))
     if ( (nrnZ/as.numeric(nrow(inDF))) < presPerc) {
-      #if (verbose) {
-      #  print (paste('col',c,': ',colnames(inDF)[c],'; nr non Zero:',nrnZ,'=',nrnZ/as.numeric(nrow(inDF)),'>> Column removed!'))
-      #}
+      if (verbose) {
+        print (paste('col',c,': ',colnames(inDF)[c],'; nr non Zero:',nrnZ,'=',nrnZ/as.numeric(nrow(inDF)),'>> Column removed!'))
+      }
       nrRemoved = nrRemoved + 1
       toRemove <- c(toRemove,c)
     }
@@ -621,9 +641,6 @@ filterMetaGenomeDF <- function(inDF,presPerc = 0.1,minMRelAb = 0.01,minMedRelAb=
   inDF <- inDF[,toKeep]
   }
 
-  #TODO
-  
-  
   # remove taxonomic levels
   # -----------------------------
   inDFnonTaxa <- as.data.frame(inDF[,grep('k__',colnames(inDF),invert=T)])
