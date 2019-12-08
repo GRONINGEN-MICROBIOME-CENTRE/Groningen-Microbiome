@@ -7,7 +7,6 @@
 #6.partial correlation to check the confunding effect from covariates
 
 
-
 ###1.sparcc for network inference (Python)
 python SparCC.py $INPUT_PATH --cor_file=$OUTPUT_PATH/real_cors_sparcc_sp.txt
 python MakeBootstraps.py $INPUT_PATH -n $BOOT_ITER -t permutation_#.txt -p $OUTPUT_PATH/Resamplings/
