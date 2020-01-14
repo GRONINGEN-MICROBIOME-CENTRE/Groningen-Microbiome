@@ -1,4 +1,4 @@
-####main codes for 300OB cohort bile acids analysis (for questions, please contact Lianmin Chen, lianminchen@yeah.net)
+#####main codes for 300OB cohort bile acids analysis (for questions, please contact Lianmin Chen, lianminchen@yeah.net)
 #1.QTL mapping (GWAS)
 #2.microbiome wide association (MWAS)
 #3.LD clumping
