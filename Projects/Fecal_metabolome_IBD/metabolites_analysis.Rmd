@@ -395,11 +395,11 @@ summary_sample$Metabolite=NULL
 summary_sample2=merge(summary_sample,phenos,by="row.names")
 ```
 
-Plot representing the distribution of metabolites based on its missigness 
+Plot representing the distribution of metabolites based on its missingness 
 
 ```{r, warning=F,message=FALSE, echo=F}
 
-cc=ggplot(summary_sample2, aes(x=perc_missing, fill=DiagnosisCurrent))+ geom_histogram(color="black" ) + theme_classic() + xlab("Percentage of samples missing") + ylab("Number of metabolites")
+cc=ggplot(summary_sample2, aes(x=perc_missing, fill=DiagnosisCurrent))+ geom_histogram(color="black" ) + theme_classic() + xlab("Missing metabolites per sample (%)") + ylab("Number of samples")
 
 ggplotly(cc)
 
@@ -804,7 +804,7 @@ for (i in 46:ncol(CD_controls)){
   cd_cnt[x,1]=colnames(CD_controls)[i]
   cd_cnt[x,12]=asoc$p.value
   #UC
-  asoc=wilcox.test(UC_controls[,i][UC_controls$Diag=="UC"],UC_controls[,i][UC_controls$Diag!="CD"])
+  asoc=wilcox.test(UC_controls[,i][UC_controls$Diag=="UC"],UC_controls[,i][UC_controls$Diag!="UC"])
   #cd_cnt[x,1]=colnames(CD_controls)[i]
   cd_cnt[x,13]=asoc$p.value
 }
