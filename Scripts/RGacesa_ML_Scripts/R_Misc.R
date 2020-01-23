@@ -8,7 +8,7 @@ library(pheatmap)
 # summary of one dataframe feature VS response
 #TODO: extend to categorical variables
 # ========================================================
-makeOneSummaryByResponse <- function(inDF,ftr,response) {
+makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,controlClass="HC",formatSci=F,formatDig=2,formatRoundDig=3) {
   ret = data.frame()
   for (rv in unique(inDF[[response]])) {
     if (class(inDF[[ftr]]) == "numeric") {
@@ -23,16 +23,72 @@ makeOneSummaryByResponse <- function(inDF,ftr,response) {
       nonzero <- sum(inDF[inDF[[response]]==rv,][[ftr]]!=0)
       prev <- nonzero/nr
       if (is.na(prev)) {prev = 0.0}
-      print(paste0(' > ',response,' = ',rv,'; mean(',ftr,') = ',mn,'; sd = ',sd,'| median = ',md,' Q1 = ',q1,' Q3 = ',q3))
-      ret <- rbind.data.frame(ret,data.frame(Var=ftr,Group=rv,Mean=mn,SD=sd,Min=min,Q1=q1,Median=md,Q3=q3,Max=max,
-                                             NR=nr,nonzero=nonzero,prevalence=prev,
-                                             niceOut=paste0(md,' [',q1,';',q3,']')  ))
+      oneRow <- data.frame(Var=ftr,Group=rv,Mean=mn,SD=sd,Min=min,Q1=q1,Median=md,Q3=q3,Max=max,
+                           NR=nr,nonzero=nonzero,prevalence=prev,
+                           niceOut=paste0(format(round(md,formatRoundDig),digits = formatDig,scientific = formatSci),
+                                          ' [',format(round(q1,formatRoundDig),digits = formatDig,scientific = formatSci), '; ',
+                                          format(round(q3,formatRoundDig),digits = formatDig,scientific = formatSci) ,']')  )
+      if (!doTestVsControl) {
+        print(paste0(' > ',response,' = ',rv,'; mean(',ftr,') = ',mn,'; sd = ',sd,'| median = ',md,' Q1 = ',q1,' Q3 = ',q3))
+        ret <- rbind.data.frame(ret,oneRow)
+      } else {
+        if (rv != controlClass) {
+          tst <- wilcox.test(inDF[inDF[[response]] == controlClass,][[ftr]],
+                             inDF[inDF[[response]] == rv,][[ftr]])
+          print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+          sigStr = ""
+          pV <- tst$p.value
+          print(paste0(' > P-value = ',pV))
+        } else {
+          pV = NA; sig = ""; FDR = NA
+        } 
+        oneRow$pV <- pV
+        ret <- rbind.data.frame(ret,oneRow)
+      }
     } else if (class(inDF[[ftr]]) == "factor") {
       
     }
   }
   ret
 }
+
+# summary of one dataframe feature VS response
+# > wraps makeOneSummaryByResponse, does testing for multiple features
+# and does FDR and "nice" output
+# > input is same as for
+# makeOneSummaryByResponse, but ftrs is vector of variable names
+# =====================================================================
+makeMultiSummaryByResponse <- function(inDF,ftrs,response,doTestVsControl=T,controlClass="HC",formatSci=F,formatDig=2,formatRoundDig=3,doFDR=T)
+{
+  ret <- data.frame()
+  # debug / reality check
+  if (sum(ftrs %in% colnames(inDF)) < length(ftrs)) {
+    print(" WARNING: 1 or more feature variables missing from input dataframe (inDF): ")
+    for (f in ftrs) {
+      if (!(f %in% colnames(inDF))) {
+        print(paste0(' > ',f,' is missing!'))
+      }
+    }
+    print('  >> Continuing with remaining features ...')
+  }
+  for (f in ftrs) {
+    ret <- rbind.data.frame(ret,makeOneSummaryByResponse(inDF,f,response,doTestVsControl,
+                                                         controlClass,formatSci,
+                                                         formatDig,formatRoundDig))
+  }
+  if (doFDR) {ret$FDR <- p.adjust(ret$pV)}
+  else {ret$FDR <- ret$pV}
+  ret$FDRfor <- format(ret$FDR,digits = formatDig,scientific = T)
+  ret$FDRsig <- as.character(ret$FDR <= 0.05)
+  ret$FDRsig[ret$FDR <= 0.05] <- "*"
+  ret$FDRsig[ret$FDR <= 1.0e-5] <- "**"
+  #ret$FDRsig[ret$FDR <= 1.0e-10] <- "***"
+  ret$FDRsig[ret$FDRsig=="FALSE"] <- ""
+  ret$FDRsig[is.na(ret$FDRsig)] <- ""
+  ret$niceOut <- paste0(ret$niceOut," ",ret$FDRsig)
+  ret
+}
+
 
 # ============= makes summary of one vector ==============
 # ========================================================
@@ -360,7 +416,8 @@ save_pheatmap_png <- function(x, filename, width=1200, height=1200, res = 150) {
 
 aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=20,outFile="plot.png",pVcutoff=0.05,multiTest=F,
                                  clusterFeatures=T,clusterPhenos=F,subsetFeatures="",subsetPhenos="",
-                                 metric="statSig",enrichmentCutoff = 1.005,addXextra=0,addYextra=0,maxMax = 5) {
+                                 metric="statSig",enrichmentCutoff = 1.005,addXextra=0,addYextra=0,maxMax = 5,
+                                 shortenTaxNames=T,invertYN=F) {
   if (!metric %in% c("statSig","meanEffectRatio","medEffectRatio"))  {
     print (" >> metric MUST be one of [statSig, meanEffectRatio, medEffectRatio]")
     break()
@@ -400,14 +457,15 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
     }
     print (paste0('  >> doing multiple-testing correction for ',nrTests,' tests!'))
   }
-  print ('  >>> parsing tables ...')
   
+  print ('  >>> parsing tables ...')
   for (f in dir(tblFolder, pattern =".csv")) {
     doParse = F
     for (g in doFeatures) {if (grepl(g,f)) {doParse = T}}
     if (doParse) {
-      #print(f)
+      print(f)
       iT <- read.table(paste0(tblFolder,'/',f),sep=',',header = T,stringsAsFactors = F)
+      if (shortenTaxNames) {for (r in c(1:nrow(iT))) {iT$feature[r] <- purgeMGNameOne(iT$feature[r])}}
       iT$V1 <- tolower(iT$V1)
       iT$V2 <- tolower(iT$V2)
       if (subsetFeatures != "") {
@@ -421,7 +479,7 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
       } else {
         iT$FDR <- iT$pValue
       }
-      if (!(iT$V2[1] %in% c("y","1"))) {
+      if (!(iT$V2[1] %in% c("y","1","n","0"))) {
         print(paste0('WARNING: table ',f, ' / responseVar ',iT$V2[1],' : responseVar is not categorical 0/1 or n/y, skipping it ...'))
       } else {
         # add row(s) to dataframe
@@ -517,6 +575,7 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
   } else if (metric == "meanEffectRatio") {
     hmPlotDF[abs(hmPlotDF) < log(enrichmentCutoff)] <- 0.0
   }
+  hmPlotDF[is.na(hmPlotDF)] <- 0.0
   if (sum(hmPlotDF != 0) == 0) {
     hmPlotDF <- hmDFsig
     noSig = TRUE
@@ -529,6 +588,7 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
   hmPlotDF$sorter <- NULL
   hmPlotDF <- hmPlotDF[1:min(nrToPlot,nrow(hmPlotDF)),]
   
+  if (invertYN) {hmPlotDF = hmPlotDF * -1}
   hmDFdirection <- hmPlotDF 
   hmDFdirection[hmDFdirection > 0] <- 1
   hmDFdirection[hmDFdirection < 0] <- -1
@@ -571,7 +631,8 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
 
 aggregatePlotHeatmapLM <- function(tblFolder,doFeatures=c("taxAbundances"),nrToPlot=20,outFile="plot.png",pVcutoff=0.05,multiTest=F,
                                  clusterFeatures=T,clusterPhenos=F,subsetFeatures="",subsetPhenos="",
-                                 metric="statSig",enrichmentCutoff = 1.005,addXextra=0,addYextra=0,maxMax = 5) {
+                                 metric="statSig",enrichmentCutoff = 1.005,addXextra=0,addYextra=0,maxMax = 5,
+                                 shortenTaxNames=F) {
   print ('>>> AGGREGATING RESULTS:')
   if (multiTest) {
     print (paste0(' doing multiple-testing correction (BH), using FDR = ',pVcutoff))

@@ -4,7 +4,7 @@ Year: 2018-2019
 
 Current status: Finished
 
-Publication: NA
+Publication: Vich Vila, A., Collij, V., Sanna, S. et al. Impact of commonly used drugs on the composition and metabolic function of the gut microbiota. Nat Commun 11, 362 (2020) doi:10.1038/s41467-019-14177-z
 
 Link to raw data: 
 
