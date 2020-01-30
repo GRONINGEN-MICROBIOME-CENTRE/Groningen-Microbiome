@@ -8,7 +8,7 @@ output: html_document
 Introduction
 ===
 
-In this project we aim to investigate the relation between fecal metabolites and inflammatory bowel diseases phenotypes. The cohort consist of 750 samples of different patients, devided in 255 controls from the population cohort LifeLines (NL), 265 patients with Crohns disease and 198 patients with ulcerative colitis from the 1000IBD cohort (NL). 
+In this project we aim to investigate the relation between fecal metabolites and inflammatory bowel diseases phenotypes. The cohort consist of 750 samples of different patients, devided in 255 controls from the population cohort LifeLines (NL), 270 patients with Crohns disease and 211 patients with ulcerative colitis from the 1000IBD cohort (NL). 
 
 Metabolites were measured using METABOLON platform combining untargeted metabolite detection with short chain fatty acids measurments. Untargeted metabolite detection consisted on an ultrahigh performance liquid chromatography tandem mass spectrocopy (UPLC-MS/MS): 2 acidic positive ion condition (C18 columns) + 1 Basic negative ion optimazed (C18 column) + 1 Basic negative ionization (Hilic column).
 
@@ -37,10 +37,11 @@ library(heatmaply)
 library(ggpubr)
 library(ggbiplot)
 library(coin)
+library(DT)
 library(compositions)
 library(RColorBrewer)
 
-#Invert rank transformation function. 
+#Inverse rank transformation function. 
 invrank= function(x) {qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))}
 ```
 
@@ -63,45 +64,32 @@ g) Metagenomics taxa: MetaPhlan's profiles (v2.7)
 
 ```{r, warning, message=F, echo=T}
 #transformed metabolites (raw data transformed to adjust distrubution, medians = 1)
-all_metabolites <- read.delim("~/Documents/Project_Metabolome/Takeda/all_metabolites2.txt", row.names=1)
+all_metabolites <- read.delim("~/Documents/Project_Metabolome/1.Input_files/all_metabolites2.txt", row.names=1)
 
 #raw values (AUC of peaks)
-all_metabolites_raw <- read.delim("~/Documents/Project_Metabolome/Takeda/all_metabolites_raw2.txt", row.names=1)
+all_metabolites_raw <- read.delim("~/Documents/Project_Metabolome/1.Input_files/all_metabolites_raw2.txt", row.names=1)
 
 #Metabolites annotation
-annot <- read.delim("~/Documents/Project_Metabolome/Takeda/info_metabolites_v2.txt", row.names=1)
+annot <- read.delim("~/Documents/Project_Metabolome/1.Input_files/info_metabolites_v2.txt", row.names=1)
 annot$SUPER.PATHWAY.1=NULL
 
-#phenotypes
+#Phenotypes
 
-#SCFA concentrations
-phenos_scfa <- read.delim("~/Documents/Project_Metabolome/input_scfa_short.txt")
-
-#Selection of host phenotypes
-phenos=read.delim("~/Documents/Project_Metabolome/phenos_sel.txt", row.names = 1)
-
-#info on techinical parameters of the metabolite measuments (columns used, day, etc.)
-tech=read.delim("~/Documents/Project_Metabolome/tech.txt")
-
-#Stool frequency & binary BSS (soft/hard)
-stool=read.delim("~/Documents/Project_Metabolome/intestinal_info.txt")
-
-#Diet (Food frequency questionnaires adjusted for nutrient density)
-
-food <- read.delim("~/Documents/Project_Metabolome/Foodgroups.txt")
-
-# Medication
+phenos_ibd=read.delim("~/Documents/Project_Metabolome/1.Input_files/Merged_IBD_phenos_clean_v2.txt",row.names = 1)
+phenos_lld=read.delim("~/Documents/Project_Metabolome/1.Input_files/Merged_LLD_phenos_clean_v2.txt", row.names=1)
+cc_pheno=read.delim("~/Documents/Project_Metabolome/1.Input_files/mini_pheno.txt", row.names=1)
 
 # Storage
 
 #translate id's 
-IDs_LLD <- read.delim("~/Documents/Project_Metabolome/Takeda/IDs_LLD.txt", header=FALSE)
-IDs_IBD <- read.delim("~/Documents/Project_Metabolome/Takeda/IDs_IBD.txt", header=FALSE)
+IDs_LLD <- read.delim("~/Documents/Project_Metabolome/1.Input_files//IDs_LLD.txt", header=FALSE)
+IDs_IBD <- read.delim("~/Documents/Project_Metabolome/1.Input_files//IDs_IBD.txt", header=FALSE)
 
 #Metagenomics taxa
 
-IBD_taxa <- read.delim("~/Documents/Project_Metabolome/taxa/IBD_taxonomy_unstrat_clean.txt", row.names=1)
-LLD_taxa <- read.delim("~/Documents/Project_Metabolome/taxa/LLD_taxonomy_unstrat_clean.txt", row.names=1)
+IBD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa//IBD_taxonomy_unstrat_clean.txt", row.names=1)
+LLD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa//LLD_taxonomy_unstrat_clean.txt", row.names=1)
+
 
 ```
 
@@ -131,9 +119,6 @@ Translate all id's to the same id (easier to deal with multiple tables)
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
 
-rownames(tech)=tech$CLIENT_IDENTIFIER
-tech$CLIENT_IDENTIFIER=NULL
-
 #Change Metabolon ids to UMCG ids to connect later to phenotypes 
 all_raw=as.data.frame(t(all_metabolites_raw))
 all=as.data.frame(t(all_metabolites))
@@ -149,9 +134,9 @@ IDs$V1=NULL
 # Merge to replace the ids Metabolon => UMCG
 all_new_ID=merge(IDs,all, by="row.names")
 all_new_ID_raw=merge(IDs,all_raw, by="row.names")
-tech_ID=merge(IDs,tech, by="row.names")
-rownames(tech_ID)=tech_ID$V5
-tech_ID$V5=NULL
+#tech_ID=merge(IDs,tech, by="row.names")
+#rownames(tech_ID)=tech_ID$V5
+#tech_ID$V5=NULL
 rownames(all_new_ID_raw)=all_new_ID_raw$V5
 all_new_ID_raw$Row.names=NULL
 all_new_ID_raw$V5=NULL
@@ -160,30 +145,30 @@ all_new_ID$V5=NULL
 all_new_ID$Row.names=NULL
 
 #Keep only the samples with metabolite measurments
-stool=stool[complete.cases(stool[ ,1]),]
-rownames(stool)=stool$UMCGIBDResearchIDorLLDeepID
-stool$UMCGIBDResearchIDorLLDeepID=NULL
-IDs2=IDs
-rownames(IDs2)=IDs$V5
-stool_ID=merge(IDs2,stool, by="row.names")
-stool_ID$V5=NULL
-rownames(stool_ID)=stool_ID$Row.names
-stool_ID$Row.names=NULL
+#stool=stool[complete.cases(stool[ ,1]),]
+#rownames(stool)=stool$UMCGIBDResearchIDorLLDeepID
+#stool$UMCGIBDResearchIDorLLDeepID=NULL
+#IDs2=IDs
+#rownames(IDs2)=IDs$V5
+#stool_ID=merge(IDs2,stool, by="row.names")
+#stool_ID$V5=NULL
+#rownames(stool_ID)=stool_ID$Row.names
+#stool_ID$Row.names=NULL
 
 #Change also filter the diet file
 
 
 
 #Merge host phenotypes with technical information
-phenos2=merge(tech_ID,phenos, by="row.names")
-rownames(phenos2)=phenos2$Row.names
-phenos2$Row.names=NULL
+#phenos2=merge(tech_ID,phenos, by="row.names")
+#rownames(phenos2)=phenos2$Row.names
+#phenos2$Row.names=NULL
 
 #Merge also the stool phenotypes
 
-phenos3=merge(phenos2,stool_ID, by="row.names")
-rownames(phenos3)=phenos3$Row.names
-phenos3$Row.names=NULL
+#phenos3=merge(phenos2,stool_ID, by="row.names")
+#rownames(phenos3)=phenos3$Row.names
+#phenos3$Row.names=NULL
 ```
 
 
@@ -201,9 +186,9 @@ Use inverse rank transformation
 #mclean=log10(all_new_ID)
 #Tranform to inv-rank values
 
-CD=rownames(phenos)[phenos$DiagnosisCurrent=="CD"]
-UC=rownames(phenos)[phenos$DiagnosisCurrent=="UC"]
-CT=rownames(phenos)[phenos$DiagnosisCurrent=="generalpopulation"]
+CD=rownames(phenos_ibd)[phenos_ibd$ibd_Diagnosis=="CD"]
+UC=rownames(phenos_ibd)[phenos_ibd$ibd_Diagnosis=="UC"]
+CT=rownames(phenos_lld)
 
 all_new_ID_raw_cd=all_new_ID_raw[rownames(all_new_ID_raw)%in%CD,]
 all_new_ID_raw_uc=all_new_ID_raw[rownames(all_new_ID_raw)%in%UC,]
@@ -356,40 +341,46 @@ summary_met[,1]=colnames(all_new_ID_raw)
 summary_met=as.data.frame(summary_met)
 colnames(summary_met)=c("Metabolite", "NAs","Non_NAs", "Min", "Max", "Mean", "Median","SD", "Outliers_x3IQR", "Min_trans_data", "Max_trans_data", "SD_trans_data","Normal_distrib","NAs_CT","Non_NAs_CT", "Min_CT", "Max_CT", "Mean_CT", "Median_CT","SD_CT", "Outliers_x3IQR_CT", "Min_trans_data_CT", "Max_trans_data_CT","SD_CT", "Normal_distrib_CT", "NAs_CD","Non_NAs_CD", "Min_CD", "Max_CD", "Mean_CD", "Median_CD", "SD_CD","Outliers_x3IQR_CD", "Min_trans_data_CD", "Max_trans_data_CD", "SD_CD", "Normal_distrib_CD","NAs_UC","Non_NAs_UC", "Min_UC", "Max_UC", "Mean_UC", "Median_UC", "SD_UC","Outliers_x3IQR_UC", "Min_trans_data_UC", "Max_trans_data_UC", "SD_UC", "Normal_distrib_UC")
 
-#summary_met$perc_missing=((as.numeric(as.character(summary_met$NAs))/nrow(summary_met))*100)
-summary_short=summary_met[,c("Metabolite","NAs","NAs_CT","NAs_CD", "NAs_UC")]
-summary_short$missing=((as.numeric(as.character(summary_short$NAs))/nrow(all_new_ID))*100)
-summary_short$missing_CT=((as.numeric(as.character(summary_short$NAs_CT))/nrow(all_new_ID_ct))*100)
-summary_short$missing_CD=((as.numeric(as.character(summary_short$NAs_CD))/nrow(all_new_ID_cd))*100)
-summary_short$missing_UC=((as.numeric(as.character(summary_short$NAs_UC))/nrow(all_new_ID_raw_uc))*100)
-summary_short$NAs=NULL
-summary_short$NAs_CT=NULL
-summary_short$NAs_CD=NULL
-summary_short$NAs_UC=NULL
-summary_short2=melt(summary_short)
+#Calculate presence
+summary_short=summary_met[,c("Metabolite", "Non_NAs")]
+summary_short2=summary_met[,c("Metabolite","Non_NAs","Non_NAs_CT","Non_NAs_CD", "Non_NAs_UC")]
+summary_short2$prevalence=((as.numeric(as.character(summary_short2$Non_NAs))/nrow(all_new_ID))*100)
+summary_short2$prevalence_CT=((as.numeric(as.character(summary_short2$Non_NAs_CT))/nrow(all_new_ID_ct))*100)
+summary_short2$prevalence_CD=((as.numeric(as.character(summary_short2$Non_NAs_CD))/nrow(all_new_ID_cd))*100)
+summary_short2$prevalence_UC=((as.numeric(as.character(summary_short2$Non_NAs_UC))/nrow(all_new_ID_raw_uc))*100)
+summary_short2$Non_NAs=NULL
+summary_short2$Non_NAs_CT=NULL
+summary_short2$Non_NAs_CD=NULL
+summary_short2$Non_NAs_UC=NULL
+summary_short2[,-1] <-round(summary_short2[,-1],0)
+summary_short3=melt(summary_short2)
+#summary_short2=melt(summary_short, id.vars = "Metabolite")
 ```
 
-Distribution of the missigness
+Distribution of the prevalence
 
 ```{r, warning=F,message=FALSE, echo=F}
-aa=ggplot(summary_short, aes(missing))+ geom_histogram(color="darkblue", fill="lightblue",bins=10) + theme_classic() + xlab("% missing samples") + ylab("Number of metabolites")
+aa=ggplot(summary_short, aes(reorder(Metabolite,-as.numeric(as.character(Non_NAs))),as.numeric(as.character(Non_NAs))))+ geom_bar(color="darkblue",stat = "identity") + theme_classic() + ylab("Number of samples (n=750)") + xlab("Metabolites") +  theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
 
 ggplotly(aa)
 ```
 
 
-Distribution of the missigness per cohort (CT=controls, CD=Crohns, UC=Ulcerative colitis)
+Distribution of the prevalence per cohort (CT=controls, CD=Crohns, UC=Ulcerative colitis)
 
 ```{r, warning=F,message=FALSE, echo=F}
-ggplot(summary_short2, aes(x=value,y=variable, fill=variable))+ geom_density_ridges_gradient(stat = "binline", bins = 20, scale=3) + theme_classic() + xlab("% missing samples") + ylab("Number of metabolites")
+ggplot(summary_short3, aes(x=value,y=variable, fill=variable))+ geom_density_ridges_gradient(stat = "binline", bins = 20, scale=3) + theme_classic() + xlab("Present in % samples") + ylab("Number of metabolites")
 ```
 
-Same but different visualization
-
-```{r, warning=F,message=FALSE, echo=F}
-bb=ggplot(summary_short, aes(reorder(Metabolite, -missing),missing))+ geom_bar(color="darkblue", fill="lightblue", stat = "identity") + theme_classic() + ylab("% missingness") + xlab("Metabolites") + theme(axis.text.x=element_blank())
-
-ggplotly(bb)
+```{r, echo=F}
+summary_short4=summary_short2
+rownames(summary_short4)=summary_short4$Metabolite
+summary_short4$Metabolite=NULL
+summary_short4=merge(annot,summary_short4, by="row.names")
+rownames(summary_short4)=summary_short4$Row.names
+summary_short4$Row.names=NULL
+colnames(summary_short4)=c("Super pathway","Annotation", "Detected in cohort (%)", "Detected in controls (%)", "Detected in CD (%)", "Dectected in UC (%)")
+datatable(summary_short4)
 ```
 
 
@@ -411,35 +402,52 @@ colnames(summary_sample)=c("Metabolite", "NAs","Non_NAs")
 summary_sample$perc_missing=((as.numeric(as.character(summary_sample$NAs))/nrow(all_new_ID_raw2))*100)
 rownames(summary_sample)=summary_sample$Metabolite
 summary_sample$Metabolite=NULL
-summary_sample2=merge(summary_sample,phenos,by="row.names")
+summary_sample2=merge(summary_sample,cc_pheno,by="row.names")
 ```
 
 Plot representing the distribution of metabolites based on its missingness 
 
 ```{r, warning=F,message=FALSE, echo=F}
 
-cc=ggplot(summary_sample2, aes(x=perc_missing, fill=DiagnosisCurrent))+ geom_histogram(color="black" ) + theme_classic() + xlab("Missing metabolites per sample (%)") + ylab("Number of samples")
+cc=ggplot(summary_sample2, aes(x=perc_missing, fill=ibd_Diagnosis))+ geom_histogram(color="black" ) + theme_classic() + xlab("Percentage of missing metabolites per sample (%)") + ylab("Number of samples")
 
 ggplotly(cc)
 
 ```
 
 
-Remove metabolites absent in more than 85% of the data per each cohort
+Test new vs old SCFA measurments in the population controls (4 samples with missing values)
+---
+
+```{r}
+
+ggscatter(phenos_lld,"scfa_Butyric.acid","scfa_old_Butyrat_umol.g",add="reg.line", conf.int = T, add.params = list(color = "red",fill = "purple")) +  stat_cor( label.x = 3, method = "spearman") + xlab ("Butyric acid new measurment") + ylab ("Butyric acid old measurment")
+
+ggscatter(phenos_lld,"scfa_Acetic.acid","scfa_old_Acetat_umol.g",add="reg.line", conf.int = T, add.params = list(color = "red",fill = "purple")) +  stat_cor( label.x = 3, method = "spearman") + xlab ("Acetate new measurment") + ylab ("Acetate old measurment")
+
+
+ggscatter(phenos_lld,"scfa_Propionic.acid","scfa_old_Propionat_umol.g",add="reg.line", conf.int = T, add.params = list(color = "red",fill = "purple")) +  stat_cor( label.x = 3, method = "spearman") + xlab ("Propionate new measurment") + ylab ("Propionate old measurment")
+
+ggscatter(phenos_lld,"scfa_Acetic.acid","scfa_old_Acetat_umol.g",add="reg.line", conf.int = T, add.params = list(color = "red",fill = "purple")) +  stat_cor( label.x = 3, method = "spearman") + xlab ("Acetate new measurment") + ylab ("Acetate old measurment")
+
+```
+
+
+Filter metabolites based on the presence / absence 
 ---
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
-#to_remove=subset(summary_met, summary_met$perc_missing>85)
-to_remove_90=subset(summary_short,missing_CT>90 | missing_CD>90 | missing_UC>90)
-removeCT=subset(summary_short,missing_CT>90)
+
+to_remove_90=subset(summary_short2,prevalence_CT<10 | prevalence_CD<10 | prevalence_UC<10)
+removeCT=subset(summary_short2,prevalence_CT<10)
 removeCT=factor(removeCT$Metabolite)
-removeCD=subset(summary_short,missing_CD>90)
+removeCD=subset(summary_short2,prevalence_CD<10)
 removeCD=factor(removeCD$Metabolite)
-removeUC=subset(summary_short,missing_UC>90)
+removeUC=subset(summary_short2,prevalence_UC<10)
 removeUC=factor(removeUC$Metabolite)
 ```
 
-Venn diagram metabolites missing >90% per cohort
+Venn diagram metabolites present in less than 10% of the samples
 
 ```{r, warning=F,message=FALSE, echo=F}
 plot(euler(list(A = removeCT, B = removeCD, C = removeUC)),quantities=T, label=c("Controls","CD", "UC"))
@@ -447,12 +455,12 @@ plot(euler(list(A = removeCT, B = removeCD, C = removeUC)),quantities=T, label=c
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
 #to_remove=subset(summary_met, summary_met$perc_missing>85)
-to_remove_85=subset(summary_short,missing_CT>85 | missing_CD>85 | missing_UC>85)
-removeCT=subset(summary_short,missing_CT>85)
+to_remove_80=subset(summary_short2,prevalence_CT<20 | prevalence_CD<20 | prevalence_CD<20)
+removeCT=subset(summary_short2,prevalence_CT<20)
 removeCT=factor(removeCT$Metabolite)
-removeCD=subset(summary_short,missing_CD>85)
+removeCD=subset(summary_short2,prevalence_CD<20)
 removeCD=factor(removeCD$Metabolite)
-removeUC=subset(summary_short,missing_UC>85)
+removeUC=subset(summary_short2,prevalence_UC<20)
 removeUC=factor(removeUC$Metabolite)
 
 ```
@@ -469,10 +477,20 @@ Removing metabolites in the normalized metabolite tables and merge phenotypes
 ```{r, warning=F,message=FALSE, echo=T}
 
 # Select metabolites to remove
-to_remove=subset(summary_short,missing_CT>85 & missing_CD>85 & missing_UC>85)
+to_remove=subset(summary_short2,prevalence_CT<20 & prevalence_CD<20 & prevalence_UC<20)
+to_remove1=to_remove
+rownames(to_remove1)=to_remove1$Metabolite
+to_remove1=merge(annot,to_remove1,by="row.names")
 to_remove2=factor(to_remove$Metabolite)
 `%ni%` <- Negate(`%in%`)
+```
 
+```{r}
+datatable(to_remove1)
+```
+
+
+```{r, warning=F,message=FALSE, echo=T}
 #Filter/remove selected metabolites
 norm_CD_filt=subset(norm_metab_CD,select = names(norm_metab_CD) %ni% to_remove2)
 norm_CT_filt=subset(norm_metab_CT,select = names(norm_metab_CT) %ni% to_remove2)
@@ -482,24 +500,24 @@ annot_v2=subset(annot,rownames(annot) %in% names(norm_filt))
 
 #Adjust diagnosis in the phenotype file
 
-phenos3$Diag="Controls"
-phenos3[phenos3$DiagnosisCurrent=="CD",]$Diag="CD"
-phenos3[phenos3$DiagnosisCurrent=="UC",]$Diag="UC"
+#phenos3$Diag="Controls"
+#phenos3[phenos3$DiagnosisCurrent=="CD",]$Diag="CD"
+#phenos3[phenos3$DiagnosisCurrent=="UC",]$Diag="UC"
 #phenos3[phenos3$DiagnosisCurrent=="ReconsideringDiagnosis",]$Diag="IBDU"
 #phenos3[phenos3$DiagnosisCurrent=="IBDI",]$Diag="IBDU"
 
-rownames(phenos_scfa)=phenos_scfa$Row.names
-phenos_scfa$Diag="Controls"
-phenos_scfa[phenos_scfa$DiagnosisCurrent=="CD",]$Diag="CD"
-phenos_scfa[phenos_scfa$DiagnosisCurrent=="UC",]$Diag="UC"
-phenos_scfa[phenos_scfa$DiagnosisCurrent=="ReconsideringDiagnosis",]$Diag="IBDU"
-phenos_scfa[phenos_scfa$DiagnosisCurrent=="IBDI",]$Diag="IBDU"
+#rownames(phenos_scfa)=phenos_scfa$Row.names
+#phenos_scfa$Diag="Controls"
+#phenos_scfa[phenos_scfa$DiagnosisCurrent=="CD",]$Diag="CD"
+#phenos_scfa[phenos_scfa$DiagnosisCurrent=="UC",]$Diag="UC"
+#phenos_scfa[phenos_scfa$DiagnosisCurrent=="ReconsideringDiagnosis",]$Diag="IBDU"
+#phenos_scfa[phenos_scfa$DiagnosisCurrent=="IBDI",]$Diag="IBDU"
 
 #Merge phenotyes
-CD_f_t=merge(phenos3,norm_CD_filt,by="row.names")
-CT_f_t=merge(phenos3,norm_CT_filt,by="row.names")
-UC_f_t=merge(phenos3,norm_UC_filt,by="row.names")
-all_f_t=merge(phenos3,norm_filt,by="row.names")
+CD_f_t=merge(cc_pheno,norm_CD_filt,by="row.names")
+CT_f_t=merge(cc_pheno,norm_CT_filt,by="row.names")
+UC_f_t=merge(cc_pheno,norm_UC_filt,by="row.names")
+all_f_t=merge(cc_pheno,norm_filt,by="row.names")
 
 ```
 
@@ -576,14 +594,60 @@ Looking at the top (horitzontal) dendogram we can see 2~4 clusters (left to righ
 #annotation_sel=mclean_p[,c("Diag","Box", "LC.COLUMN", "SPL.AMNT.GRAM", "RUN.DAY")]
 #annotation_sel3=phenos_scfa[,c("Diag","X2.Methylbutyric.acid","Acetic.acid","Butyric.acid","Hexanoic.acid","Isobutyric.acid","Isovaleric.acid","Propionic.acid","Valeric.acid")]
 #annotation_sel3[,2:9]=log10(annotation_sel3[,2:9])
-annot_v4=all_f_t[,c("Row.names","Stoma","IleocecalValveInSitu","ActiveDisease","Diag","BinaryBSS","BowelMovementADayDef")]
-rownames(annot_v4)=annot_v4$Row.names
-annot_v4$Row.names=NULL
+
+annot_v3.1=all_f_t[,c("Row.names","ibd_Diagnosis","ibd_CurrentStomaOrPouch")]
+rownames(annot_v3.1)=annot_v3.1$Row.names
+annot_v3.1$Row.names=NULL
+
+annot_v4=phenos_ibd[,c("ibd_Diagnosis","ibd_CurrentStomaOrPouch","ibd_ActiveDisease","ibd_ResectionAny","metabolon_month_frezzer","ibd_DiseaseLocation")]
+annot_v5=phenos_lld[,c("clinical_BowelMovementADayDef","clinical_BinaryBSS","ibd_FecalCalprotectinOver200yesno","metabolon_Month_in_freezer")]
+#rownames(annot_v4)=annot_v4$Row.names
+#annot_v4$Row.names=NULL
 ```
+
+All samples
+---
 
 
 ```{r, warning=F,message=FALSE, echo=F, fig.height=15, fig.align='center',fig.width=10}
-pheatmap(t(norm_filt), show_colnames = F,show_rownames = F, scale = "none", annotation_row = annot_v3, annotation_col = annot_v4, fontsize = 7, annotation_colors = list ( Diag=c("CD"="firebrick2", "UC"="blue2", "Controls"="white"),ActiveDisease=c("Active"="firebrick2","NotActive"="white"),IleocecalValveInSitu=c("no"="firebrick2","yes"="white"), Stoma=c("Yes"="red","No"="white"),BinaryBSS=c("Hard"="gray79","Soft"="brown"), SuperPathway=c("Amino Acid"="lightblue", "Carbohydrate"="red", "Cofactors and Vitamins" = "gold2", "Energy"="gray79", "Lipid"="darkviolet", "Nucleotide" = "orange", "Partially Characterized Molecules" ="turquoise", "Peptide" = "limegreen", "Unknown"="black", "Xenobiotics"="tan1" )))
+pheatmap(t(norm_filt), show_colnames = F,show_rownames = F, scale = "none", annotation_col = annot_v3.1, annotation_row = annot_v3, fontsize = 7, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "Control"="white", "IBDU"="black"),ibd_CurrentStomaOrPouch=c("yes"="firebrick2","no"="white","Control"="white" ), SUPER.PATHWAY=c("Amino Acid"="lightblue", "Carbohydrate"="red", "Cofactors and Vitamins" = "gold2", "Energy"="gray79", "Lipid"="darkviolet", "Nucleotide" = "orange", "Partially Characterized Molecules" ="turquoise", "Peptide" = "limegreen", "Unknown_compount"="black", "Xenobiotics"="tan1" )))
+```
+
+
+Patients with CD
+---
+
+
+```{r, warning=F,message=FALSE, echo=F, fig.height=15, fig.align='center',fig.width=10}
+annot_v4.2=annot_v4[rownames(annot_v4) %in% rownames(norm_CD_filt),]
+annot_v4.2=annot_v4.2[match(rownames(norm_CD_filt), rownames(annot_v4.2)), ]
+
+pheatmap(t(norm_CD_filt), show_colnames = F,show_rownames = F, scale = "none", annotation_col = annot_v4.2, annotation_row = annot_v3, fontsize = 7, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "IBDU"="white"),ibd_ActiveDisease=c("Active"="firebrick2","NotActive"="white"),ibd_DiseaseLocation=c("ileum"="firebrick2","colon"="blue","both"="gray79"), ibd_ResectionAny=c("yes"="red","no"="white"), ibd_CurrentStomaOrPouch=c("yes"="red","no"="white"), SUPER.PATHWAY=c("Amino Acid"="lightblue", "Carbohydrate"="red", "Cofactors and Vitamins" = "gold2", "Energy"="gray79", "Lipid"="darkviolet", "Nucleotide" = "orange", "Partially Characterized Molecules" ="turquoise", "Peptide" = "limegreen", "Unknown_compount"="black", "Xenobiotics"="tan1" )))
+```
+
+
+Patients with UC
+----
+
+
+
+```{r, warning=F,message=FALSE, echo=F, fig.height=15, fig.align='center',fig.width=10}
+annot_v4.2=annot_v4[rownames(annot_v4) %in% rownames(norm_UC_filt),]
+annot_v4.2=annot_v4.2[match(rownames(norm_UC_filt), rownames(annot_v4.2)), ]
+
+pheatmap(t(norm_UC_filt), show_colnames = F,show_rownames = F, scale = "none", annotation_col = annot_v4.2, annotation_row = annot_v3, fontsize = 7, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "IBDU"="white"),ibd_ActiveDisease=c("Active"="firebrick2","NotActive"="white"),ibd_DiseaseLocation=c("ileum"="firebrick2","colon"="blue","both"="gray79"), ibd_ResectionAny=c("yes"="red","no"="white"), ibd_CurrentStomaOrPouch=c("yes"="red","no"="white"), SUPER.PATHWAY=c("Amino Acid"="lightblue", "Carbohydrate"="red", "Cofactors and Vitamins" = "gold2", "Energy"="gray79", "Lipid"="darkviolet", "Nucleotide" = "orange", "Partially Characterized Molecules" ="turquoise", "Peptide" = "limegreen", "Unknown_compount"="black", "Xenobiotics"="tan1" )))
+```
+
+
+Population controls
+---
+
+
+```{r, warning=F,message=FALSE, echo=F, fig.height=15, fig.align='center',fig.width=10}
+annot_v5.2=annot_v5[rownames(annot_v5) %in% rownames(norm_CT_filt),]
+annot_v5.2=annot_v5.2[match(rownames(norm_CT_filt), rownames(annot_v5.2)), ]
+
+pheatmap(t(norm_CT_filt), show_colnames = F,show_rownames = F, scale = "none", annotation_col = annot_v5.2, annotation_row = annot_v3, fontsize = 7, annotation_colors = list ( ibd_FecalCalprotectinOver200yesno=c("yes"="firebrick2","no"="white"), SUPER.PATHWAY=c("Amino Acid"="lightblue", "Carbohydrate"="red", "Cofactors and Vitamins" = "gold2", "Energy"="gray79", "Lipid"="darkviolet", "Nucleotide" = "orange", "Partially Characterized Molecules" ="turquoise", "Peptide" = "limegreen", "Unknown_compount"="black", "Xenobiotics"="tan1" )))
 ```
 
 
@@ -650,8 +714,8 @@ Correlations are performed per cohort. Combining disease with control cohorts co
 
 #Simple loop to correlate bateria with metabolites
 
-pvs_cd=matrix(nrow=116, ncol=1438)
-rhos_cd=matrix(nrow=116, ncol=1438)
+pvs_cd=matrix(nrow=116, ncol=ncol(tmb_CD)-116)
+rhos_cd=matrix(nrow=116, ncol=ncol(tmb_CD)-116)
 x=0
 for (i in 1:116){
   x=x+1
@@ -678,8 +742,8 @@ mpvs_cd$fdr=p.adjust(mpvs_cd$value,method = "bonferroni")
 ##UC
 
 
-pvs_uc=matrix(nrow=116, ncol=1438)
-rhos_uc=matrix(nrow=116, ncol=1438)
+pvs_uc=matrix(nrow=116, ncol=ncol(tmb_UC)-116)
+rhos_uc=matrix(nrow=116, ncol=ncol(tmb_UC)-116)
 x=0
 for (i in 1:116){
   x=x+1
@@ -705,8 +769,8 @@ mpvs_uc$fdr=p.adjust(mpvs_uc$value,method = "bonferroni")
 #Controls
 
 
-pvs_ct=matrix(nrow=116, ncol=1438)
-rhos_ct=matrix(nrow=116, ncol=1438)
+pvs_ct=matrix(nrow=116, ncol=ncol(tmb_CT)-116)
+rhos_ct=matrix(nrow=116, ncol=ncol(tmb_CT)-116)
 x=0
 for (i in 1:116){
   x=x+1
@@ -778,17 +842,17 @@ Fold changes are estimated from the raw values provided by Metabolon (AUC) [log2
 ```{r, warning=F,message=FALSE, echo=T}
 #mclean_raw=mclean_pre[,!colnames(mclean_pre) %in% to_remove]
 m_raw_filt=subset(all_new_ID_raw,select = names(all_new_ID_raw) %ni% to_remove2)
-m_raw_filt_p=merge(phenos3,m_raw_filt,by="row.names")
+m_raw_filt_p=merge(cc_pheno,m_raw_filt,by="row.names")
 
-CD_controls=subset(all_f_t,all_f_t$Diag!="UC")
+CD_controls=subset(all_f_t,all_f_t$ibd_Diagnosis!="UC")
 
 #Remove pouches or stomas
-CD_controls=subset(CD_controls,CD_controls$Stoma=="No")
-CD_controls_raw=subset(m_raw_filt_p,m_raw_filt_p$Diag!="UC")
+CD_controls=subset(CD_controls,CD_controls$ibd_CurrentStomaOrPouch!="yes")
+CD_controls_raw=subset(m_raw_filt_p,m_raw_filt_p$ibd_Diagnosis!="UC")
 
-UC_controls=subset(all_f_t,all_f_t$Diag!="CD")
-UC_controls=subset(UC_controls,UC_controls$Stoma=="No")
-UC_controls_raw=subset(m_raw_filt_p,all_f_t$Diag!="CD")
+UC_controls=subset(all_f_t,all_f_t$ibd_Diagnosis!="CD")
+UC_controls=subset(UC_controls,UC_controls$ibd_CurrentStomaOrPouch!="yes")
+UC_controls_raw=subset(m_raw_filt_p,all_f_t$ibd_Diagnosis!="CD")
 
 
 # ncol-45 (45 = number of phenotypes in the input dataframe)
@@ -798,15 +862,15 @@ x=0
 for (i in 46:ncol(CD_controls)){
   x=x+1
   #cd_cnt[x,2]=median(CD_controls[,i][CD_controls$Diag=="CD"])
-  cd_cnt[x,2]=median(CD_controls_raw[,i][CD_controls_raw$Diag=="CD"], na.rm = T) #2
-  cd_cnt[x,3]=median(UC_controls_raw[,i][UC_controls_raw$Diag=="UC"], na.rm = T) #3
+  cd_cnt[x,2]=median(CD_controls_raw[,i][CD_controls_raw$ibd_Diagnosis=="CD"], na.rm = T) #2
+  cd_cnt[x,3]=median(UC_controls_raw[,i][UC_controls_raw$ibd_Diagnosis=="UC"], na.rm = T) #3
   #cd_cnt[x,3]=median(CD_controls[,i][CD_controls$Diag!="CD"])
-  cd_cnt[x,4]=median(CD_controls_raw[,i][CD_controls_raw$Diag!="CD"], na.rm = T) #4
+  cd_cnt[x,4]=median(CD_controls_raw[,i][CD_controls_raw$ibd_Diagnosis!="CD"], na.rm = T) #4
   #cd_cnt[x,4]=mean(CD_controls[,i][CD_controls$Diag=="CD"])
-  cd_cnt[x,5]=mean(CD_controls_raw[,i][CD_controls_raw$Diag=="CD"], na.rm = T) #5
-  cd_cnt[x,6]=mean(UC_controls_raw[,i][UC_controls_raw$Diag=="UC"], na.rm = T) #6
+  cd_cnt[x,5]=mean(CD_controls_raw[,i][CD_controls_raw$ibd_Diagnosis=="CD"], na.rm = T) #5
+  cd_cnt[x,6]=mean(UC_controls_raw[,i][UC_controls_raw$ibd_Diagnosis=="UC"], na.rm = T) #6
   #cd_cnt[x,5]=mean(CD_controls[,i][CD_controls$Diag!="CD"])
-  cd_cnt[x,7]=mean(CD_controls_raw[,i][CD_controls_raw$Diag!="CD"], na.rm = T) #7
+  cd_cnt[x,7]=mean(CD_controls_raw[,i][CD_controls_raw$ibd_Diagnosis!="CD"], na.rm = T) #7
   #Wilcoxon effect size
   
   #Fold change
@@ -819,11 +883,11 @@ for (i in 46:ncol(CD_controls)){
   
   #Wilcoxon test
   #CD
-  asoc=wilcox.test(CD_controls[,i][CD_controls$Diag=="CD"],CD_controls[,i][CD_controls$Diag!="CD"])
+  asoc=wilcox.test(CD_controls[,i][CD_controls$ibd_Diagnosis=="CD"],CD_controls[,i][CD_controls$ibd_Diagnosis!="CD"])
   cd_cnt[x,1]=colnames(CD_controls)[i]
   cd_cnt[x,12]=asoc$p.value
   #UC
-  asoc=wilcox.test(UC_controls[,i][UC_controls$Diag=="UC"],UC_controls[,i][UC_controls$Diag!="UC"])
+  asoc=wilcox.test(UC_controls[,i][UC_controls$ibd_Diagnosis=="UC"],UC_controls[,i][UC_controls$ibd_Diagnosis!="UC"])
   #cd_cnt[x,1]=colnames(CD_controls)[i]
   cd_cnt[x,13]=asoc$p.value
 }
