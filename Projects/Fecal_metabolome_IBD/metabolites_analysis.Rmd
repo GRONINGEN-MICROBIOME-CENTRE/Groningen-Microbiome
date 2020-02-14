@@ -21,6 +21,7 @@ Load functions
 library(corrplot)
 library(plotly)
 library(pheatmap)
+library(NbClust)
 library(reshape2)
 library(ggrepel)
 library(dplyr)
@@ -28,21 +29,27 @@ library(eulerr)
 library(vegan)
 library(ape)
 library(ggridges)
+library (UpSetR)
 library(ggplot2)
 library(psych)
 library(ggord)
+library(mice)
 library(caret)
+library(factoextra)
 library(Rtsne)
 library(heatmaply)
 library(ggpubr)
 library(ggbiplot)
 library(coin)
 library(DT)
+library(pvclust)
 library(compositions)
 library(RColorBrewer)
 
 #Inverse rank transformation function. 
 invrank= function(x) {qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))}
+
+`%ni%` <- Negate(`%in%`)
 ```
 
 Import data
@@ -82,13 +89,13 @@ cc_pheno=read.delim("~/Documents/Project_Metabolome/1.Input_files/mini_pheno.txt
 # Storage
 
 #translate id's 
-IDs_LLD <- read.delim("~/Documents/Project_Metabolome/1.Input_files//IDs_LLD.txt", header=FALSE)
-IDs_IBD <- read.delim("~/Documents/Project_Metabolome/1.Input_files//IDs_IBD.txt", header=FALSE)
+IDs_LLD <- read.delim("~/Documents/Project_Metabolome/1.Input_files/IDs_LLD.txt", header=FALSE)
+IDs_IBD <- read.delim("~/Documents/Project_Metabolome/1.Input_files/IDs_IBD.txt", header=FALSE)
 
 #Metagenomics taxa
 
-IBD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa//IBD_taxonomy_unstrat_clean.txt", row.names=1)
-LLD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa//LLD_taxonomy_unstrat_clean.txt", row.names=1)
+IBD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa/IBD_taxonomy_unstrat_clean.txt", row.names=1)
+LLD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa/LLD_taxonomy_unstrat_clean.txt", row.names=1)
 
 
 ```
@@ -104,18 +111,43 @@ met_1=as.data.frame(table(annot$SUB.PATHWAY))
 yy=ggplot(met_2, aes(x = reorder(Var1, -Freq),Freq)) + geom_bar(stat = "identity", color="black") + theme_classic() + theme(axis.title.x = element_blank(),axis.text.y = element_text(size = 12)) + coord_flip() + xlab("") + ylab("Number of metabolites")
 
 ggplotly(yy)
+```
 
+```{r, warning=F,message=FALSE, echo=F,fig.height=15,}
 xx=ggplot(met_1, aes(x = reorder(Var1, -Freq),Freq)) + geom_bar(stat = "identity", color="black") + theme_classic() + theme(axis.title.x = element_blank(),axis.text.y = element_text(size = 7)) + coord_flip() + xlab("") + ylab("Number of metabolites")
 
 ggplotly(xx)
 ```
 
 
+Normalize and impute missing metabolites
+---
+
+```{r, echo=T, message=F}
+
+
+metabolite_test=as.data.frame(t(all_metabolites_raw))
+
+#scale date, mean =0 , sd =1
+scaled.test <- scale(metabolite_test)
+
+#apply log10 transformation + scale
+
+metabolite_test_log=log10(metabolite_test)
+scaled_log_metabolites <- scale(metabolite_test_log)
+
+#Impute na's
+
+#Method 1: Median
+impute_missing_values=function(x)
+
+```
+
 
 Adjust all ids
 ---
 
-Translate all id's to the same id (easier to deal with multiple tables)
+__Translate all id's to the same id (easier to deal with multiple tables)__
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
 
@@ -134,58 +166,45 @@ IDs$V1=NULL
 # Merge to replace the ids Metabolon => UMCG
 all_new_ID=merge(IDs,all, by="row.names")
 all_new_ID_raw=merge(IDs,all_raw, by="row.names")
-#tech_ID=merge(IDs,tech, by="row.names")
-#rownames(tech_ID)=tech_ID$V5
-#tech_ID$V5=NULL
+
 rownames(all_new_ID_raw)=all_new_ID_raw$V5
 all_new_ID_raw$Row.names=NULL
 all_new_ID_raw$V5=NULL
 row.names(all_new_ID)=all_new_ID$V5
 all_new_ID$V5=NULL
 all_new_ID$Row.names=NULL
-
-#Keep only the samples with metabolite measurments
-#stool=stool[complete.cases(stool[ ,1]),]
-#rownames(stool)=stool$UMCGIBDResearchIDorLLDeepID
-#stool$UMCGIBDResearchIDorLLDeepID=NULL
-#IDs2=IDs
-#rownames(IDs2)=IDs$V5
-#stool_ID=merge(IDs2,stool, by="row.names")
-#stool_ID$V5=NULL
-#rownames(stool_ID)=stool_ID$Row.names
-#stool_ID$Row.names=NULL
-
-#Change also filter the diet file
-
-
-
-#Merge host phenotypes with technical information
-#phenos2=merge(tech_ID,phenos, by="row.names")
-#rownames(phenos2)=phenos2$Row.names
-#phenos2$Row.names=NULL
-
-#Merge also the stool phenotypes
-
-#phenos3=merge(phenos2,stool_ID, by="row.names")
-#rownames(phenos3)=phenos3$Row.names
-#phenos3$Row.names=NULL
 ```
 
 
 Data preparation and descriptive statsitics
 ===
 
-
-Normalize data for testing and split per phenotype (Control / CD / UC)
+Remove participants with a pouch or stoma
 ---
 
-Use inverse rank transformation
+__Rational: Patients with pouch or stoma do not capture the colonic metabolite/microbiota profile__
+
+```{r}
+remove_pouch_stoma=rownames(phenos_ibd)[phenos_ibd$ibd_CurrentStomaOrPouch=="yes"]
+
+#Keep data with stoma
+all_new_ID_with_stoma=all_new_ID
+all_new_ID_raw_with_stoma=all_new_ID_raw
+
+#Remove
+all_new_ID=all_new_ID[row.names(all_new_ID)%ni%remove_pouch_stoma,]
+all_new_ID_raw=all_new_ID_raw[row.names(all_new_ID_raw)%ni%remove_pouch_stoma,]
+
+```
+
+Normalize metabolite data and split per phenotype (Control / CD / UC)
+---
+
+__Select: use inverse rank transformation or Log10__
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
-#Transform to log 10 ( metabolites values)
-#mclean=log10(all_new_ID)
-#Tranform to inv-rank values
 
+#Subset disease cohort
 CD=rownames(phenos_ibd)[phenos_ibd$ibd_Diagnosis=="CD"]
 UC=rownames(phenos_ibd)[phenos_ibd$ibd_Diagnosis=="UC"]
 CT=rownames(phenos_lld)
@@ -198,10 +217,19 @@ all_new_ID_cd=all_new_ID[rownames(all_new_ID)%in%CD,]
 all_new_ID_uc=all_new_ID[rownames(all_new_ID)%in%UC,]
 all_new_ID_ct=all_new_ID[rownames(all_new_ID)%in%CT,]
 
-norm_metab=as.data.frame(apply(all_new_ID,2,invrank))
-norm_metab_CD=as.data.frame(apply(all_new_ID_cd,2,invrank))
-norm_metab_UC=as.data.frame(apply(all_new_ID_uc,2,invrank))
-norm_metab_CT=as.data.frame(apply(all_new_ID_ct,2,invrank))
+##Choose method for metabolite transformation
+
+#Tranform to inv-rank values
+#norm_metab=as.data.frame(apply(all_new_ID,2,invrank))
+#norm_metab_CD=as.data.frame(apply(all_new_ID_cd,2,invrank))
+#norm_metab_UC=as.data.frame(apply(all_new_ID_uc,2,invrank))
+#norm_metab_CT=as.data.frame(apply(all_new_ID_ct,2,invrank))
+
+#Use log10 transformation
+norm_metab=log10(all_new_ID)
+norm_metab_CD=log10(all_new_ID_cd)
+norm_metab_UC=log10(all_new_ID_uc)
+norm_metab_CT=log10(all_new_ID_ct)
 
 ```
 
@@ -219,7 +247,7 @@ Important. Summary statistics are not calculated if the variance of a metabolite
 
 - Calculate min and max values on transformed values (median adjusted)
 
-- Normality test (Shapiro-test) on inverse-rank transformed data. 
+- Normality test (Shapiro-test) on inverse-rank/log10 transformed data (see above). 
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
 
@@ -228,113 +256,113 @@ for (i in 1:ncol(all_new_ID_raw)){
   summary_met[i,2]=sum(is.na(all_new_ID_raw[,i]))
   summary_met[i,3]=sum(!is.na(all_new_ID_raw[,i]))
   if (var(all_new_ID[,i]) == 0){
-  summary_met[i,4]="NA"
-  summary_met[i,5]="NA"
-  summary_met[i,6]="NA"
-  summary_met[i,7]="NA"
-  summary_met[i,8]="NA"
-  summary_met[i,9]="NA"
-  summary_met[i,10]="NA"
-  summary_met[i,11]="NA"
-  summary_met[i,12]="NA"
-  summary_met[i,13]="NA"
+    summary_met[i,4]="NA"
+    summary_met[i,5]="NA"
+    summary_met[i,6]="NA"
+    summary_met[i,7]="NA"
+    summary_met[i,8]="NA"
+    summary_met[i,9]="NA"
+    summary_met[i,10]="NA"
+    summary_met[i,11]="NA"
+    summary_met[i,12]="NA"
+    summary_met[i,13]="NA"
   }
   else{
-  summary_met[i,4]=min(all_new_ID_raw[,i], na.rm = T)
-  summary_met[i,5]=max(all_new_ID_raw[,i], na.rm = T)
-  summary_met[i,6]=mean(all_new_ID_raw[,i], na.rm = T)
-  summary_met[i,7]=median(all_new_ID_raw[,i], na.rm = T)
-  summary_met[i,8]=sd(all_new_ID_raw[,i], na.rm = T)
-  summary_met[i,9]=length(boxplot(all_new_ID_raw[,i], plot=FALSE, range = 3)$out)
-  summary_met[i,10]=min(all_new_ID[,i], na.rm = T)
-  summary_met[i,11]=max(all_new_ID[,i], na.rm = T)
-  summary_met[i,12]=sd(all_new_ID[,i], na.rm = T)
-  nor=shapiro.test(norm_metab[,i])
-  summary_met[i,13]=nor$p.value>=0.05
+    summary_met[i,4]=min(all_new_ID_raw[,i], na.rm = T)
+    summary_met[i,5]=max(all_new_ID_raw[,i], na.rm = T)
+    summary_met[i,6]=mean(all_new_ID_raw[,i], na.rm = T)
+    summary_met[i,7]=median(all_new_ID_raw[,i], na.rm = T)
+    summary_met[i,8]=sd(all_new_ID_raw[,i], na.rm = T)
+    summary_met[i,9]=length(boxplot(all_new_ID_raw[,i], plot=FALSE, range = 3)$out)
+    summary_met[i,10]=min(all_new_ID[,i], na.rm = T)
+    summary_met[i,11]=max(all_new_ID[,i], na.rm = T)
+    summary_met[i,12]=sd(all_new_ID[,i], na.rm = T)
+    nor=shapiro.test(norm_metab[,i])
+    summary_met[i,13]=nor$p.value>=0.05
   }
 #Controls
   summary_met[i,14]=sum(is.na(all_new_ID_raw_ct[,i]))
   summary_met[i,15]=sum(!is.na(all_new_ID_raw_ct[,i]))
   if (var(all_new_ID_ct[,i]) == 0){
-  summary_met[i,16]="NA"
-  summary_met[i,17]="NA"
-  summary_met[i,18]="NA"
-  summary_met[i,19]="NA"
-  summary_met[i,20]="NA"
-  summary_met[i,21]="NA"
-  summary_met[i,22]="NA"
-  summary_met[i,23]="NA"
-  summary_met[i,24]="NA"
-  summary_met[i,25]="NA"
+    summary_met[i,16]="NA"
+    summary_met[i,17]="NA"
+    summary_met[i,18]="NA"
+    summary_met[i,19]="NA"
+    summary_met[i,20]="NA"
+    summary_met[i,21]="NA"
+    summary_met[i,22]="NA"
+    summary_met[i,23]="NA"
+    summary_met[i,24]="NA"
+    summary_met[i,25]="NA"
   }
   else{
-  summary_met[i,16]=min(all_new_ID_raw_ct[,i], na.rm = T)
-  summary_met[i,17]=max(all_new_ID_raw_ct[,i], na.rm = T)
-  summary_met[i,18]=mean(all_new_ID_raw_ct[,i], na.rm = T)
-  summary_met[i,19]=median(all_new_ID_raw_ct[,i], na.rm = T)
-  summary_met[i,20]=sd(all_new_ID_raw_ct[,i], na.rm = T)
-  summary_met[i,21]=length(boxplot(all_new_ID_raw_ct[,i], plot=FALSE, range = 3)$out)
-  summary_met[i,22]=min(all_new_ID_ct[,i], na.rm = T)
-  summary_met[i,23]=max(all_new_ID_ct[,i], na.rm = T)
-  summary_met[i,24]=sd(all_new_ID_ct[,i], na.rm = T)
-  nor=shapiro.test(norm_metab_CT[,i])
-  summary_met[i,25]=nor$p.value>=0.05
+    summary_met[i,16]=min(all_new_ID_raw_ct[,i], na.rm = T)
+    summary_met[i,17]=max(all_new_ID_raw_ct[,i], na.rm = T)
+    summary_met[i,18]=mean(all_new_ID_raw_ct[,i], na.rm = T)
+    summary_met[i,19]=median(all_new_ID_raw_ct[,i], na.rm = T)
+    summary_met[i,20]=sd(all_new_ID_raw_ct[,i], na.rm = T)
+    summary_met[i,21]=length(boxplot(all_new_ID_raw_ct[,i], plot=FALSE, range = 3)$out)
+    summary_met[i,22]=min(all_new_ID_ct[,i], na.rm = T)
+    summary_met[i,23]=max(all_new_ID_ct[,i], na.rm = T)
+    summary_met[i,24]=sd(all_new_ID_ct[,i], na.rm = T)
+    nor=shapiro.test(norm_metab_CT[,i])
+    summary_met[i,25]=nor$p.value>=0.05
   }
 #CD
   summary_met[i,26]=sum(is.na(all_new_ID_raw_cd[,i]))
   summary_met[i,27]=sum(!is.na(all_new_ID_raw_cd[,i]))
   if (var(all_new_ID_cd[,i]) == 0){
-  summary_met[i,28]="NA"
-  summary_met[i,29]="NA"
-  summary_met[i,30]="NA"
-  summary_met[i,31]="NA"
-  summary_met[i,32]="NA"
-  summary_met[i,33]="NA"
-  summary_met[i,34]="NA"
-  summary_met[i,35]="NA"
-  summary_met[i,36]="NA"
-  summary_met[i,37]="NA"
+    summary_met[i,28]="NA"
+    summary_met[i,29]="NA"
+    summary_met[i,30]="NA"
+    summary_met[i,31]="NA"
+    summary_met[i,32]="NA"
+    summary_met[i,33]="NA"
+    summary_met[i,34]="NA"
+    summary_met[i,35]="NA"
+    summary_met[i,36]="NA"
+    summary_met[i,37]="NA"
   }
   else{
-  summary_met[i,28]=min(all_new_ID_raw_cd[,i], na.rm = T)
-  summary_met[i,29]=max(all_new_ID_raw_cd[,i], na.rm = T)
-  summary_met[i,30]=mean(all_new_ID_raw_cd[,i], na.rm = T)
-  summary_met[i,31]=median(all_new_ID_raw_cd[,i], na.rm = T)
-  summary_met[i,32]=sd(all_new_ID_raw_cd[,i], na.rm = T)
-  summary_met[i,33]=length(boxplot(all_new_ID_raw_cd[,i], plot=FALSE, range = 3)$out)
-  summary_met[i,34]=min(all_new_ID_cd[,i], na.rm = T)
-  summary_met[i,35]=max(all_new_ID_cd[,i], na.rm = T)
-  summary_met[i,36]=sd(all_new_ID_cd[,i], na.rm = T)
-  nor=shapiro.test(norm_metab_CD[,i])
-  summary_met[i,37]=nor$p.value>=0.05
+    summary_met[i,28]=min(all_new_ID_raw_cd[,i], na.rm = T)
+    summary_met[i,29]=max(all_new_ID_raw_cd[,i], na.rm = T)
+    summary_met[i,30]=mean(all_new_ID_raw_cd[,i], na.rm = T)
+    summary_met[i,31]=median(all_new_ID_raw_cd[,i], na.rm = T)
+    summary_met[i,32]=sd(all_new_ID_raw_cd[,i], na.rm = T)
+    summary_met[i,33]=length(boxplot(all_new_ID_raw_cd[,i], plot=FALSE, range = 3)$out)
+    summary_met[i,34]=min(all_new_ID_cd[,i], na.rm = T)
+    summary_met[i,35]=max(all_new_ID_cd[,i], na.rm = T)
+    summary_met[i,36]=sd(all_new_ID_cd[,i], na.rm = T)
+    nor=shapiro.test(norm_metab_CD[,i])
+    summary_met[i,37]=nor$p.value>=0.05
   }
 #UC
   summary_met[i,38]=sum(is.na(all_new_ID_raw_uc[,i]))
   summary_met[i,39]=sum(!is.na(all_new_ID_raw_uc[,i]))
   if (var(all_new_ID_uc[,i]) == 0){
-  summary_met[i,40]="NA"
-  summary_met[i,41]="NA"
-  summary_met[i,42]="NA"
-  summary_met[i,43]="NA"
-  summary_met[i,44]="NA"
-  summary_met[i,45]="NA"
-  summary_met[i,46]="NA"
-  summary_met[i,47]="NA"
-  summary_met[i,48]="NA"
-  summary_met[i,49]="NA"
+    summary_met[i,40]="NA"
+    summary_met[i,41]="NA"
+    summary_met[i,42]="NA"
+    summary_met[i,43]="NA"
+    summary_met[i,44]="NA"
+    summary_met[i,45]="NA"
+    summary_met[i,46]="NA"
+    summary_met[i,47]="NA"
+    summary_met[i,48]="NA"
+    summary_met[i,49]="NA"
   }
   else{
-  summary_met[i,40]=min(all_new_ID_raw_uc[,i], na.rm = T)
-  summary_met[i,41]=max(all_new_ID_raw_uc[,i], na.rm = T)
-  summary_met[i,42]=mean(all_new_ID_raw_uc[,i], na.rm = T)
-  summary_met[i,43]=median(all_new_ID_raw_uc[,i], na.rm = T)
-  summary_met[i,44]=sd(all_new_ID_raw_uc[,i], na.rm = T)
-  summary_met[i,45]=length(boxplot(all_new_ID_raw_uc[,i], plot=FALSE, range = 3)$out)
-  summary_met[i,46]=min(all_new_ID_uc[,i], na.rm = T)
-  summary_met[i,47]=max(all_new_ID_uc[,i], na.rm = T)
-  summary_met[i,48]=sd(all_new_ID_uc[,i], na.rm = T)
-  nor=shapiro.test(norm_metab_UC[,i])
-  summary_met[i,49]=nor$p.value>=0.05
+    summary_met[i,40]=min(all_new_ID_raw_uc[,i], na.rm = T)
+    summary_met[i,41]=max(all_new_ID_raw_uc[,i], na.rm = T)
+    summary_met[i,42]=mean(all_new_ID_raw_uc[,i], na.rm = T)
+    summary_met[i,43]=median(all_new_ID_raw_uc[,i], na.rm = T)
+    summary_met[i,44]=sd(all_new_ID_raw_uc[,i], na.rm = T)
+    summary_met[i,45]=length(boxplot(all_new_ID_raw_uc[,i], plot=FALSE, range = 3)$out)
+    summary_met[i,46]=min(all_new_ID_uc[,i], na.rm = T)
+    summary_met[i,47]=max(all_new_ID_uc[,i], na.rm = T)
+    summary_met[i,48]=sd(all_new_ID_uc[,i], na.rm = T)
+    nor=shapiro.test(norm_metab_UC[,i])
+    summary_met[i,49]=nor$p.value>=0.05
   }
 }
 summary_met[,1]=colnames(all_new_ID_raw)
@@ -392,10 +420,12 @@ Summary statistics per sample
 
 all_new_ID_raw2=as.data.frame(t(all_new_ID_raw))
 summary_sample=matrix(nrow=ncol(all_new_ID_raw2), ncol=3)
+
 for (i in 1:ncol(all_new_ID_raw2)){
   summary_sample[i,2]=sum(is.na(all_new_ID_raw2[,i]))
   summary_sample[i,3]=sum(!is.na(all_new_ID_raw2[,i]))
 }
+
 summary_sample[,1]=colnames(all_new_ID_raw2)
 summary_sample=as.data.frame(summary_sample)
 colnames(summary_sample)=c("Metabolite", "NAs","Non_NAs")
@@ -428,7 +458,7 @@ ggscatter(phenos_lld,"scfa_Acetic.acid","scfa_old_Acetat_umol.g",add="reg.line",
 
 ggscatter(phenos_lld,"scfa_Propionic.acid","scfa_old_Propionat_umol.g",add="reg.line", conf.int = T, add.params = list(color = "red",fill = "purple")) +  stat_cor( label.x = 3, method = "spearman") + xlab ("Propionate new measurment") + ylab ("Propionate old measurment")
 
-ggscatter(phenos_lld,"scfa_Acetic.acid","scfa_old_Acetat_umol.g",add="reg.line", conf.int = T, add.params = list(color = "red",fill = "purple")) +  stat_cor( label.x = 3, method = "spearman") + xlab ("Acetate new measurment") + ylab ("Acetate old measurment")
+ggscatter(phenos_lld,"scfa_Valeric.acid","scfa_old_Valerat_umol.g",add="reg.line", conf.int = T, add.params = list(color = "red",fill = "purple")) +  stat_cor( label.x = 3, method = "spearman") + xlab ("Acetate new measurment") + ylab ("Acetate old measurment")
 
 ```
 
@@ -439,36 +469,38 @@ Filter metabolites based on the presence / absence
 ```{r, warning=F,message=FALSE, echo=TRUE}
 
 to_remove_90=subset(summary_short2,prevalence_CT<10 | prevalence_CD<10 | prevalence_UC<10)
-removeCT=subset(summary_short2,prevalence_CT<10)
-removeCT=factor(removeCT$Metabolite)
-removeCD=subset(summary_short2,prevalence_CD<10)
-removeCD=factor(removeCD$Metabolite)
-removeUC=subset(summary_short2,prevalence_UC<10)
-removeUC=factor(removeUC$Metabolite)
+
+keepCT=subset(summary_short2,prevalence_CT>10)
+keepCT=factor(keepCT$Metabolite)
+keepCD=subset(summary_short2,prevalence_CD>10)
+keepCD=factor(keepCD$Metabolite)
+keepUC=subset(summary_short2,prevalence_UC>10)
+keepUC=factor(keepUC$Metabolite)
 ```
 
-Venn diagram metabolites present in less than 10% of the samples
+Number of metabolites to keep after removing metabolites present in less than 10% of the samples
 
 ```{r, warning=F,message=FALSE, echo=F}
-plot(euler(list(A = removeCT, B = removeCD, C = removeUC)),quantities=T, label=c("Controls","CD", "UC"))
+plot(euler(list(A = keepCT, B = keepCD, C = keepUC)),quantities=T, label=c("Controls","CD", "UC"))
 ```
+
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
 #to_remove=subset(summary_met, summary_met$perc_missing>85)
 to_remove_80=subset(summary_short2,prevalence_CT<20 | prevalence_CD<20 | prevalence_CD<20)
-removeCT=subset(summary_short2,prevalence_CT<20)
-removeCT=factor(removeCT$Metabolite)
-removeCD=subset(summary_short2,prevalence_CD<20)
-removeCD=factor(removeCD$Metabolite)
-removeUC=subset(summary_short2,prevalence_UC<20)
-removeUC=factor(removeUC$Metabolite)
 
+keepCT=subset(summary_short2,prevalence_CT>20)
+keepCT=factor(keepCT$Metabolite)
+keepCD=subset(summary_short2,prevalence_CD>20)
+keepCD=factor(keepCD$Metabolite)
+keepUC=subset(summary_short2,prevalence_UC>20)
+keepUC=factor(keepUC$Metabolite)
 ```
 
-Venn diagram metabolites missing >85% per cohort
+Numbers of metabolites to keep after removing metabolites present in less than 20% of the samples
 
 ```{r, warning=F,message=FALSE, echo=F}
-plot(euler(list(A = removeCT, B = removeCD, C = removeUC)),quantities=T, label=c("Controls","CD", "UC"))
+plot(euler(list(A = keepCT, B = keepCD, C = keepUC)),quantities=T, label=c("Controls","CD", "UC"))
 ```
 
 
@@ -482,7 +514,7 @@ to_remove1=to_remove
 rownames(to_remove1)=to_remove1$Metabolite
 to_remove1=merge(annot,to_remove1,by="row.names")
 to_remove2=factor(to_remove$Metabolite)
-`%ni%` <- Negate(`%in%`)
+
 ```
 
 ```{r}
@@ -498,21 +530,6 @@ norm_UC_filt=subset(norm_metab_UC,select = names(norm_metab_UC) %ni% to_remove2)
 norm_filt=subset(norm_metab,select = names(norm_metab) %ni% to_remove2)
 annot_v2=subset(annot,rownames(annot) %in% names(norm_filt))
 
-#Adjust diagnosis in the phenotype file
-
-#phenos3$Diag="Controls"
-#phenos3[phenos3$DiagnosisCurrent=="CD",]$Diag="CD"
-#phenos3[phenos3$DiagnosisCurrent=="UC",]$Diag="UC"
-#phenos3[phenos3$DiagnosisCurrent=="ReconsideringDiagnosis",]$Diag="IBDU"
-#phenos3[phenos3$DiagnosisCurrent=="IBDI",]$Diag="IBDU"
-
-#rownames(phenos_scfa)=phenos_scfa$Row.names
-#phenos_scfa$Diag="Controls"
-#phenos_scfa[phenos_scfa$DiagnosisCurrent=="CD",]$Diag="CD"
-#phenos_scfa[phenos_scfa$DiagnosisCurrent=="UC",]$Diag="UC"
-#phenos_scfa[phenos_scfa$DiagnosisCurrent=="ReconsideringDiagnosis",]$Diag="IBDU"
-#phenos_scfa[phenos_scfa$DiagnosisCurrent=="IBDI",]$Diag="IBDU"
-
 #Merge phenotyes
 CD_f_t=merge(cc_pheno,norm_CD_filt,by="row.names")
 CT_f_t=merge(cc_pheno,norm_CT_filt,by="row.names")
@@ -522,8 +539,211 @@ all_f_t=merge(cc_pheno,norm_filt,by="row.names")
 ```
 
 
+
+Prepare taxa profiles
+===
+
+1. Focus only at species taxa level
+
+
+2. Filter out taxa present in less than 20% of all samples
+
+
+3. Create subsets per cohort
+
+```{r, warning=F,message=FALSE, echo=T}
+#Clean names
+LLD_sp=LLD_taxa[grep("s__", rownames(LLD_taxa)), ]
+IBD_sp=IBD_taxa[grep("s__", rownames(IBD_taxa)), ]
+LLD_sp=LLD_sp[!grepl("t__", rownames(LLD_sp)), ]
+IBD_sp=IBD_sp[!grepl("t__", rownames(IBD_sp)), ]
+row.names(LLD_sp)=gsub(".*s__","",row.names(LLD_sp))
+row.names(IBD_sp)=gsub(".*s__","",row.names(IBD_sp))
+
+#Merge
+taxa=as.data.frame(t(merge(IBD_sp,LLD_sp, by="row.names")))
+taxa=merge(IBD_sp,LLD_sp, by="row.names")
+row.names(taxa)=taxa$Row.names
+taxa$Row.names=NULL
+taxa=taxa[, colSums(taxa != 0) > 0]
+taxa=as.data.frame(t(taxa))
+
+#Match samples
+taxa2=subset(taxa,rownames(taxa) %in% rownames(norm_filt))
+
+#Filter present in at least 20% of the samples
+taxa2=taxa2/100
+taxa2[taxa2=="NA"]=0
+taxa2[taxa2=="NaN"]=0
+taxa_filt=taxa2[,((colSums(taxa2 !=0) / nrow(taxa2)) *100 )>20]
+
+
+#Data transformation
+
+#Choose square root arcsine transformation
+taxa_filt=asin(sqrt(taxa_filt))
+
+#Choose square root arcsine transformation
+#taxa_filt2=as.data.frame(clr(as.matrix(taxa_filt)))
+
+taxa_and_mb=merge(taxa_filt,norm_filt,by="row.names")
+rownames(taxa_and_mb)=taxa_and_mb$Row.names
+taxa_and_mb$Row.names=NULL
+
+#Split per phenotype
+rownames(CD_f_t)=CD_f_t$Row.names
+CD_f_t$Row.names=NULL
+
+rownames(CT_f_t)=CT_f_t$Row.names
+CT_f_t$Row.names=NULL
+
+rownames(UC_f_t)=UC_f_t$Row.names
+UC_f_t$Row.names=NULL
+
+tmb_CD=subset(taxa_and_mb,rownames(taxa_and_mb) %in% rownames(CD_f_t))
+tmb_UC=subset(taxa_and_mb,rownames(taxa_and_mb) %in% rownames(UC_f_t))
+tmb_CT=subset(taxa_and_mb,rownames(taxa_and_mb) %in% rownames(CT_f_t))
+```
+
+
+PCA: Samples clustered on metabolites
+===
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+
+pca_log= prcomp(norm_filt,scale. = T, center = T)
+cmp_log=as.data.frame(pca_log$x[,1:5])
+cc_pheno2=read.delim("~/Documents/Project_Metabolome/1.Input_files/mini_pheno2.txt", row.names=1)
+cmp_log2=merge(cc_pheno2,cmp_log,by="row.names")
+v_exp = pca_log$sdev^2
+prop_v_exp= data.frame( PC=1:length(v_exp),perc= 100*(v_exp / sum(v_exp)))
+
+```
+
+
+Percentage of variance explained per component
+---
+
+```{r}
+prop_v_exp2=prop_v_exp[1:20,]
+ggplot(prop_v_exp2, aes (PC,perc)) + geom_bar (stat="identity") + geom_text(aes(label=round(perc, 2)), size=3, vjust=-.5) + theme_bw() + xlab ("Principal components") + ylab ("% explained variance")
+```
+
+
+PC1 & PC2: Diagnosis
+---
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+```
+
+PC2 & PC3: Diagnosis
+---
+
+```{r}
+ggplot(cmp_log2, aes(-PC2,-PC3, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+```
+
+PC1 & PC2: Bowel Movements a day
+---
+
+```{r}
+ggplot(cmp_log2, aes(-PC1,-PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
+```
+
+PC1 & PC2: Bristol stool scale binary (soft vs hard)
+---
+
+```{r}
+ggplot(cmp_log2, aes(-PC1,-PC2, color=clinical_BinaryBSS)) + geom_point() + theme_bw()
+```
+
+PC1 & PC2: Number of months that the sample spend in the -80 freezer
+---
+
+```{r}
+ggplot(cmp_log2, aes(-PC1,-PC2, color=metabolon_Month_in_freezer)) + geom_point() + theme_bw()
+```
+
+
+
+
+PCA/PCoA: Microbiota composition (taxa)
+===
+
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+#Filter present in at least 20% of the samples
+taxa2=subset(taxa,rownames(taxa) %in% rownames(norm_filt))
+taxa2=taxa2/100
+taxa2[taxa2=="NA"]=0
+taxa2[taxa2=="NaN"]=0
+taxa_filt=taxa2[,((colSums(taxa2 !=0) / nrow(taxa2)) *100 )>20]
+#Data transformation
+#Choose square root arcsine transformation
+taxa_asin=asin(sqrt(taxa_filt))
+
+#Calculate bray curtis dissimilarity
+bc_dis=vegdist(taxa_asin,method = "bray")
+tax_mds <- metaMDS(comm=bc_dis,k=5, autotransform = FALSE)
+data.scores <- as.data.frame(scores(tax_mds))
+data.scores$site <- rownames(tax_mds) 
+bc_mds=merge(cc_pheno2,data.scores,by="row.names")
+
+#Choose centered log-ratios
+taxa_clr=as.data.frame(clr(as.matrix(taxa_filt)))
+pca_clr= prcomp(taxa_clr,scale. = T, center = T)
+cmp_clr=as.data.frame(pca_clr$x[,1:5])
+cmp_clr2=merge(cc_pheno2,cmp_clr,by="row.names")
+```
+
+
+PCoA plot based on the Bray-Curtis dissimilarites calculated from 112 bacterial species 
+---
+
+For microbiome data we made the following selection
+
+__a) Select only species level__
+__b) Select species present in at least 20% of the samples__
+
+```{r}
+
+ggplot(bc_mds, aes(NMDS1,NMDS2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+
+```
+
+
+PCA plot based on the centered-log ratio abundances of 116 bacterial species
+---
+
+```{r}
+
+ggplot(cmp_clr2, aes(PC1,PC2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+
+```
+
+
+
+#First cluster metabolites, then do the fit...
+```{r eval=FALSE, include=FALSE}
+#norm_filt_fit=subset(norm_filt,rownames(norm_filt) %in% rownames(taxa_clr))
+#fit_mb_to_tx=envfit(tax_mds,norm_filt_fit)
+#df <- data.frame((fit_mb_to_tx$vectors)$arrows, (fit_mb_to_tx$vectors)$r, (fit_mb_to_tx$vectors)$pvals)
+#write.table(df,"~/Documents/Project_Metabolome/4.Summary_stats/envfit_test.txt", sep="\t", quote = F)
+```
+
+
 Explore the correlations and clustering between metabolites
-----
+====
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+
+clustering_results=NbClust(all_new_ID, diss=NULL, distance = "euclidean", method = "ward.D2", index="all")
+
+clustering_results=NbClust(norm_CT_filt, diss=NULL, distance = "euclidean", method = "ward.D2", index="silhouette")
+
+```
+
 
 Correlations using Spearman correlation. 
 
@@ -532,6 +752,15 @@ Correlations using Spearman correlation.
 corCD=cor(norm_CD_filt,method = "spearman")
 corCT=cor(norm_CT_filt,method = "spearman")
 corUC=cor(norm_UC_filt,method = "spearman")
+
+distCD=as.dist(1-corCD)
+distUC=as.dist(1-corUC)
+distCT=as.dist(1-corCT)
+
+clustCD= hclust(distCD, method = "ward.D2", members=NULL)
+clustUC= hclust(distUC, method = "ward.D2", members=NULL)
+clustCT= hclust(distCT, method = "ward.D2", members=NULL)
+
 
 annot_v3=annot_v2
 annot_v3$SUB.PATHWAY=NULL
@@ -658,53 +887,6 @@ Prepare taxonomic data: keep only species level, remove taxa present <20% of the
 
 One IBD sample (G105251=>IBDFEC0435) does not have MGS data
  
-```{r, warning=F,message=FALSE, echo=T}
-#Clean names
-LLD_sp=LLD_taxa[grep("s__", rownames(LLD_taxa)), ]
-IBD_sp=IBD_taxa[grep("s__", rownames(IBD_taxa)), ]
-LLD_sp=LLD_sp[!grepl("t__", rownames(LLD_sp)), ]
-IBD_sp=IBD_sp[!grepl("t__", rownames(IBD_sp)), ]
-row.names(LLD_sp)=gsub(".*s__","",row.names(LLD_sp))
-row.names(IBD_sp)=gsub(".*s__","",row.names(IBD_sp))
-
-#Merge
-taxa=as.data.frame(t(merge(IBD_sp,LLD_sp, by="row.names")))
-taxa=merge(IBD_sp,LLD_sp, by="row.names")
-row.names(taxa)=taxa$Row.names
-taxa$Row.names=NULL
-taxa=as.data.frame(t(taxa))
-
-#Match samples
-taxa2=subset(taxa,rownames(taxa) %in% rownames(norm_filt))
-
-#Filter present in at least 20% of the samples
-taxa2=taxa2/100
-taxa2[taxa2=="NA"]=0
-taxa2[taxa2=="NaN"]=0
-taxa_filt=taxa2[,((colSums(taxa2 !=0) / nrow(taxa2)) *100 )>20]
-taxa_filt=asin(sqrt(taxa_filt))
-
-taxa_and_mb=merge(taxa_filt,norm_filt,by="row.names")
-rownames(taxa_and_mb)=taxa_and_mb$Row.names
-taxa_and_mb$Row.names=NULL
-
-#Split per phenotype
-rownames(CD_f_t)=CD_f_t$Row.names
-CD_f_t$Row.names=NULL
-
-rownames(CT_f_t)=CT_f_t$Row.names
-CT_f_t$Row.names=NULL
-
-rownames(UC_f_t)=UC_f_t$Row.names
-UC_f_t$Row.names=NULL
-
-tmb_CD=subset(taxa_and_mb,rownames(taxa_and_mb) %in% rownames(CD_f_t))
-tmb_UC=subset(taxa_and_mb,rownames(taxa_and_mb) %in% rownames(UC_f_t))
-tmb_CT=subset(taxa_and_mb,rownames(taxa_and_mb) %in% rownames(CT_f_t))
-```
-
-
-
 Spearman correlation between bacteria abundances and metabolite values. Later we can consider more elegant methods.
 
 Correlations are performed per cohort. Combining disease with control cohorts could influence the correlations (disease co-occurring events)
@@ -831,7 +1013,7 @@ Preliminar differential abundance analyses: diseases and host phenotypes
   
 First we conduct analysis to identify disease trend.
 
-Important! Notice that here we don't take into account any counfunding or correction factors.
+__Important! Notice that here we don't take into account any counfunding or correction factors__
 
 However, we remove patients with pouch or stomas (n=66) due to their dysbiotic profile seen at taxa and metabolic levels.
 
@@ -925,7 +1107,7 @@ table(cd_cnt2$sig_uc)
 Using the above thresholds we found that almost half of the metabolites are differentially abundant on patients with CD (787/1438) and ~10% in patients with UC (158/1438). 
 
 
-Volcano plot of differentially abundant metabolites when comparing controls to patients with CD
+__Volcano plot of differentially abundant metabolites when comparing controls to patients with CD__
 
 
 ```{r, warning=F,message=FALSE, echo=F, fig.align='center'}
@@ -941,7 +1123,7 @@ ggplotly(ba)
 
 
 
-Volcano plot of differentially abundant metabolites when comparing controls to patients with UC
+__Volcano plot of differentially abundant metabolites when comparing controls to patients with UC__
 
 
 ```{r, warning=F,message=FALSE, echo=F, fig.align='center'}
@@ -953,6 +1135,112 @@ bb=ggplot(cd_cnt2,aes(x=as.numeric(as.character(Log2_Fold_change_UC)), y=log10_p
    scale_color_manual(values = c( "blue","black","gray38","coral1")) + xlim (-6,6) + geom_hline(yintercept = 1.30, linetype = "dashed", color="purple") +
    geom_vline(xintercept = c(-1, 1), linetype = "dashed", color="purple")
 ggplotly(bb)
+```
+
+
+Exploring potential confouders
+----
+
+__Perform a linear model including: age, sex, BMI, Bristol Stool Scale (Hard or Soft), Months that the sample spend in the freezer, bowel movements a day and diagnosis (IBD or Control)__
+
+
+lm (Metabolite ~ Age + Sex + BMI + BSS + Freezer_time + Bowel movements + Diagnosis)
+
+
+Testing 1368 metabolites, 
+
+
+```{r, warning=F,message=FALSE, echo=T}
+
+cc2 <- read.delim("~/Documents/Project_Metabolome/1.Input_files/mini_pheno3.txt", row.names=1)
+cc2$BSS=cc2$clinical_BinaryBSS
+cc2$BSS[is.na(cc2$BSS)] <- "Hard"
+cc2$Diag=as.character(cc2$ibd_Diagnosis)
+cc2$Diag[cc2$ibd_Diagnosis!="Control"]="IBD"
+mcc2=merge(cc2,norm_filt,by="row.names")
+
+#Test IBD vs Controls
+mcc3=mcc2
+#mcc3=subset(mcc2,mcc2$ibd_Diagnosis!="UC")
+#mcc3=subset(mcc3,mcc3$ibd_Diagnosis!="IBDU")
+tmp_results=matrix(nrow=ncol(mcc3)*7,ncol = 5)
+my_col=1
+for (i in 16:ncol(mcc3)){
+  my_lm=lm(mcc3[,i]~host_Age_sampling+host_Sex+host_BMI+BSS+metabolon_Month_in_freezer+clinical_BowelMovementADayDef+Diag, data=mcc3)
+  my_sum=summary(my_lm)
+  for (a in 2:nrow(my_sum$coefficients)){
+  #Metabolite
+  tmp_results[my_col,1]=colnames(mcc3)[i]
+  #Factor
+  tmp_results[my_col,2]=rownames(my_sum$coefficients)[a]
+  #Estimate
+  tmp_results[my_col,3]=my_sum$coefficients[a,1]
+  #SE
+  tmp_results[my_col,4]=my_sum$coefficients[a,2]
+  #p-value
+  tmp_results[my_col,5]=my_sum$coefficients[a,4]
+  my_col=my_col+1
+  }
+} 
+my_results=as.data.frame(tmp_results)
+my_results=my_results[complete.cases(my_results$V1),]
+colnames(my_results)=c("Metabolite","Factor","Estimate","SE","pvalue")
+my_results$FDR=p.adjust(as.numeric(as.character(my_results$pvalue)),method = "fdr")
+my_sig=subset(my_results,my_results$FDR<0.05)
+
+
+
+```
+
+
+```{r, warning=F,message=FALSE, echo=T}
+sig_df=as.data.frame(table(my_sig$Factor))
+my_sig_met=as.data.frame(table(my_sig$Metabolite))
+my_sig_met=my_sig_met[my_sig_met$Freq>0,]
+
+BSS=subset(my_sig, my_sig$Factor=="BSSSoft")
+BSS2=factor(BSS$Metabolite)
+
+move=subset(my_sig, my_sig$Factor=="clinical_BowelMovementADayDef")
+move=factor(move$Metabolite)
+
+mon=subset(my_sig, my_sig$Factor=="metabolon_Month_in_freezer")
+mon=factor(mon$Metabolite)
+
+sex=subset(my_sig, my_sig$Factor=="host_Sexmale")
+sex=factor(sex$Metabolite)
+
+
+age=subset(my_sig, my_sig$Factor=="host_Age_sampling")
+age=factor(age$Metabolite)
+
+
+bmi=subset(my_sig, my_sig$Factor=="host_BMI")
+bmi=factor(bmi$Metabolite)
+
+
+ibd=subset(my_sig, my_sig$Factor=="DiagIBD")
+ibd=factor(ibd$Metabolite)
+
+
+
+my_test_list=list(IBD =ibd, BMI = bmi, Age = age, Sex=sex ,Month_in_freezer=mon, Bowel_move=move, BSS=BSS2)
+
+```
+
+__Number of associated metabolites per feature__
+
+
+```{r}
+datatable(sig_df)
+```
+
+
+IBD and Bristol stool scale are the parameters that contribute to the largest (and significant) proportion of metabolites variation. However, a proportion of the metabolites (~100/1368 is associated to the time that the sample was stored in a freezer -80C), showing the importance of potential technical confounders in the further associations analyses. 
+
+
+```{r, warning=F,message=FALSE, echo=F}
+upset(fromList(my_test_list), order.by = "freq", nsets = 7)
 ```
 
 
