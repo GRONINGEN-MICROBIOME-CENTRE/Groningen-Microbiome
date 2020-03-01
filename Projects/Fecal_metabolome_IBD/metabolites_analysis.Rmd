@@ -45,11 +45,58 @@ library(DT)
 library(pvclust)
 library(compositions)
 library(RColorBrewer)
+```
 
+Functions
+---
+
+```{r}
 #Inverse rank transformation function. 
 invrank= function(x) {qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))}
 
+#negate in (to exclude columns)
 `%ni%` <- Negate(`%in%`)
+
+#Imputation and filtering metabolites
+impute_missing_values=function(x, samples_row=T, method="hfmin", missing_filter=0){
+  #if samples are in columns transpose
+  if (!samples_row){
+    x=as.data.frame(t(x))
+  } 
+  #Exclude/keep columns that pass the missigness threshold
+  if (missing_filter>1){
+    stop("\n Hey! \n Values should be a proportion of missing values allowed per column: a value from 0 to 1") 
+  }
+  col_ori=ncol(x)
+  col_keep=colnames(x)[colSums(!is.na(x))/nrow(x)>missing_filter]
+  x=x[,col_keep]
+  my_num_removed=col_ori-ncol(x)
+  warning (paste(my_num_removed, "columns removed due to many missing values"))
+  if (method=="zero"){
+    x[is.na(x)]=0
+  }
+  else if (method=="min"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), min(a, na.rm = TRUE), a))
+  }
+  else if (method=="hfmin"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), min(a, na.rm = TRUE)/2, a))
+  }
+  else if (method=="mean"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), mean(a, na.rm = TRUE), a))
+  }
+  else if (method=="median"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), median(a, na.rm = TRUE), a))
+  }
+  else if (method=="mice"){
+    require(mice)
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), median(a, na.rm = TRUE), a))
+  }
+  else{
+    stop("\n Hey! \n Method parameters for imputing missing values per column are: \n min -> min (col), hfmin -> min(col)/2, mean -> mean (col), median -> median(col), mice -> using mice package [Multivariate Imputation By Chained Equations] defaults \n")
+  }
+  return(as.data.frame(x))
+}
+
 ```
 
 Import data
@@ -125,7 +172,6 @@ Normalize and impute missing metabolites
 
 ```{r, echo=T, message=F}
 
-
 metabolite_test=as.data.frame(t(all_metabolites_raw))
 
 #scale date, mean =0 , sd =1
@@ -139,7 +185,6 @@ scaled_log_metabolites <- scale(metabolite_test_log)
 #Impute na's
 
 #Method 1: Median
-impute_missing_values=function(x)
 
 ```
 

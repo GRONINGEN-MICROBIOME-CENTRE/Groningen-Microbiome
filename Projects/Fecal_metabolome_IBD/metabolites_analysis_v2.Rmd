@@ -1,0 +1,827 @@
+---
+title: "Metabolites_analysis_v2"
+author: "Arnau Vich"
+date: "2/26/2020"
+output: html_document
+---
+
+Introduction
+===
+
+Untargeted metabolomics
+---
+
+In this project we aim to investigate the relation between fecal metabolites and inflammatory bowel diseases phenotypes. The cohort consist of 750 samples of different patients, devided in 255 controls from the population cohort LifeLines (NL), 270 patients with Crohns disease and 211 patients with ulcerative colitis from the 1000IBD cohort (NL). 
+
+Metabolites were measured using METABOLON platform combining untargeted metabolite detection with short chain fatty acids measurments. Untargeted metabolite detection consisted on an ultrahigh performance liquid chromatography tandem mass spectrocopy (UPLC-MS/MS): 2 acidic positive ion condition (C18 columns) + 1 Basic negative ion optimazed (C18 column) + 1 Basic negative ionization (Hilic column).
+
+Metabolites will be combined with the following data layers: matching shot-gun sequencing metagenomics (from the same sample), host phenotypes at time of sampling (including disease phenotypes), diet (food frequency questionnaires) & host genetics (GSA and WES data). 
+
+
+SCFA quantification [METABOLON description]
+---
+
+Human feces samples are analyzed for eight short chain fatty acids: acetic acid (C2), propionic acid (C3), isobutyric acid (C4), butyric acid (C4), 2-methyl-butyric acid (C5), isovaleric acid (C5), valeric acid (C5) and caproic acid (hexanoic acid, C6) by LC-MS/MS.
+
+
+Human feces samples are spiked with stable labelled internal standards and are homogenized and subjected to protein precipitation with an organic solvent. 
+
+The peak area of the individual analyte product ions is measured against the peak area of the product ions of the corresponding internal standards. Quantitation is performed using a weighted linear least squares regression analysis generated from fortified calibration standards prepared immediately prior to each run.
+
+
+The QC Endogenous was prepared from a single lot of human stool. All analytes are at the endogenous level except hexanoic acid, which was spiked in due to low levels in this lot. The other three levels of QC were prepared by spiking phosphate buffered saline (PBS) with all analytes to achieve the appropriate concentrations for each level.
+
+
+Sample analysis was carried out in a 96-well plate format containing two calibration curves and eight QC samples (per plate) to monitor assay performance. Twelve batches were prepared and analyzed.
+
+
+Precision was evaluated using the corresponding QC replicates in the sample runs. QCs met acceptance criteria at all levels for all analytes (Targeted acceptance criteria: at least 50% of QC samples at each concentration level per analyte should be within ±20.0% of the running mean, and at least 2/3 of all QC samples per analyte should fall within ±20.0% of the corresponding running mean.).
+
+
+A total of 750 human stool samples were analyzed.
+Analyte concentrations that fell below and above the limit of quantitation are extrapolated, and the reported values given a comment of BLOQ or ALOQ, respectively. 
+
+Analytes that cannot be extrapolated below the limit of quantitation are considered not quantifiable and are noted as N/Q. Samples that did not have sufficient quantity are noted as QNS.
+
+
+Load libraries
+---
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+library(corrplot)
+library(plotly)
+library(pheatmap)
+library(NbClust)
+library(reshape2)
+library(ggrepel)
+library(dplyr)
+library(eulerr)
+library(vegan)
+library(ape)
+library(ggridges)
+library (UpSetR)
+library(ggplot2)
+library(psych)
+library(ggord)
+library(mice)
+library(caret)
+library(factoextra)
+library(Rtsne)
+library(heatmaply)
+library(ggpubr)
+library(ggbiplot)
+library(coin)
+library(DT)
+library(pvclust)
+library(compositions)
+library(RColorBrewer)
+```
+
+Create functions
+---
+
+```{r}
+####################################
+#Inverse rank transformation function.
+####################################
+
+invrank= function(x) {qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))}
+
+###############################
+#negate in (to exclude columns)
+###############################
+
+`%ni%` <- Negate(`%in%`)
+
+#####################################
+#Imputation and filtering metabolites
+#####################################
+
+impute_missing_values=function(x, samples_row=T, method="hfmin", missing_filter=0){
+  #if samples are in columns transpose
+  if (!samples_row){
+    x=as.data.frame(t(x))
+  } 
+  #Exclude/keep columns that pass the missigness threshold
+  if (missing_filter>1){
+    stop("\n Hey! \n Values should be a proportion of missing values allowed per column: a value from 0 to 1") 
+  }
+  col_ori=ncol(x)
+  col_keep=colnames(x)[colSums(!is.na(x))/nrow(x)>missing_filter]
+  x=x[,col_keep]
+  my_num_removed=col_ori-ncol(x)
+  warning (paste(my_num_removed, "columns removed due to many missing values"))
+  if (method=="zero"){
+    x[is.na(x)]=0
+  }
+  else if (method=="min"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), min(a, na.rm = TRUE), a))
+  }
+  else if (method=="hfmin"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), min(a, na.rm = TRUE)/2, a))
+  }
+  else if (method=="mean"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), mean(a, na.rm = TRUE), a))
+  }
+  else if (method=="median"){
+    x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), median(a, na.rm = TRUE), a))
+  }
+  else if (method=="none"){
+    x=x
+  }
+  else{
+    stop("\n Hey! \n Method parameters for imputing missing values per column are: \n min -> min (col), hfmin -> min(col)/2, mean -> mean (col), median -> median(col), mice -> using mice package [Multivariate Imputation By Chained Equations] defaults \n")
+  }
+  return(as.data.frame(x))
+}
+
+
+##############################
+# Summary stats
+##############################
+
+summary_stats=function(feature_matrix,pheno){
+  a=1
+  num_var=length(levels(pheno[,1]))
+  print (paste("Number of phenotypes detected for summary statistics:", num_var))
+  summary_met=matrix(nrow=ncol(feature_matrix),ncol=(9*(num_var+1))+1)
+  for (i in 1:ncol(feature_matrix)){
+    #print (colnames(feature_matrix)[i])
+    pos=2
+    summary_met[i,pos]=sum(is.na(feature_matrix[,i]))
+    pos=pos+1
+    summary_met[i,pos]=sum(!is.na(feature_matrix[,i]))
+    if (sum(is.na(feature_matrix[,i]) == nrow(feature_matrix))){
+      pos=pos+1
+      summary_met[i,pos]="NA"
+      pos=pos+1
+      summary_met[i,pos]="NA"
+      pos=pos+1
+      summary_met[i,pos]="NA"
+      pos=pos+1
+      summary_met[i,pos]="NA"
+      pos=pos+1
+      summary_met[i,pos]="NA"
+      pos=pos+1
+      summary_met[i,pos]="NA"
+      pos=pos+1
+      summary_met[i,pos]="NA"
+    }
+    else{
+      pos=pos+1
+      summary_met[i,pos]=min(feature_matrix[,i], na.rm = T)
+      pos=pos+1
+      summary_met[i,pos]=max(feature_matrix[,i], na.rm = T)
+      pos=pos+1
+      summary_met[i,pos]=mean(feature_matrix[,i], na.rm = T)
+      pos=pos+1
+      summary_met[i,pos]=median(feature_matrix[,i], na.rm = T)
+      pos=pos+1
+      summary_met[i,pos]=sd(feature_matrix[,i], na.rm = T)
+      pos=pos+1
+      summary_met[i,pos]=length(boxplot(feature_matrix[,i], plot=FALSE, range = 3)$out)
+      if (sum(!is.na(feature_matrix[,i])) < 10){
+        pos=pos+1
+        summary_met[i,pos]="NA"
+        } else {
+        nor=shapiro.test(feature_matrix[,i])
+        pos=pos+1
+        summary_met[i,pos]=nor$p.value>=0.05
+      }
+    }
+    for (x in levels (pheno[,1])){
+      id_list=rownames(pheno)[pheno[,1]==x]
+      tmp_all=feature_matrix[rownames(feature_matrix)%in%id_list,]
+      pos=pos+1
+      summary_met[i,pos]=sum(is.na(tmp_all[,i]))
+      pos=pos+1
+      summary_met[i,pos]=sum(!is.na(tmp_all[,i]))
+      if (sum(is.na(tmp_all[,i]) == nrow(tmp_all))){
+        pos=pos+1
+        summary_met[i,pos]="NA"
+        pos=pos+1
+        summary_met[i,pos]="NA"
+        pos=pos+1
+        summary_met[i,pos]="NA"
+        pos=pos+1
+        summary_met[i,pos]="NA"
+        pos=pos+1
+        summary_met[i,pos]="NA"
+        pos=pos+1
+        summary_met[i,pos]="NA"
+        pos=pos+1
+        summary_met[i,pos]="NA"
+      }else{
+        pos=pos+1
+        summary_met[i,pos]=min(tmp_all[,i], na.rm = T)
+        pos=pos+1 
+        summary_met[i,pos]=max(tmp_all[,i], na.rm = T)
+        pos=pos+1 
+        summary_met[i,pos]=mean(tmp_all[,i], na.rm = T)
+        pos=pos+1
+        summary_met[i,pos]=median(tmp_all[,i], na.rm = T)
+        pos=pos+1 
+        summary_met[i,pos]=sd(tmp_all[,i], na.rm = T)
+        pos=pos+1 
+        summary_met[i,pos]=length(boxplot(tmp_all[,i], plot=FALSE, range = 3)$out)
+        if (sum(!is.na(tmp_all[,i])) < 10){
+          pos=pos+1 
+          summary_met[i,pos]="NA"
+          } else {
+          nor=shapiro.test(tmp_all[,i])
+          pos=pos+1 
+          summary_met[i,pos]=nor$p.value>=0.05
+          }
+        }
+      }
+    }
+  summary_met[,1]=colnames(feature_matrix)
+  my_colnames=c("Metabolite", "NAs","Non_NAs", "Min", "Max", "Mean", "Median","SD", "Outliers_x3IQR","Normal_distrib")
+  for (o in levels (pheno[,1])){
+    my_colnames=c(my_colnames,paste("NAs",o, sep="_"))
+    my_colnames=c(my_colnames,paste("Non_NAs",o,sep="_"))
+    my_colnames=c(my_colnames,paste("Min",o,sep="_"))
+    my_colnames=c(my_colnames,paste("Max",o,sep="_"))
+    my_colnames=c(my_colnames,paste("Mean",o,sep="_"))
+    my_colnames=c(my_colnames,paste("Median",o,sep="_"))
+    my_colnames=c(my_colnames,paste("SD",o,sep="_"))
+    my_colnames=c(my_colnames,paste("Outliers_x3IQR",o,sep="_"))
+    my_colnames=c(my_colnames,paste("Normal_distrib",o,sep="_"))
+  }
+  colnames(summary_met)=my_colnames
+  return(summary_met)
+}  
+
+
+
+###############################################
+# Filtering and transforming taxa             #
+###############################################
+
+transform_and_filter_taxa=function(x, samples_row=T, method="asin", missing_filter=0){
+  x[x=="NA"]=0
+  x[x=="NaN"]=0
+  #if samples are in columns transpose
+  if (!samples_row){
+  
+    x=as.data.frame(t(x))
+  
+  } 
+  #Exclude/keep columns that pass the missigness threshold
+  if (missing_filter>100){
+  
+    stop("\n Hey! \n Values should be a proportion of missing values allowed per column: a value from 0 to 100") 
+  
+  }
+  
+  x_filt=x[,((colSums(x !=0) / nrow(x)) *100 )>missing_filter]
+  my_num_removed=ncol(x)-ncol(x_filt)
+  print (paste(my_num_removed, "species removed due to many missing values"))
+  
+  if (method=="asin"){
+
+    x_filt=x_filt/100
+    x_filt=asin(sqrt(x_filt))
+
+  } else if (method=="log"){
+    
+    #replace 0 by the half of the smallest value observed
+    my_min=min(x_filt[x_filt>0]/2)
+    x_filt=x_filt+my_min
+    x_filt=log10(x_filt)
+
+  }else if (method=="clr"){
+  
+    x_filt=x_filt/100
+    #replace 0 by the half of the smallest value observed
+    my_min=min(x_filt[x_filt>0]/2)
+    x_filt=x_filt+my_min
+    #clr transformation (adapted from microbiome package function)
+    d <- apply(x_filt, 2, function(b) {
+      log(b) - mean(log(b))
+    })
+    x_filt=d
+  
+  }
+  return(as.data.frame(x_filt))
+}
+
+
+```
+
+
+1. Import data
+===
+
+a) Metabolites: Here we use both raw values provided by Metabolon (metabolites AUC).
+
+
+b) Short Chain Fatty Acids (SFCA): Together with the untargetted metabolite assessment, SCFA concentrations were measured in the same fecal samples (μg/g)
+
+
+c) Host phenotypes: Information about the host (age,sex,BMI, diet, etc.). This consist of 3 files: phenotypes shared and used for the case-control analysis, phenotypes specific for the population controls & phenotypes specific for cases (disease location, activity, etc.)
+
+
+d) Experiment variables: Different technical variables from the untargetted metabolic experiments. We will use this information as a potential counfounding factors. 
+
+
+e) Genetics. 
+
+
+f) Metagenomics taxa: MetaPhlan's profiles (v2.7)
+
+
+g) Pathway annotation provided by Metabolon
+
+
+h) ID's for each data modality: Allows to combine different datasets / information 
+
+```{r, warning, message=F, echo=T}
+#transformed metabolites (raw data transformed to adjust distrubution, medians = 1)
+#all_metabolites <- read.delim("~/Documents/Project_Metabolome/1.Input_files/all_metabolites2.txt", row.names=1)
+
+# a) Raw values (AUC of peaks)
+
+all_metabolites_raw <- read.delim("~/Documents/Project_Metabolome/1.Input_files/all_metabolites_raw2.txt", row.names=1)
+
+# b) SCFA
+
+SCFA <- read.delim("~/Documents/Project_Metabolome/1.Input_files/old/SCFA.txt")
+
+# c) Phenotypes
+
+phenos_ibd=read.delim("~/Documents/Project_Metabolome/1.Input_files/Merged_IBD_phenos_clean_v2.txt",row.names = 1)
+phenos_lld=read.delim("~/Documents/Project_Metabolome/1.Input_files/Merged_LLD_phenos_clean_v2.txt", row.names=1)
+cc_pheno=read.delim("~/Documents/Project_Metabolome/1.Input_files/case_control_meta_v1.txt", row.names=1)
+
+# d) Experiment variables 
+
+my_batch=read.delim("~/Documents/Project_Metabolome/1.Input_files/Metabolon_preparation_v2.txt", row.names=1)
+
+
+# e) Genetics
+
+
+# f) Metagenomic taxa (add metagenomic genes/pathways)
+
+IBD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa/IBD_taxonomy_unstrat_clean.txt", row.names=1)
+LLD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa/LLD_taxonomy_unstrat_clean.txt", row.names=1)
+
+
+# g) Metabolites annotation
+annot <- read.delim("~/Documents/Project_Metabolome/1.Input_files/info_metabolites_v2.txt", row.names=1)
+annot$SUPER.PATHWAY.1=NULL
+
+
+# h) ID's index (translate from different data modalities metabolomics <-> metagenomic <-> phenotypes)
+
+IDs_LLD <- read.delim("~/Documents/Project_Metabolome/1.Input_files/IDs_LLD.txt", header=FALSE)
+IDs_IBD <- read.delim("~/Documents/Project_Metabolome/1.Input_files/IDs_IBD.txt", header=FALSE)
+```
+
+
+Adjust all ids
+---
+
+__Translate all id's to the same id (easier to deal with multiple tables)__
+
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+
+#Change Metabolon ids to UMCG ids to connect later to phenotypes 
+all_raw=as.data.frame(t(all_metabolites_raw))
+
+# Select IDs
+IDs_IBD=IDs_IBD[,c(1,5)]
+IDs_LLD$V2=NULL
+
+# [IMPORTANT] Table with matching ids between UMCG and Metabolon
+IDs=data.frame(rbind(as.matrix(IDs_IBD), as.matrix(IDs_LLD)))
+rownames(IDs)=IDs$V1
+IDs$V1=NULL
+
+# Merge to replace the ids Metabolon => UMCG
+
+all_new_ID_raw=merge(IDs,all_raw, by="row.names")
+rownames(all_new_ID_raw)=all_new_ID_raw$V5
+all_new_ID_raw$Row.names=NULL
+all_new_ID_raw$V5=NULL
+
+#Repeat for the batch information: Metabolon ID => UMCG ID
+
+my_batch_id=merge(IDs,my_batch, by="row.names")
+rownames(my_batch_id)=my_batch_id$V5
+my_batch_id$Row.names=NULL
+my_batch_id$V5=NULL
+
+#In case that we use the transformed data provided by Metabolon
+
+#all=as.data.frame(t(all_metabolites))
+#all_new_ID=merge(IDs,all, by="row.names")
+#row.names(all_new_ID)=all_new_ID$V5
+#all_new_ID$V5=NULL
+#all_new_ID$Row.names=NULL
+#all_new_ID=all_new_ID[row.names(all_new_ID)%ni%remove_pouch_stoma,]
+#all_new_ID_with_stoma=all_new_ID
+```
+
+
+2. Summary statistics
+===
+
+
+Annotation by METABOLON
+---
+
+Describe the categories of metabolites
+---
+
+```{r, warning=F,message=FALSE, echo=F}
+met_2=as.data.frame(table(annot$SUPER.PATHWAY))
+met_1=as.data.frame(table(annot$SUB.PATHWAY))
+
+yy=ggplot(met_2, aes(x = reorder(Var1, -Freq),Freq)) + geom_bar(stat = "identity", color="black") + theme_classic() + theme(axis.title.x = element_blank(),axis.text.y = element_text(size = 12)) + coord_flip() + xlab("") + ylab("Number of metabolites")
+
+ggplotly(yy)
+```
+
+```{r, warning=F,message=FALSE, echo=F,fig.height=20}
+xx=ggplot(met_1, aes(x = reorder(Var1, -Freq),Freq)) + geom_bar(stat = "identity", color="black") + theme_classic() + theme(axis.title.x = element_blank(),axis.text.y = element_text(size = 5)) + coord_flip() + xlab("") + ylab("Number of metabolites")
+
+ggplotly(xx)
+```
+
+
+Remove participants with a pouch or stoma
+---
+
+__Rational: Patients with pouch or stoma do not capture the colonic metabolite/microbiota profile__
+
+```{r}
+remove_pouch_stoma=rownames(phenos_ibd)[phenos_ibd$ibd_CurrentStomaOrPouch=="yes"]
+#Keep data of the participants with stoma
+all_new_ID_raw_with_stoma=all_new_ID_raw
+#Remove
+all_new_ID_raw=all_new_ID_raw[row.names(all_new_ID_raw)%ni%remove_pouch_stoma,]
+cc_pheno=cc_pheno[row.names(cc_pheno)%ni%remove_pouch_stoma,]
+print (paste("Number of samples excluded due to pouch or stoma:", length(remove_pouch_stoma)))
+```
+
+Normalize and impute missing metabolites
+---
+
+```{r, echo=T, message=F, warning=F}
+
+all_new_ID_tmp=as.data.frame(t(all_new_ID_raw))
+
+
+#apply log10 transformation + scale
+all_new_ID_tmp=log10(all_new_ID_tmp)
+
+#scale date, mean =0 , sd =1
+all_new_ID_tmp <- scale(all_new_ID_tmp)
+
+#Impute na's 
+### WARNING: now we are using the half of the minimum observed value per metabolite, in the future => KNN imputation
+all_new_ID=impute_missing_values(all_new_ID_tmp,samples_row = T, method = "hfmin", missing_filter = 0)
+
+all_new_ID=as.data.frame(t(all_new_ID))
+```
+
+
+Summary stats per metabolite per cohort
+---
+
+```{r, echo=T, message=F, warning=F}
+
+#Raw data
+select=cc_pheno[,1, drop=F]
+summary_met=summary_stats(all_new_ID_raw,select)
+summary_met=as.data.frame(summary_met)
+#Transformed data
+summary_met_trans=summary_stats(all_new_ID, select)
+summary_met_trans=as.data.frame(summary_met_trans)
+```
+
+
+__Check prevalence per phenotype__
+
+```{r, echo=T, message=F, warning=F}
+summary_short=summary_met[,c("Metabolite", "Non_NAs")]
+summary_short2=summary_met[,c("Metabolite","Non_NAs","Non_NAs_Control","Non_NAs_CD", "Non_NAs_UC")]
+summary_short2$prevalence_all=((as.numeric(as.character(summary_short2$Non_NAs))/nrow(all_new_ID))*100)
+summary_short2$prevalence_Control=((as.numeric(as.character(summary_short2$Non_NAs_Control))/length(select[select$ibd_Diagnosis=="Control",])*100))
+summary_short2$prevalence_CD=((as.numeric(as.character(summary_short2$Non_NAs_CD))/length(select[select$ibd_Diagnosis=="CD",])*100))
+summary_short2$prevalence_UC=((as.numeric(as.character(summary_short2$Non_NAs_UC))/length(select[select$ibd_Diagnosis=="UC",])*100))
+summary_short2$Non_NAs=NULL
+summary_short2$Non_NAs_Control=NULL
+summary_short2$Non_NAs_CD=NULL
+summary_short2$Non_NAs_UC=NULL
+summary_short2[,-1] <-round(summary_short2[,-1],0)
+summary_short3=melt(summary_short2)
+```
+
+__Presence of each metabolite per sample__
+
+```{r, echo=F}
+aa=ggplot(summary_short, aes(reorder(Metabolite,-as.numeric(as.character(Non_NAs))),as.numeric(as.character(Non_NAs))))+ geom_bar(color="darkblue",stat = "identity") + theme_classic() + ylab("Number of samples (n=750)") + xlab("Metabolites") +  theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
+
+ggplotly(aa)
+```
+
+__Percentage of prevalence of metabolites per cohort__
+
+```{r, echo=F}
+bb=ggplot(summary_short3, aes(value, fill=variable)) + geom_histogram(position = "dodge", bins = 10, binwidth = 7, color="black") + theme_bw() + scale_fill_manual(values = c("grey79","white","blue2", "firebrick2")) + ylab("Number of metabolites") + xlab("% presence in samples")
+
+ggplotly(bb)
+```
+
+__Prevalence/Missigness per metabolite per cohort with annotations__
+
+```{r, echo=F}
+summary_short4=summary_short2
+rownames(summary_short4)=summary_short4$Metabolite
+summary_short4$Metabolite=NULL
+summary_short4=merge(annot,summary_short4, by="row.names")
+rownames(summary_short4)=summary_short4$Row.names
+summary_short4$Row.names=NULL
+colnames(summary_short4)=c("Super pathway","Annotation", "Detected in cohort (%)", "Detected in controls (%)", "Detected in CD (%)", "Dectected in UC (%)")
+datatable(summary_short4)
+```
+
+
+__Number of metabolites per samples__
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+
+all_new_ID_raw2=as.data.frame(t(all_new_ID_raw))
+summary_sample=matrix(nrow=ncol(all_new_ID_raw2), ncol=3)
+
+for (i in 1:ncol(all_new_ID_raw2)){
+  summary_sample[i,2]=sum(is.na(all_new_ID_raw2[,i]))
+  summary_sample[i,3]=sum(!is.na(all_new_ID_raw2[,i]))
+}
+
+summary_sample[,1]=colnames(all_new_ID_raw2)
+summary_sample=as.data.frame(summary_sample)
+colnames(summary_sample)=c("Metabolite", "NAs","Non_NAs")
+summary_sample$perc_detected=((as.numeric(as.character(summary_sample$Non_NAs))/nrow(all_new_ID_raw2))*100)
+rownames(summary_sample)=summary_sample$Metabolite
+summary_sample$Metabolite=NULL
+summary_sample2=merge(summary_sample,cc_pheno,by="row.names")
+```
+
+
+```{r, echo=F}
+cc=ggplot(summary_sample2, aes(perc_detected, fill=ibd_Diagnosis)) + geom_histogram(position = "dodge", bins = 100, binwidth = 7, color="black") + theme_bw() + scale_fill_manual(values = c("firebrick2","white","grey42","blue2")) + ylab("Number of samples") + xlab("% detected metabolites")
+
+ggplotly(cc)
+```
+
+
+__Summary statistics microbiome__
+
+1. Focus only at species taxa level
+
+
+2. Filter out taxa present in less than 20% of all samples
+
+
+```{r, warning=F,message=FALSE, echo=T}
+
+#Clean names
+LLD_sp=LLD_taxa[grep("s__", rownames(LLD_taxa)), ]
+IBD_sp=IBD_taxa[grep("s__", rownames(IBD_taxa)), ]
+LLD_sp=LLD_sp[!grepl("t__", rownames(LLD_sp)), ]
+IBD_sp=IBD_sp[!grepl("t__", rownames(IBD_sp)), ]
+row.names(LLD_sp)=gsub(".*s__","",row.names(LLD_sp))
+row.names(IBD_sp)=gsub(".*s__","",row.names(IBD_sp))
+
+#Merge
+taxa=as.data.frame(t(merge(IBD_sp,LLD_sp, by="row.names")))
+taxa=merge(IBD_sp,LLD_sp, by="row.names")
+row.names(taxa)=taxa$Row.names
+taxa$Row.names=NULL
+
+#Remove samples that miss microbiome data
+taxa=taxa[, colSums(taxa != 0) > 0]
+taxa=as.data.frame(t(taxa))
+
+my_shannon=as.data.frame(diversity(taxa, index="shannon"))
+colnames(my_shannon)=c("Shannon_Index")
+my_simpson=as.data.frame(diversity(taxa, index="simpson"))
+colnames(my_simpson)=c("Simpson_Index")
+richness_microbiota=merge(my_shannon,my_simpson,by="row.names")
+rownames(richness_microbiota)=richness_microbiota$Row.names
+richness_microbiota$Row.names=NULL
+richness_microbiota2=subset(richness_microbiota,rownames(richness_microbiota) %in% rownames(summary_sample))
+cc_pheno2=merge(richness_microbiota2,cc_pheno,by="row.names", all = T)
+rownames(cc_pheno2)=cc_pheno2$Row.names
+cc_pheno2$Row.names=NULL
+```
+
+__Microbial richness indexes (Shannon & Simpson)__
+
+```{r, echo=F}
+ggplot(cc_pheno2, aes(ibd_Diagnosis,Shannon_Index, fill=ibd_Diagnosis)) + theme_bw() + geom_violin() + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.4) + scale_fill_manual(values = c("firebrick2","white","grey42","blue2"))
+
+
+ggplot(cc_pheno2, aes(ibd_Diagnosis,Simpson_Index, fill=ibd_Diagnosis)) + theme_bw() + geom_violin() + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.4) + scale_fill_manual(values = c("firebrick2","white","grey42","blue2"))
+```
+
+
+__Filter bacteria (detection in >20% of the samples) and normalization__
+
+
+```{r}
+
+#Subset samples from the taxonomic table for which we also have metagenomics 
+taxa2=subset(taxa,rownames(taxa) %in% rownames(summary_sample))
+
+print (paste("Number of taxa detected:",ncol(taxa2)))
+
+#Filter 20% and to clr transformation
+taxa_filt=transform_and_filter_taxa(taxa2,samples_row = T,method = "clr",missing_filter = 20)
+
+print (paste("Number of taxa after filtering",ncol(taxa_filt)))
+
+#Merge taxa and metabolites
+taxa_and_mb=merge(taxa_filt,norm_filt,by="row.names")
+rownames(taxa_and_mb)=taxa_and_mb$Row.names
+taxa_and_mb$Row.names=NULL
+
+#Merge taxa and phenotypes
+cc_pheno3=merge(cc_pheno2,taxa_filt,by="row.names", all = T)
+rownames(cc_pheno3)=cc_pheno3$Row.names
+cc_pheno3$Row.names=NULL
+
+```
+
+
+
+3. Filter metabolites by missigness
+===
+
+__We remove metabolites that are present in less than 20% of the samples in the 3 cohorts (CD,UC,Controls)__
+
+
+```{r,echo=F}
+
+to_remove=subset(summary_short2,prevalence_Control<20 & prevalence_CD<20 & prevalence_UC<20)
+
+print(paste("Number of metabolites removed:",length(to_remove$Metabolite)))
+```
+
+
+__Metabolites that are present between 20% to 70% of the samples will be subset and transform to binary feature (present/absent)__
+
+```{r,echo=F}
+
+mtb_logistic=subset(summary_short2,prevalence_Control>20 & prevalence_Control<70 & prevalence_UC>20 & prevalence_UC<70 & prevalence_CD>20 & prevalence_CD<70 )
+
+print(paste("Number of metabolites for presence/absence analysis:",length(mtb_logistic$Metabolite)))
+```
+
+
+__Metabolites present in more than 70% of the samples will be analyzed quantitatively__
+
+```{r,echo=F}
+
+to_keep=subset(summary_short2,prevalence_Control>70 & prevalence_CD>70 & prevalence_UC>70)
+
+print(paste("Number of metabolites removed:",length(to_keep$Metabolite)))
+```
+
+
+4.SCFA
+===
+
+__Show SCFA names__
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+unique(levels(SCFA$Analyte))
+```
+
+__Load data and replace values under the detection levels for missing values and restructure the data__
+
+Original report contain 1 row per sample per measurment, we want to restructure in a way that all samples are in rows and each column is a SCFA.  
+
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+#Duplicate original values (before remplacing for NA)
+
+SCFA$ori_Result=SCFA$Result
+
+#Replace values below level quantification (BLOQ) to NA
+SCFA$Result[SCFA$Comment.1=="BLOQ"] = "N/Q"
+SCFA$Result[SCFA$Result=="N/Q"] = NA
+```
+
+__Summary of the values under the detection levels (TRUE column)__
+
+```{r}
+table(SCFA$Analyte,is.na(SCFA$Result))
+```
+
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+#Remove unecessary columns (sample type, group/project name, detection limits and comments)
+
+SCFAsub=SCFA[,c("Unique.Sample.ID...as.labeled.on.tube.","Sample.Amount..gram.","Comment","Analyte","Result")]
+SCFA_table <- dcast(SCFAsub, ...~Analyte)
+
+#for (i in 3:ncol(SCFA_table)){
+#     impute_min=min(as.numeric(as.character(SCFA_table[,i])), na.rm = T)/2
+#     SCFA_table[,i][is.na(SCFA_table[,i])] = impute_min
+#}
+
+IDs=data.frame(rbind(as.matrix(IDs_IBD), as.matrix(IDs_LLD)))
+rownames(SCFA_table)=SCFA_table$Unique.Sample.ID...as.labeled.on.tube.
+SCFA_table$Unique.Sample.ID...as.labeled.on.tube.=NULL
+rownames(IDs)=IDs$V1
+IDs$V1=NULL
+SCFA_new_ID=merge(IDs,SCFA_table, by="row.names")
+SCFA_new_ID$Row.names=NULL
+row.names(SCFA_new_ID)=SCFA_new_ID$V5
+SCFA_new_ID$V5=NULL
+colnames(SCFA_new_ID)=c("Amount_sample_gram", "Box", "Methylbutyric_acid", "acetic_acid", "butyric_acid", "hexanoic_acid", "isobutyric_acid","isovaleric_acid" ,"propionic_acid", "valeric_acid")
+```
+
+__Merge phenotypes to SCFA__
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+
+SCFA_with_phenos=merge(SCFA_new_ID,cc_pheno2, by="row.names")
+
+```
+
+
+__Plot SCFA per diagnosis__
+
+```{r, warning=F,message=FALSE, echo=T}
+plot_SCFA=SCFA_with_phenos[,c("Row.names","ibd_Diagnosis","Methylbutyric_acid", "acetic_acid", "butyric_acid", "hexanoic_acid", "isobutyric_acid","isovaleric_acid" ,"propionic_acid", "valeric_acid")]
+
+plot_SCFA_m=melt(plot_SCFA, id.vars = c("Row.names","ibd_Diagnosis"))
+plot_SCFA_m=subset(plot_SCFA_m, plot_SCFA_m$diag2!="IBDU")
+#my_comparisions=list( c("CD","Control"), c("Control","Pouch_Stoma"), c("UC","Pouch_Stoma"), c("Control","UC"), c("CD","Pouch_Stoma"), c("CD","UC"))
+#Check NA's per SCFA per Cohort
+#table(plot_SCFA_m$diag2, plot_SCFA_m$variable, is.na(plot_SCFA_m$value))
+my_comparisions=list( c("CD","Control"), c("Control","UC"), c("CD","UC"))
+```
+
+```{r, warning=F,message=FALSE, echo=F, fig.height=15}
+ggplot (plot_SCFA_m, aes (ibd_Diagnosis,log10(as.numeric(as.character(value))), fill=ibd_Diagnosis)) + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2) + facet_wrap(~ variable, ncol=2) + theme_bw() +scale_fill_brewer(palette ="RdBu")  + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA yg/g)") + xlab ("Cohort") + scale_x_discrete(labels=c("(n=239)","(n=255)", "(n=68)", "(n=176)"))
+```
+
+
+
+5.PCA analysis
+===
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+
+pca_log= prcomp(norm_filt,scale. = T, center = T)
+cmp_log=as.data.frame(pca_log$x[,1:5])
+cc_pheno2=read.delim("~/Documents/Project_Metabolome/1.Input_files/mini_pheno2.txt", row.names=1)
+cmp_log2=merge(cc_pheno2,cmp_log,by="row.names")
+v_exp = pca_log$sdev^2
+prop_v_exp= data.frame( PC=1:length(v_exp),perc= 100*(v_exp / sum(v_exp)))
+
+```
+
+
+
+
+
+```{r, warning=F,message=FALSE, echo=TRUE}
+#to_remove=subset(summary_met, summary_met$perc_missing>85)
+to_remove_80=subset(summary_short2,prevalence_CT<20 | prevalence_CD<20 | prevalence_CD<20)
+
+keepCT=subset(summary_short2,prevalence_CT>20)
+keepCT=factor(keepCT$Metabolite)
+keepCD=subset(summary_short2,prevalence_CD>20)
+keepCD=factor(keepCD$Metabolite)
+keepUC=subset(summary_short2,prevalence_UC>20)
+keepUC=factor(keepUC$Metabolite)
+```
+
+Numbers of metabolites to keep after removing metabolites present in less than 20% of the samples
+
+```{r, warning=F,message=FALSE, echo=F}
+plot(euler(list(A = keepCT, B = keepCD, C = keepUC)),quantities=T, label=c("Controls","CD", "UC"))
+```
+
+
+Removing metabolites in the normalized metabolite tables and merge phenotypes
+
+```{r, warning=F,message=FALSE, echo=T}
+
+# Select metabolites to remove
+to_remove=subset(summary_short2,prevalence_CT<20 & prevalence_CD<20 & prevalence_UC<20)
+to_remove1=to_remove
+rownames(to_remove1)=to_remove1$Metabolite
+to_remove1=merge(annot,to_remove1,by="row.names")
+to_remove2=factor(to_remove$Metabolite)
+
+```
