@@ -2,51 +2,241 @@
 # by R.Gacesa (UMCG, 2019)
 #
 # MISC FUNCTIONS for plotting, microbiome stuff ...
-# =========================================================
+# 
+# NOTE:
+# > also includes some functions  written by Dr. Alexander Kurilshikov (UMCG)
+# =============================================================================
 library(pheatmap)
+
+# inverse rank transformation function by Alex
+# ==============================================================================
+invrank <- function(x) {qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))}
+# ==============================================================================
+
+# implementation of inverse rank transformation function by Alex to dataframe
+# NOTE: it transforms only numeric and integer fields so it can eat mixed DF
+# ==============================================================================
+invrankDF <- function(inDF) {
+  for (cn in colnames(inDF)) {
+    if (class(inDF[[cn]]) == "numeric" | class(inDF[[cn]]) == "integer") {
+      inDF[[cn]] <- invrank(inDF[[cn]] )
+    }
+  }
+  inDF
+}
+# ==============================================================================
+
+# recodes dataframe factor variables
+# =========================================
+recodeMulticlassFactorsDF <- function(inDF,minClasses=3,maxClasses=6,verbose=T,recodeInt=T,
+                                      posClass='Y',negClass='N',idCol="") {
+  
+  if (verbose) {
+    print(paste0('==================================================================================='))
+    print(paste0('STARTING recodeMulticlassFactorsDF; minClasses = ',minClasses,', maxClasses = ',maxClasses))
+    print(paste0(' recodeInt=',recodeInt))
+    print(paste0('==================================================================================='))
+  }
+  # iterate over DF columns
+  for (cn in colnames(inDF)) {
+    tmpCol <- inDF[[cn]]
+    # check if col is int, conditionally convert to factor
+    if (class(tmpCol) == "integer" & recodeInt) {
+      tmpCol <- factor(tmpCol)
+    }
+    # check if we want to recode it
+    if (class(tmpCol) == "factor") {
+      cclasses <- levels(tmpCol)
+      if ( length(cclasses) >= minClasses & length(cclasses) <= maxClasses ) {
+        if (verbose) {
+          print(paste0(' > Column ',cn,' has ',length(cclasses),' classes, recoding!'))
+        }
+        newCols <- paste0(cn,'.',cclasses,'.',posClass,negClass)
+        for (newColNR in c(1:length(cclasses)) ) {
+          newCol <- inDF[[cn]]==cclasses[[newColNR]]
+          newCol[newCol==TRUE] <- posClass
+          newCol[newCol==FALSE] <- negClass
+          newColName <- newCols[newColNR]
+          inDF[[newColName]] <- newCol
+        }
+      }
+    }
+  } # end of column iteration loop
+  # sort
+  cnms <- colnames(inDF)
+  cnmsWoIDs <- cnms[!cnms %in% c(idCol)]
+  cnmsWoIDs <- cnmsWoIDs[order(cnmsWoIDs)]
+  inDF <- inDF[,c("DAG3_sampleID",cnmsWoIDs) ]
+  colnames(inDF) <- gsub('\\.\\.','\\.',colnames(inDF))
+  inDF
+}
+
 
 # summary of one dataframe feature VS response
 #TODO: extend to categorical variables
 # ========================================================
-makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,controlClass="HC",formatSci=F,formatDig=2,formatRoundDig=3) {
+makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,controlClass="HC",
+                                     formatSci=F,formatDig=2,formatRoundDig=3,dropNAs = T,verbose=T,
+                                     includeTotals=T) {
+  if (verbose) {
+    print(paste0('==================================================================================='))
+    print(paste0('STARTING makeOneSummaryByResponse; feature = ',ftr,', Response = ',response))
+    print(paste0('==================================================================================='))
+  }
+  if (!response %in% colnames(inDF)) {
+    print(paste0('ERROR: ',response,' not in inDF columns! STOPPING!'))
+    return()
+  }
+  if (!ftr %in% colnames(inDF)) {
+    print(paste0('ERROR: ',ftr,' not in inDF columns! STOPPING!'))
+    return()
+  }
+  inDF <- inDF[,c(ftr,response)]
+  if (dropNAs) {
+    inDF <- inDF[complete.cases(inDF),]
+  } else if (sum(is.na(inDF))) {
+    print('WARNING: NAs in data and dropNAs is FALSE, CODE MIGHT CRASH!!!')
+  }
+  if (doTestVsControl) {
+    if (!controlClass %in% inDF[[response]]) {
+      print(paste0('ERROR: ',controlClass,' not in ',response, ' STOPPING!'))
+      return()
+    }
+  }
   ret = data.frame()
-  for (rv in unique(inDF[[response]])) {
+  retB = data.frame()
+  retMG = data.frame()
+  ftrsToTest <- unique(as.character(inDF[[response]]))
+  if (includeTotals) {ftrsToTest <- c(ftrsToTest,"TOTAL")}
+  for (rv in ftrsToTest) {
+    if (verbose) {
+      print(paste0(' >> making summary for ',ftr,' == ',rv,' VS ',response))
+    }
+    # INTEGER VARIABLE => transform to NUMERIC and treat as it
+    if (class(inDF[[ftr]]) == "integer") {
+      inDF[[ftr]] <- as.numeric(inDF[[ftr]])
+    }
+    # ==================================================
+    # NUMERIC VARIABLE
+    #  > use M/U/W test (wilcoxon implementation in R)
+    #  > report mean/SD/min/Q1/Median/Q3/Max/NR/nonzero/prevalence (non na)
+    # ==================================================
     if (class(inDF[[ftr]]) == "numeric") {
-      mn <-  mean(inDF[inDF[[response]]==rv,][[ftr]])
-      sd <-  sd(inDF[inDF[[response]]==rv,][[ftr]])
-      md <-  median(inDF[inDF[[response]]==rv,][[ftr]])
-      min <- min(inDF[inDF[[response]]==rv,][[ftr]])
-      q1  <- quantile(inDF[inDF[[response]]==rv,][[ftr]])[[2]]
-      q3  <- quantile(inDF[inDF[[response]]==rv,][[ftr]])[[4]]
-      max <- max(inDF[inDF[[response]]==rv,][[ftr]])
-      nr <- sum(inDF[[response]]==rv)
-      nonzero <- sum(inDF[inDF[[response]]==rv,][[ftr]]!=0)
+      if (verbose) {
+        print(paste0('   -> ',ftr,' is numeric, making mean +/- sd and IQR range summary, M/U/W test for differences to controls!'))
+      }
+      if (rv == "TOTAL") {
+        ftrData <- inDF[[ftr]]
+      } else {
+        ftrData <- inDF[inDF[[response]]==rv,][[ftr]]
+      }
+      mn <-  mean(ftrData)
+      sd <-  sd(ftrData)
+      md <-  median(ftrData)
+      min <- min(ftrData)
+      q1  <- quantile(ftrData)[[2]]
+      q3  <- quantile(ftrData)[[4]]
+      max <- max(ftrData)
+      nr <- length(ftrData)
+      nonzero <- sum(ftrData!=0)
       prev <- nonzero/nr
       if (is.na(prev)) {prev = 0.0}
-      oneRow <- data.frame(Var=ftr,Group=rv,Mean=mn,SD=sd,Min=min,Q1=q1,Median=md,Q3=q3,Max=max,
+      oneRow <- data.frame(Var=ftr,Var.Type=class(inDF[[ftr]]),Group=rv,Mean=mn,SD=sd,Min=min,Q1=q1,Median=md,Q3=q3,Max=max,
                            NR=nr,nonzero=nonzero,prevalence=prev,
                            niceOut=paste0(format(round(md,formatRoundDig),digits = formatDig,scientific = formatSci),
                                           ' [',format(round(q1,formatRoundDig),digits = formatDig,scientific = formatSci), '; ',
-                                          format(round(q3,formatRoundDig),digits = formatDig,scientific = formatSci) ,']')  )
+                                          format(round(q3,formatRoundDig),digits = formatDig,scientific = formatSci) ,']'),
+                           niceOutMSD=paste0(format(round(mn,formatRoundDig),digits = formatDig,scientific = formatSci),
+                                             ' +/- ',format(round(sd,formatRoundDig),digits = formatDig,scientific = formatSci))
+      )
       if (!doTestVsControl) {
         print(paste0(' > ',response,' = ',rv,'; mean(',ftr,') = ',mn,'; sd = ',sd,'| median = ',md,' Q1 = ',q1,' Q3 = ',q3))
         ret <- rbind.data.frame(ret,oneRow)
       } else {
         if (rv != controlClass) {
-          tst <- wilcox.test(inDF[inDF[[response]] == controlClass,][[ftr]],
-                             inDF[inDF[[response]] == rv,][[ftr]])
-          print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+          ctrData <- inDF[inDF[[response]] == controlClass,][[ftr]]
+          tst <- wilcox.test(ctrData,ftrData)
+          if (verbose) {
+            print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+          }
           sigStr = ""
           pV <- tst$p.value
-          print(paste0(' > P-value = ',pV))
+          if (verbose) {
+            print(paste0(' > P-value = ',pV))
+          }
         } else {
           pV = NA; sig = ""; FDR = NA
         } 
         oneRow$pV <- pV
         ret <- rbind.data.frame(ret,oneRow)
       }
-    } else if (class(inDF[[ftr]]) == "factor") {
+    } 
+    # ===============================================
+    # CATEGORICAL VARIABLE <BINARY>
+    # > use chi/squared test
+    # report: 
+    #  > percent of group 1
+    # ===============================================
+    if (class(inDF[[ftr]]) == "factor") {
       
+      if (length(unique(inDF[[ftr]])) == 2) {
+        if (verbose) {
+          print(paste0('   -> ',ftr,' is factor with 2 classes!!'))
+        }
+        g1 <- unique(inDF[[ftr]])[1]
+        g2 <- unique(inDF[[ftr]])[2]
+        if (rv == "TOTAL") {
+          nr <- length(inDF[[response]])
+          nonzero <- sum(inDF[[ftr]]!=0)
+          nrg1 <- sum(inDF[[ftr]] == g1)
+          nrg2 <- sum(inDF[[ftr]] == g2)
+        } else {
+          nr <- sum(inDF[[response]]==rv)
+          nonzero <- sum(inDF[inDF[[response]]==rv,][[ftr]]!=0)
+          nrg1 <- sum(inDF[[response]]==rv & inDF[[ftr]] == g1)
+          nrg2 <- sum(inDF[[response]]==rv & inDF[[ftr]] == g2)
+        }
+        percg1 <- nrg1/nr
+        percg2 <- nrg2/nr
+        prev <- nonzero/nr
+        if (is.na(prev)) {prev = 0.0}
+        oneRowB <- data.frame(Var=ftr,Var.Type=class(inDF[[ftr]]),Group=rv,
+                              NR=nr,nonzero=nonzero,prevalence=prev,
+                              Lvl1=g1,nrLvl1=nrg1,percLvl1=percg1,
+                              Lvl2=g2,nrLvl2=nrg2,percLvl2=percg2)
+        if (!doTestVsControl) {
+          retB <- rbind.data.frame(retB,oneRowB)
+        } else {
+          if (rv != controlClass & rv != "TOTAL") {
+            toTestDF <- inDF[inDF[[response]] %in% c(rv,controlClass),]          
+            toTestDF[[ftr]] <- as.factor(as.character(toTestDF[[ftr]] ))
+            toTestDF[[response]] <- as.factor(as.character(toTestDF[[response]] ))
+            tblTest <- table(toTestDF[[ftr]],toTestDF[[response]])
+            tst <- chisq.test(tblTest)
+            if (verbose) {
+              print(tblTest)
+              print(tst)
+            }
+            if (verbose) {
+              print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+            }
+            sigStr = ""
+            pV <- tst$p.value
+            if (verbose) {
+              print(paste0(' > P-value = ',pV))
+            }
+          } else {
+            pV = NA; sig = ""; FDR = NA
+          } 
+          oneRowB$pV <- pV
+          retB <- rbind.data.frame(retB,oneRowB)
+          ret <- retB
+        }
+      }
+    } else if (TRUE) {
+      # ========================================
+      # CATEGORICAL, > 2 groups
+      # ========================================
     }
   }
   ret
@@ -58,7 +248,9 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
 # > input is same as for
 # makeOneSummaryByResponse, but ftrs is vector of variable names
 # =====================================================================
-makeMultiSummaryByResponse <- function(inDF,ftrs,response,doTestVsControl=T,controlClass="HC",formatSci=F,formatDig=2,formatRoundDig=3,doFDR=T)
+makeMultiSummaryByResponse <- function(inDF,ftrs,response,doTestVsControl=T,controlClass="HC",
+                                       formatSci=F,formatDig=2,formatRoundDig=3,doFDR=T,verbose=F,
+                                       includeTotals=T,doSort=T)
 {
   ret <- data.frame()
   # debug / reality check
@@ -74,7 +266,8 @@ makeMultiSummaryByResponse <- function(inDF,ftrs,response,doTestVsControl=T,cont
   for (f in ftrs) {
     ret <- rbind.data.frame(ret,makeOneSummaryByResponse(inDF,f,response,doTestVsControl,
                                                          controlClass,formatSci,
-                                                         formatDig,formatRoundDig))
+                                                         formatDig,formatRoundDig,verbose = verbose,
+                                                         includeTotals=includeTotals))
   }
   if (doFDR) {ret$FDR <- p.adjust(ret$pV)}
   else {ret$FDR <- ret$pV}
@@ -86,6 +279,9 @@ makeMultiSummaryByResponse <- function(inDF,ftrs,response,doTestVsControl=T,cont
   ret$FDRsig[ret$FDRsig=="FALSE"] <- ""
   ret$FDRsig[is.na(ret$FDRsig)] <- ""
   ret$niceOut <- paste0(ret$niceOut," ",ret$FDRsig)
+  if (doSort) {
+    ret <- ret[order(ret$pV,decreasing = F),]
+  }
   ret
 }
 
@@ -414,12 +610,17 @@ save_pheatmap_png <- function(x, filename, width=1200, height=1200, res = 150) {
 # - currently works only on binary features (0 vs 1 OR n vs y)
 # - metric should be : statsig, 
 
+# NOTES:
+# - returns list (heatmap,table of log transformed effect/p-values,non-transformed table)
+#
+
 aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=20,outFile="plot.png",pVcutoff=0.05,multiTest=F,
                                  clusterFeatures=T,clusterPhenos=F,subsetFeatures="",subsetPhenos="",
+                                 subsetFeaturesGrep="",
                                  metric="statSig",enrichmentCutoff = 1.005,addXextra=0,addYextra=0,maxMax = 5,
-                                 shortenTaxNames=T,invertYN=F) {
-  if (!metric %in% c("statSig","meanEffectRatio","medEffectRatio"))  {
-    print (" >> metric MUST be one of [statSig, meanEffectRatio, medEffectRatio]")
+                                 shortenTaxNames=T,invertYN=F,fixPhenos=T,cleanPhenoNamesGrep="") {
+  if (!metric %in% c("statSig","meanEffectRatio","medEffectRatio","beta"))  {
+    print (" >> metric MUST be one of [statSig, meanEffectRatio, medEffectRatio,beta]")
     break()
   }
   
@@ -433,6 +634,7 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
   hmDFsig <- NULL
   hmDFenrich <- NULL
   hmDFdirection <- NULL
+  hmDFpv <- NULL
   mSS <- 0
   #maxMax <- 5
   # calculate NR of tests
@@ -445,10 +647,13 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
         #print(f)
         iT <- read.table(paste0(tblFolder,'/',f),sep=',',header = T,stringsAsFactors = F)
         #print(nrow(iT))
-        if (subsetFeatures != "") {
-          iT <- iT[grep(subsetFeatures,iT$feature),]
+        if (subsetFeatures[[1]]!= "") {
+          iT <- iT[iT$feature %in% subsetFeatures,]
         }
-        if (subsetPhenos != "")  {
+        if (subsetFeaturesGrep!="") {
+          iT <- iT[grep(subsetFeaturesGrep,iT$feature),]
+        }
+        if (subsetPhenos[[1]]!= "")  {
           iT <- iT[iT$PHENOTYPE %in% subsetPhenos,]
         }
         nrTests <- nrTests+nrow(iT)
@@ -465,19 +670,48 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
     if (doParse) {
       print(f)
       iT <- read.table(paste0(tblFolder,'/',f),sep=',',header = T,stringsAsFactors = F)
-      if (shortenTaxNames) {for (r in c(1:nrow(iT))) {iT$feature[r] <- purgeMGNameOne(iT$feature[r])}}
+      if (subsetFeatures[[1]]!= "") {
+        iT <- iT[iT$feature %in% subsetFeatures,]
+      }
+      if (subsetFeaturesGrep!="") {
+        iT <- iT[grep(subsetFeaturesGrep,iT$feature),]
+      }
+      if (subsetPhenos[[1]]!= "")  {
+        iT <- iT[iT$PHENOTYPE %in% subsetPhenos,]
+      }
+      
+      if (fixPhenos) {
+        if (!"PHENOTYPE" %in% colnames(iT)) {
+          iT$PHENOTYPE=gsub('_diversities','',gsub('phen_','',gsub('\\.csv','',f)))
+        }
+      }
+      if (shortenTaxNames) {
+        for (r in c(1:nrow(iT))) {
+          if (grepl('__',iT$feature[r])) {
+            iT$feature[r] <- purgeMGNameOne(iT$feature[r])
+          }
+        }
+      }
       iT$V1 <- tolower(iT$V1)
       iT$V2 <- tolower(iT$V2)
-      if (subsetFeatures != "") {
-        iT <- iT[grep(subsetFeatures,iT$feature),]
+      if (subsetFeatures[[1]] != "") {
+        iT <- iT[subsetFeatures %in% iT$feature,]
       }
-      if (subsetPhenos != "")  {
+      if (subsetPhenos[[1]] != "")  {
         iT <- iT[iT$PHENOTYPE %in% subsetPhenos,]
       }
       if (multiTest) {
-        iT$FDR <- p.adjust(iT$pValue,n = nrTests)
+        if ("pCorr" %in% colnames(iT)) {
+          iT$FDR <- p.adjust(iT$pCorr,n = nrTests)
+        } else {
+          iT$FDR <- p.adjust(iT$pValue,n = nrTests)
+        }
       } else {
-        iT$FDR <- iT$pValue
+        if ("pCorr" %in% colnames(iT)) {
+          iT$FDR <- iT$pCorr
+        } else {
+          iT$FDR <- iT$pValue
+        }
       }
       if (!(iT$V2[1] %in% c("y","1","n","0"))) {
         print(paste0('WARNING: table ',f, ' / responseVar ',iT$V2[1],' : responseVar is not categorical 0/1 or n/y, skipping it ...'))
@@ -488,8 +722,10 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
           # > statistical significance 
           if (grepl("Prevalences", f)) {
             oneCol <- data.frame(feature=iT$feature,toplot=log(iT$FDR,base = 10)*-1*sign(1/iT$V1toV2-1)); colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
+            oneColraw <- data.frame(feature=iT$feature,toplot=iT$FDR); colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
           } else {
             oneCol <- data.frame(feature=iT$feature,toplot=log(iT$FDR,base = 10)*sign(iT$V1minusV2)); colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
+            oneColraw <- data.frame(feature=iT$feature,toplot=iT$FDR); colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
           }
         } else if (metric == "meanEffectRatio") {
           # > mean enrichment / depletion
@@ -506,7 +742,7 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
             eSize[is.infinite(eSize)] <- mSS*1.05
             oneCol <- data.frame(feature=iT$feature,toplot=(eSize)); 
             oneCol$toplot[iT$FDR > pVcutoff] <- 0.0
-            colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
+            #colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
           } else {
             # > abundances
             mS <- iT$V2mean/iT$V1mean
@@ -523,7 +759,7 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
             eSize[is.infinite(eSize)] <- mSS*1.05
             oneCol <- data.frame(feature=iT$feature,toplot=(eSize))
             oneCol$toplot[iT$FDR > pVcutoff] <- 0.0
-            colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
+            #colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
           }
         } else if (metric == "medEffectRatio") {
           # > median enrichment / depletion
@@ -539,7 +775,7 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
             eSize[is.infinite(eSize)] <- mSS*1.05
             oneCol <- data.frame(feature=iT$feature,toplot=(eSize)); 
             oneCol$toplot[iT$FDR > pVcutoff] <- 0.0
-            colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
+            #colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
           } else {
             # > abundances
             mS <- iT$V2median/iT$V1median
@@ -554,13 +790,19 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
             eSize[is.infinite(eSize)] <- mSS*1.05
             oneCol <- data.frame(feature=iT$feature,toplot=(eSize))
             oneCol$toplot[iT$FDR > pVcutoff] <- 0.0
-            colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
+            #colnames(oneCol) <- c("Feature",iT$PHENOTYPE[1])
           }
         }
+        
+        colnames(oneCol) <- c("Feature",gsub(cleanPhenoNamesGrep,"",iT$PHENOTYPE[1]))
+        colnames(oneColraw) <- c("Feature",gsub(cleanPhenoNamesGrep,"",iT$PHENOTYPE[1]))
+        
         if (is.null(hmDFsig)) {
           hmDFsig <- oneCol
+          hmDFraw <- oneColraw
         } else {
           hmDFsig <- merge.data.frame(hmDFsig,oneCol,by = "Feature")
+          hmDFraw <- merge.data.frame(hmDFraw,oneColraw,by = "Feature")
         }
       }
     }
@@ -626,8 +868,16 @@ aggregatePlotHeatmap <- function(tblFolder,doFeatures=c("Abundances"),nrToPlot=2
                     height = 800+nrow(hmPlotDF)*45+addYextra
                     ,res = 200)
   print (' >>> DONE')
-  return(p)
+  return( list(p,hmDFsig,hmDFraw) )
 }
+
+# ==================================================================
+# ==================================================================
+#
+# AGGREGATOR AND PLOTTER FOR LINEAR MODELS
+#
+# ==================================================================
+# ==================================================================
 
 aggregatePlotHeatmapLM <- function(tblFolder,doFeatures=c("taxAbundances"),nrToPlot=20,outFile="plot.png",pVcutoff=0.05,multiTest=F,
                                  clusterFeatures=T,clusterPhenos=F,subsetFeatures="",subsetPhenos="",
