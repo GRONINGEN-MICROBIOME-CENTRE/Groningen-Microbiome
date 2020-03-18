@@ -1,6 +1,6 @@
 ###################################
 ### merge GWAS and plot
-### version 1.0
+### version 2.0
 ### date: 01-29-2020
 ### Author:EALM
 ###################################
@@ -16,7 +16,11 @@
 ## 26-02-2020
 ## added argument parser to work together with a sbatch launcher
 ## changed chromosome reading as numeric for character, to take also chromosome X
-
+## added filter to make manhathan plot only for gwas sinfinicant containing strains
+## added filter to plot only p<0.01 points in the manhathan plots
+## Changed multi-manhathan plotting to plot only 9 at the time
+## 04-03-2020
+## added flags for start and ending of the plotting of a feature
 
 ####Packages
 library(data.table)
@@ -35,7 +39,7 @@ library(optparse)
 #opt$input<-"/groups/umcg-wijmenga/tmp04/umcg-elopera/DAG3/output/out_v2"
 #mblist<-"/groups/umcg-wijmenga/tmp04/umcg-elopera/DAG3/output/heritable.list"
 #opt$mblist<-"/groups/umcg-wijmenga/tmp04/umcg-elopera/DAG3/output/out_v2/list.to.graph"
-
+#opt$mblist<-"/groups/umcg-wijmenga/tmp04/umcg-elopera/DAG3/output/out_v2/last.four.graphs"
 ######################## --------arguments -----------##########
 option_list = list(
   
@@ -56,11 +60,12 @@ mblist<-opt$mblist
 mblist<-fread(mblist,data.table = F,header=F)
 lambdas.list<-data.frame(name=NA,lambda=NA,short.name=NA)
 img.list<-list()
-#n=6
+#n=1
 for (n in (1:nrow(mblist))) {
   
   
   mb<-mblist[n,"V1"]
+  print (paste0(mb," plotting started ",date()))
   chrfile.path <- file.path(input,paste0(mb,"_gwas"))
   chr.files <- list.files(chrfile.path, pattern = ".chr", full.names = TRUE)
 
@@ -74,8 +79,9 @@ for (n in (1:nrow(mblist))) {
   rm(chr.dat.list)
   nrow(whole.genome)
   ###-----------Manhatan plot---------------
+  whole.genome$chr<-factor(whole.genome$chr,levels = c(as.character(seq(1,22)),"X"))
   whole.genome<-whole.genome[order(whole.genome$chr),]
-  
+table(whole.genome$chr)  
   nCHR <- length(unique(whole.genome$chr))
   whole.genome$BPcum <- NA
   s <- 0
@@ -98,8 +104,8 @@ for (n in (1:nrow(mblist))) {
   names<-lapply(mb.names, function(x){paste0(x[length(x)-1],".",x[length(x)])})
   short.name<-as.character(unlist(names))
   ### make manhatan plot if there is any GWAS significant signal
-  if (any(whole.genome$pval<0.00000001)){
-    manhplot <- ggplot(whole.genome, aes(x = BPcum, y = -log10(pval), 
+  if (any(whole.genome$pval<0.00000005)){
+    manhplot <- ggplot(whole.genome[whole.genome$pval<0.001,], aes(x = BPcum, y = -log10(pval), 
                                          color = as.factor(chr), size = -log10(pval))) +
       geom_point(alpha = 0.75) +
       geom_hline(yintercept = -log10(sig), color = "red", linetype = "dashed") + 
@@ -151,21 +157,22 @@ for (n in (1:nrow(mblist))) {
   lambda.table<-whole.genome %>% 
     group_by(chr) %>% 
     summarise(lambda=median(chisq)/qchisq(0.5,1))
-  summary.row<-c(mb,median( whole.genome$chisq)/qchisq(0.5,1))
+  lambda.table$chr<-as.character(lambda.table$chr)
+  summary.row<-c(as.character(mb),median( whole.genome$chisq)/qchisq(0.5,1))
   lambda.table<-data.frame(rbind(lambda.table,summary.row))
   lambda.file<-file.path(chrfile.path,paste0("lambda.table"))
   write.table(lambda.table,lambda.file,quote = F,row.names = F,sep = '\t')
-  ##lambda is 1.03568. to my point of view there is not a lot of inflation, but... would this change when using it  with all the chromosomes?
   lambdas.list[n,]<-lambda.table[lambda.table$chr==mb,]### changed from 1 to n and 23 for lambda.table$chr==mb
   lambdas.list[n,"short.name"]<-short.name
   ####save merged gwas results
   gwas.file<-file.path(chrfile.path,paste0("whole.genome.gwas"))
   write.table(whole.genome,gwas.file,quote = F,row.names = F,sep = '\t')
-  
+  print (paste0(mb," plotting is done ",date()))
 }
 
 ###----------make the lambda table for all microbes in list----------#####
 lambdas.list.file<-file.path(input,paste0("lambdas.list"))
+#lambdas.list.file<-file.path(input,paste0("lambdas.list_2"))
 write.table(lambdas.list,lambdas.list.file,quote = F,row.names = F,sep = '\t')
 #lambdas.list<-fread(lambdas.list.file,data.table=F,header=T)
 
@@ -206,16 +213,16 @@ write.table(lambdas.list,lambdas.list.file,quote = F,row.names = F,sep = '\t')
   plot(lambda.his)
   dev.off()
   
-###plot every 10 gwas
+###plot every 9 gwas
 m=0
 glimit=0
 while(glimit<length(img.list)){
-  glimit<-ifelse(10*(m+1)>length(img.list),length(img.list),10*(m+1))
-  plist<-img.list[(10*(m)+1):glimit]
+  glimit<-ifelse(9*(m+1)>length(img.list),length(img.list),9*(m+1))
+  plist<-img.list[(9*(m)+1):glimit]
   ### join gwas
   image.file.plt.file<-file.path(input,paste0((m+1),".mhn.all.tiff"))
   tiff(image.file.plt.file, width = 6000, height = 3000, units = "px", res = 300, compression = "lzw")
-  do.call("grid.arrange", c(plist, ncol=floor(sqrt(10))))
+  do.call("grid.arrange", c(plist, ncol=3))
   dev.off()  
   m=m+1
 }
