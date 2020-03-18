@@ -21,7 +21,11 @@ purgeMGNames <- function(dF) {
 }
 
 purgeMGNameOne <- function(oneName) {
-  cn <- strsplit(x = oneName,split = '\\.')[[1]][length(strsplit(x = oneName,split = '\\.')[[1]])]
+  if (grepl('\\.',oneName)) {
+    cn <- strsplit(x = oneName,split = '\\.')[[1]][length(strsplit(x = oneName,split = '\\.')[[1]])]
+  } else if (grepl('\\|',oneName)) {
+    cn <- strsplit(x = oneName,split = '\\|')[[1]][length(strsplit(x = oneName,split = '\\|')[[1]])]
+  } else {cn <- oneName}
   cn
 }
 
@@ -200,12 +204,12 @@ filterHumannDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,minMedRelAb=0.
 # - converts NAs to 0
 # - filters for relative abundances (median & mean) and prevalence (0 vs non-0)
 #================================================================================
-filterCardDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,minMedRelAb=0.0,rescale=T,verbose=T) {
-  nonPWYdf <- as.data.frame(inDF[,-grep('gb\\|',colnames(inDF))])
-  cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep('gb\\|',colnames(inDF))] ])
+filterCardDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,grepPat="'gb\\|'",minMedRelAb=0.0,rescale=T,verbose=T) {
+  nonPWYdf <- as.data.frame(inDF[,-grep(grepPat,colnames(inDF))])
+  cnsNonPWYdf <- colnames(inDF[colnames(inDF)[-grep(grepPat,colnames(inDF))] ])
   colnames(nonPWYdf) <- cnsNonPWYdf
-  yesPWYdf <- as.data.frame(inDF[,grep('gb\\|',colnames(inDF))])
-  cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep('gb\\|',colnames(inDF))] ])
+  yesPWYdf <- as.data.frame(inDF[,grep(grepPat,colnames(inDF))])
+  cnsYesPWYdf <- colnames(inDF[colnames(inDF)[grep(grepPat,colnames(inDF))] ])
   # replaces NAs with 0s
   for (c in colnames(yesPWYdf)) {
     yesPWYdf[,c][is.na(yesPWYdf[,c])] <- 0.0
@@ -342,7 +346,7 @@ filterVfdbDF <- function(inDF,presPerc = 0.05,minMRelAb = 0.001,minMedRelAb=0.0,
   if (length(toRemove) > 0) {
     yesPWYdf <- yesPWYdf[,!(colnames(yesPWYdf) %in% toRemove)]
   }
-  if (verbose) {print (paste(' > median abundance filter: Removed',nrRemoved,'CARDs!, ',length(colnames(yesPWYdf)),'CARDs left!')); }
+  if (verbose) {print (paste(' > median abundance filter: Removed',nrRemoved,'CARDs!, ',length(colnames(yesPWYdf)),'VFs left!')); }
   # do final rescale
   if (rescale==T) {
     if (verbose) {print ('  >> rescaling')}
@@ -378,7 +382,7 @@ reorderMicrobiomeDF <- function(inDF,verbose=T) {
 # ====================================================
 # > Subsets stuff from merged microbiome dataframe
 # ====================================================
-subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCARDs=F,getPhenos=T,getDivs=F,pwyType="All") {
+subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCARDs=F,getPhenos=T,getDivs=F,pwyType="MetaCyc",getID=T,idName="ID") {
   if (verbose) {print ("SUBSETTING Mergerd Microbiome Dataframe  ...")
     if (getPhenos) {print("  > getting phenotypes")}
     if (getTaxa) {print("  > getting taxa")}
@@ -413,6 +417,7 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
   if (pwyType=='KEGG' | pwyType=='All' | pwyType=='Kegg') {
     nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("^K[012]",colnames(inDF)))
   }
+  nonPhenoColsPWYs <- unique(nonPhenoColsPWYs)
   if (getPWYs) {
     toGet <- c(toGet,nonPhenoColsPWYs)
     if (verbose) {print(paste0(' > FOUND ',length(nonPhenoColsPWYs),' PWYs'))}
@@ -422,7 +427,7 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
     toGet <- c(toGet,nonPhenoColsVFs)
     if (verbose) {print(paste0(' > FOUND ',length(nonPhenoColsVFs),' VFs'))}
   }
-  nonPhenoColsCARDs <- c(grep("CARD",colnames(inDF)))
+  nonPhenoColsCARDs <- c(grep("^CARD",colnames(inDF)))
   if (getCARDs) {
     toGet <- c(toGet,nonPhenoColsCARDs)
     if (verbose) {print(paste0(' > FOUND ',length(nonPhenoColsCARDs),' CARDs'))}
@@ -438,104 +443,181 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
     if (verbose) {print(paste0(' > FOUND ',length(divCols),' *Diversity metrics*'))}
     toGet <- c(toGet,divCols)
   }
-  inDF <- inDF[, toGet]
+  if (getID) {
+    idCols <- grep("^",idName,"$",colnames(inDF))
+    toGet <- unique(c(toGet,idCols))
+    if (verbose) {print(paste0(' > FOUND ',length(idCols),' ID COLUMNS'))}
+  }
+  inDF <- inDF[, unique(toGet)]
 }
 
 # ================================================================================
 # calculator for diversity metrics
 # ================================================================================
-calcDIVMetrics <- function(inDF,ID="RN",metrics=c("shannon","simpson","invsimpson"),DIVlvls=c("taxS","taxG","CARD","VF","PWY",
-                                                                                              "nrS","nrG","nrCARD","nrVF","nrPWY") ) {
-  if (ID == "RN") {
+calcDIVMetrics <- function(inDF,IDcol="RowNames",pwyType="MetaCyc",
+                           metrics=c("shannon","simpson","invsimpson","richness"),
+                           DIVlvls=c("taxS","taxG","taxF","taxO","taxC","taxP","PWY","CARD","VF") ) {
+  # select IDs column
+  if (IDcol == "RowNames") {
     DIVMatrix <- data.frame(RN=rownames(inDF))
   } else {
-    DIVMatrix <- data.frame(ID=inDF[[ID]])
+    DIVMatrix <- data.frame(IDcol=inDF[[IDcol]])
+    colnames(DIVMatrix)[1] <- IDcol
   }
+  # iterate over stuff to calculate
+  #  > diversity levels (taxa per taxon lvl, pathways, VFs, CARDs)
   for (l in DIVlvls) {
-    if (l=="taxS") {
-      inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = T,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = F))
-      inDFf <- filterMetaGenomeDF(filterMetaGenomeDF(inDFt,presPerc = -1,minMRelAb = -1,minMedRelAb = -1,rescaleTaxa = T,verbose = T,
-                                                     keepDomains = "All",keepLevels = c("P","C","O","F","G","S")))
-      for (m in metrics) {
-        dv <- diversity(inDFf,index = m)
-        DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-        colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.S.',m)
+    # TAXA
+    # ================================
+    if (grepl('^tax.$',l)) {
+      toUse <- gsub('^tax','',l)
+      inDFf <- subsetMicrobiomeDF(inDF,getTaxa = T,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = F,pwyType = pwyType,getID = T)
+      if (IDcol=="RowNames") {
+      } else {
+        rownames(inDFf) <- inDFf[[IDcol]]
+        inDFf[[IDcol]] <- NULL
       }
-    } else if (l=="taxG") {
-      inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = T,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = F))
-      inDFf <-inDFf[,grep('g__',colnames(inDFf))]
+      inDFf <- filterMetaGenomeDF(inDFf,presPerc = -1,minMRelAb = -1,minMedRelAb = -1,rescaleTaxa = T,verbose = T,
+                                  keepDomains = "All",keepLevels = c(toUse))
+      # iterate over metrics, calculate each
+      # NOTE: richness is not implemented in vegan, requires special treatment
       for (m in metrics) {
-        dv <- diversity(inDFf,index = m)
+        print(paste0('  > calculating ',m,'[',l,']'))
+        if (m=="richness") {
+          inDFpa <- inDFf
+          inDFpa[inDFpa > 0] <- 1
+          dv <- rowSums(inDFpa)
+        } else {
+          dv <- diversity(inDFf,index = m)
+        }
         DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-        colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.G.',m)
+        colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.',toUse,'.',m)
       }
+      # PWYs
+      # =======================
+    } else if (l=="PWY") {
+      inDFf <- subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = T,getCARDs = F,getID = T,pwyType = pwyType)
+      if (IDcol=="RowNames") {
+      } else {
+        rownames(inDFf) <- inDFf[[IDcol]]
+        inDFf[[IDcol]] <- NULL
+      }
+      for (m in metrics) {
+        print(paste0('  > calculating ',m, '[PWYs,',pwyType,']'))
+        if (m=="richness") {
+          inDFpa <- inDFf
+          inDFpa[inDFpa > 0] <- 1
+          dv <- rowSums(inDFpa)
+        } else {
+          dv <- diversity(inDFf,index = m)
+        }
+        DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
+        colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.PWY.',m)
+      }
+      # CARD
+      # ==========================
     } else if (l=="CARD") {
-      inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = T))
+      inDFf <- subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = T,getID = T)
+      if (IDcol=="RowNames") {
+      } else {
+        rownames(inDFf) <- inDFf[[IDcol]]
+        inDFf[[IDcol]] <- NULL
+      }
       for (m in metrics) {
-        dv <- diversity(inDFf,index = m)
+        print(paste0('  > calculating ',m, '[CARDs]'))
+        if (m=="richness") {
+          inDFpa <- inDFf
+          inDFpa[inDFpa > 0] <- 1
+          dv <- rowSums(inDFpa)
+        } else {
+          dv <- diversity(inDFf,index = m)
+        }
         DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
         colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.CARD.',m)
       }
+      # VFs
+      # =======================
     } else if (l=="VF") {
-      inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = T,getPWYs = F,getCARDs = F))
+      inDFf <- subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = T,getPWYs = F,getCARDs = F,getID = T)
+      if (IDcol=="RowNames") {
+      } else {
+        rownames(inDFf) <- inDFf[[IDcol]]
+        inDFf[[IDcol]] <- NULL
+      }
       for (m in metrics) {
-        dv <- diversity(inDFf,index = m)
+        print(paste0('  > calculating ',m, '[VFs]'))
+        if (m=="richness") {
+          inDFpa <- inDFf
+          inDFpa[inDFpa > 0] <- 1
+          dv <- rowSums(inDFpa)
+        } else {
+          dv <- diversity(inDFf,index = m)
+        }
         DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
         colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.VF.',m)
       }
-    } else if (l=="PWY") {
-      inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = T,getCARDs = F))
-      for (m in metrics) {
-        dv <- diversity(inDFf,index = m)
-        DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-        colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.PWY.',m)
-      } 
     } 
   }
-  # numbers of stuff: "nrS","nrG","nrCARD","nrVF","nrPWY"
-  if ("nrS" %in% DIVlvls) {
-    inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = T,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = F))
-    inDFf <-inDFf[,grep('s__',colnames(inDFf))]
-    inDFf[inDFf > 0] <- 1
-    dv <- rowSums(inDFf)
-    DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-    colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.nrS')
-  }
-  if ("nrS" %in% DIVlvls) {
-    inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = T,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = F))
-    inDFf <-inDFf[,grep('g__',colnames(inDFf))]
-    inDFf[inDFf > 0] <- 1
-    dv <- rowSums(inDFf)
-    DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-    colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.nrG')
-  } 
-  if ("nrCARD" %in% DIVlvls) {
-    inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = T))
-    inDFf[inDFf > 0] <- 1
-    dv <- rowSums(inDFf)
-    DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-    colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.nrCARD')
-  } 
-  if ("nrVF" %in% DIVlvls) {
-    inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = T,getPWYs = F,getCARDs = F))
-    inDFf[inDFf > 0] <- 1
-    dv <- rowSums(inDFf)
-    DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-    colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.nrVF')
-  }
-  if ("nrPWY" %in% DIVlvls) {
-    inDFf <- purgeMGNames(subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = T,getCARDs = F))
-    inDFf[inDFf > 0] <- 1
-    dv <- rowSums(inDFf)
-    DIVMatrix <- cbind.data.frame(DIVMatrix,dv)
-    colnames(DIVMatrix)[ncol(DIVMatrix)] <- paste0('DIV.nrPWY')
-  } 
   return(DIVMatrix)
 }
 
-
+# ================================================================================
+# ================================================================================
+# calculator for bray-curtis metrix
+# ================================================================================
+calcBCMatrix <- function(inDF,IDcol="RowNames",pwyType="MetaCyc",
+                           div="taxS" ) {
+  # find and calculate bray-curtis
+  #  > diversity levels (taxa per taxon lvl, pathways, VFs, CARDs)
+  # TAXA
+  # ================================
+  l <- div
+  if (grepl('^tax.$',l)) {
+    toUse <- gsub('^tax','',l)
+    inDFf <- subsetMicrobiomeDF(inDF,getTaxa = T,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = F,pwyType = pwyType,getID = T)
+    if (IDcol=="RowNames") {
+    } else {
+      rownames(inDFf) <- inDFf[[IDcol]]
+      inDFf[[IDcol]] <- NULL
+    }
+    inDFf <- filterMetaGenomeDF(inDFf,presPerc = -1,minMRelAb = -1,minMedRelAb = -1,rescaleTaxa = T,verbose = T,
+                                keepDomains = "All",keepLevels = c(toUse))
+    # PWYs
+    # =======================
+  } else if (l=="PWY") {
+    inDFf <- subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = T,getCARDs = F,getID = T,pwyType = pwyType)
+    if (IDcol=="RowNames") {
+    } else {
+      rownames(inDFf) <- inDFf[[IDcol]]
+      inDFf[[IDcol]] <- NULL
+    }
+  # CARD
+  # ==========================
+  } else if (l=="CARD") {
+    inDFf <- subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = F,getPWYs = F,getCARDs = T,getID = T)
+    if (IDcol=="RowNames") {
+    } else {
+      rownames(inDFf) <- inDFf[[IDcol]]
+      inDFf[[IDcol]] <- NULL
+    }
+    # VFs
+    # =======================
+  } else if (l=="VF") {
+    inDFf <- subsetMicrobiomeDF(inDF,getTaxa = F,getPhenos = F,getVFs = T,getPWYs = F,getCARDs = F,getID = T)
+    if (IDcol=="RowNames") {
+    } else {
+      rownames(inDFf) <- inDFf[[IDcol]]
+      inDFf[[IDcol]] <- NULL
+    }
+  }
+  # actually calc B/C
+  dv <- vegdist(inDFf,method = "bray")
+  return(dv)
+}
 # ================================================================================
 
+
+# ================================================================================
 # ================================================================================
 # function for filtering microbiome (metaphlan) results
 # - takes dataframe (any)
@@ -562,7 +644,7 @@ calcDIVMetrics <- function(inDF,ID="RN",metrics=c("shannon","simpson","invsimpso
 
 #TODO: implement keepDomains
 filterMetaGenomeDF <- function(inDF,presPerc = 0.1,minMRelAb = 0.01,minMedRelAb=0.0, rescaleTaxa=F,verbose=T,
-                             keepDomains=c('Bacteria'),
+                             keepDomains=c('Bacteria','Archaea'),
                              keepLevels=c('T','S','G','F','O','C','P')) {
   
   tCols = grep('k__',colnames(inDF)) # colums with microbiome
@@ -1292,7 +1374,7 @@ testOneFeaturePrevalence <- function(dataIn,saveFolder,feature=NA,doSave=T,displ
   V2Npos = c()
   V2Nneg = c()
   for (r in seq(1,nrow(combos))) {
-    #print (paste0('testing',r))
+    print (paste0('testing',r))
     cTableRdy <- dataIn[dataIn[[responseVar]] %in% c(combos$V1[r],combos$V2[r]), c(feature,responseVar)]
     cTableRdy[[responseVar]] <- as.factor(as.character(cTableRdy[[responseVar]]))
     cTableRdy[[feature]] <- as.factor(as.character(cTableRdy[[feature]]))

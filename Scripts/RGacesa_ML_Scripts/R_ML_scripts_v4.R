@@ -31,7 +31,7 @@ plotAllLearningCurves <- function(dataI,dataName="",dataNameShort="",
                                   mdls=c("glm","gbm","rpart2","avNNet","nnet","pcaNNet","hdrda","svmRadial","svmLinear3",
                                          "rda","rrlda","regLogistic","rf","RRFglobal"),
                                   bts=3,sStep=2,sMin=50,outTable=T,outPlots=T,outFolder='plots',trainRepNR = 2,trainBootNR = 10,
-                                  doROC = T,posClass="IBS") {
+                                  doROC = T,posClass="IBS",allowParallel=T) {
   # outtable
   outTbl = data.frame(Model=character(),Metric=numeric(),Value=numeric(),SD=numeric())
   # go over all models
@@ -39,10 +39,11 @@ plotAllLearningCurves <- function(dataI,dataName="",dataNameShort="",
     startTime <- Sys.time()
     print (paste(">>>>>> PREPPING LEARNING CURVE FOR ",md," <<<<<<"))
     #registerDoSNOW(makeCluster(4, type = "SOCK"))
-    lCurve <- prepLearningCurve(dataIn = dataI,mdl = md, minSam = sMin,boots = bts,samStep = sStep,trNumber = trainRepNR,trBoot = trainBootNR,
+    lCurve <- prepLearningCurve(dataIn = dataI,mdl = md, minSam = sMin,lcBoots = bts,samStep = sStep,trNumber = trainRepNR,trBoot = trainBootNR,
                                 saveVarImp=paste(outFolder,'/lCurve_',dataNameShort,'_',md,'_varImp.png',sep=''),
                                 saveVarImpTit=paste('Covariate importance (',md,')',sep=''),
-                                posClass=posClass,ROCtitle=paste('ROC: ',dataName,' [',md,']',sep='') )
+                                posClass=posClass,ROCtitle=paste('ROC: ',dataName,' [',md,']',sep=''),
+                                allowParallel=allowParallel)
     g <- plotLearningCurves(lCurve,tit=paste("L-Curve",dataName,md))
     ggsave(g,filename = paste(outFolder,'/lCurve_',dataNameShort,'_',md,'.png',sep=''),width = 9,height = 9)
     endTime <- Sys.time()
@@ -815,8 +816,9 @@ findCorrelatedCovariates2 <- function(inData,cutOff)
 #'
 #'
 #'
-prepLearningCurve <- function(dataIn,mdl,boots=1,trSet=0.7,samStep=1.5,minSam=25,scaleCenter=T,trBoot = 25,trNumber = 5,trainType="boot",
-                              pProc = c("center","scale"), saveVarImp="", saveVarImpTit="",responseVar="Diagnosis",posClass="IBS",ROCtitle='')
+prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=25,scaleCenter=T,trBoot = 25,trNumber = 5,trainType="boot",
+                              pProc = c("center","scale"), saveVarImp="", saveVarImpTit="",responseVar="Diagnosis",posClass="IBS",ROCtitle='',
+                              allowParallel=T,optimiseMetric="Kappa")
 {
   inTrain <- createDataPartition(y=dataIn[[responseVar]],p=trSet,list=F)
   trainSet <- dataIn[inTrain,]
@@ -858,7 +860,7 @@ prepLearningCurve <- function(dataIn,mdl,boots=1,trSet=0.7,samStep=1.5,minSam=25
     auctrain <- c()
     auc <- c()
     
-    for (b in c(1:boots)) { # bootstraps loop
+    for (b in c(1:lcBoots)) { # bootstraps loop
       # another partition
       inTrain <- createDataPartition(y=dataIn[[responseVar]],p=trSet,list=F)
       trainSet <-dataIn[inTrain,]
@@ -871,12 +873,11 @@ prepLearningCurve <- function(dataIn,mdl,boots=1,trSet=0.7,samStep=1.5,minSam=25
       
       print(paste("Test",cnt,"(",nrow(smpl),"cases);","bootstrap",b))
       # prep traincontrol
-      tC = trainControl(method=trainType,
-            repeats = trNumber,
-            number = trBoot,
-            classProbs=T,
-            savePredictions = T,
-            allowParallel = T)
+      if (optimiseMetric=="ROC") {
+        tC = trainControl(method=trainType,repeats = trNumber,number = trBoot,classProbs=T,savePredictions = T,allowParallel = allowParallel,summaryFunction = twoClassSummary)
+      } else {
+        tC = trainControl(method=trainType,repeats = trNumber,number = trBoot,classProbs=T,savePredictions = T,allowParallel = allowParallel)
+      }
       #print(n)
       
       result <- tryCatch({
@@ -1422,7 +1423,7 @@ asinSqrtNormalise <- function(mN,norTaxa=T,norPWY=T) {
   rowsToNor <- c()
   if (norTaxa) {rowsToNor <- c(rowsToNor,grep('__',colnames(mN)))}
   if (norPWY) {rowsToNor <- c(rowsToNor,grep('PWY',colnames(mN)))}
-  mN[,rowsToNor] <- asin(sqrt(mN[,rowsToNor]/100.0))
+  mN[,rowsToNor] <- asin(sqrt(mN[,rowsToNor]))
   mN
 }
 # normalisation function (divide by max & center, for use on metagenomes and/or pathways)
@@ -1643,7 +1644,7 @@ prepModel <- function(dFrame,mdl) {
 #'}
 # =================================================================================
 dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",trP=0.75,positive="IBD",rfeMethod="glm",
-                                 testMethod="glm",xvnr=5,xvreps=1,parallel=T,verb=T,szs=F,trainMethod="repeatedcv") {
+                                 testMethod="glm",xvnr=5,xvreps=1,parallel=T,verb=T,szs=F,trainMethod="repeatedcv",optimiseMetric="Kappa") {
   
   #trC <- trainControl(method=rfeMethod,number=tBut,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = parallel)
   inTrain <- createDataPartition(dModel[[responseVar]],p=trP,list=F)
@@ -1664,7 +1665,7 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
   #print(szs)
   print ('  >> doing RFE profile')
   rfeProfile <- rfe(x=trSet[,-grep(responseVar,colnames(trSet))], y=trSet[[responseVar]], sizes=szs, rfeControl = rfeCtrl,
-                    metric="Kappa",method=rfeMethod,maximize = T)
+                    metric=optimiseMetric,method=rfeMethod,maximize = T)
   print ('    >>> DONE!')
   # save output
   varImpPlot <- cbind.data.frame(rownames(varImp(rfeProfile)),varImp(rfeProfile))
@@ -1674,27 +1675,31 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
   rownames(varImpPlot) <- NULL
   
   # select best NR of vars within tol% margin of error, while keeping number as low as possible
-  varNrMax <- pickSizeTolerance(rfeProfile$results, metric="Kappa",maximize = T,tol=0.1)
+  varNrMax <- pickSizeTolerance(rfeProfile$results, metric=optimiseMetric,maximize = T,tol=0.1)
   if (is.na(varNrMax)) {varNrMax = ncol(trSet)-1}
   varSelMax <- caretFuncs$selectVar(y = rfeProfile$variables,size=varNrMax)
-  varNr2 <- pickSizeTolerance(rfeProfile$results, metric="Kappa",maximize = T,tol=2)
+  varNr2 <- pickSizeTolerance(rfeProfile$results, metric=optimiseMetric,maximize = T,tol=2)
   if (is.na(varNr2)) {varNr2 = ncol(trSet)-1}
   varSel2 <- caretFuncs$selectVar(y = rfeProfile$variables,size=varNr2)
-  varNr5 <- pickSizeTolerance(rfeProfile$results, metric="Kappa",maximize = T,tol=6)
+  varNr5 <- pickSizeTolerance(rfeProfile$results, metric=optimiseMetric,maximize = T,tol=6)
   if (is.na(varNr5)) {varNr5 = ncol(trSet)-1}
   varSel5 <- caretFuncs$selectVar(y = rfeProfile$variables,size=varNr5)
   # build new model with these only, compare to original model
-  trC <- trainControl(method=trainMethod,number=xvnr,repeats = xvreps,savePredictions = T,classProbs = T,allowParallel = T)
+  if (optimiseMetric == "ROC") {
+    trC <- trainControl(method=trainMethod,number=xvnr,repeats = xvreps,savePredictions = T,classProbs = T,allowParallel = parallel,summaryFunction = twoClassSummary)
+  } else {
+    trC <- trainControl(method=trainMethod,number=xvnr,repeats = xvreps,savePredictions = T,classProbs = T,allowParallel = parallel)
+  }
   trSetMax <- trSet[,c(responseVar,varSelMax)]
   trSetSel2 <- trSet[,c(responseVar,varSel2)]
   trSetSel5 <- trSet[,c(responseVar,varSel5)]
   
   trForm <- reformulate(response=responseVar,termlabels = '.')
   
-  fitAll <- train(trForm, trSet,trControl = trC,method = testMethod,metric="Kappa")
-  fitMax <- train(trForm, trSetMax,trControl = trC,method = testMethod,metric="Kappa")
-  fitRfe2 <- train(trForm, trSetSel2,trControl = trC,method = testMethod,metric="Kappa")
-  fitRfe5 <- train(trForm, trSetSel5,trControl = trC,method = testMethod,metric="Kappa")
+  fitAll <- train(trForm, trSet,trControl = trC,method = testMethod,metric=optimiseMetric)
+  fitMax <- train(trForm, trSetMax,trControl = trC,method = testMethod,metric=optimiseMetric)
+  fitRfe2 <- train(trForm, trSetSel2,trControl = trC,method = testMethod,metric=optimiseMetric)
+  fitRfe5 <- train(trForm, trSetSel5,trControl = trC,method = testMethod,metric=optimiseMetric)
   # compare
   mNames <- c(paste("All:",ncol(testSet)-1,sep=''),paste("M.max:",varNrMax,sep=''),
               paste("M.2:",varNr2,sep=''),paste("M.5:",varNr5,sep=''))
@@ -2064,13 +2069,16 @@ doMLModelling <- function(outFolderName,
                         doMdlComparison = T, # do model comparison (raw vs optimised)
                         doOptMax = T,  # do MAX optimisation
                         doOpt2 = T,    # do V2 optimisation
-                        tBut=10,       # training xvalidations (or bootstraps) for all steps
+                        tButLC=10,     # bootstraps of learning curves
+                        tButXV=10,       # training xvalidations (or bootstraps) for all steps
                         tRep=3,        # training repeats (for all steps)
-                        lcB=5,         # learning curves bootstraps
+                        #lcB=5,         # learning curves bootstraps
                         rfeR=5,        # repeats of RFE
                         saveMdls = T,   # save fitted models
                         smoothROCs = T, # if T, make smooth ROC curves
-                        mtds = c("glm","svmRadial")
+                        mtds = c("glm","svmRadial"),
+                        optimiseMetric="Kappa",  # what to optimise (usually Kappa, TODO: ROC)
+                        allowParallel=T
 ) 
 {
   # root output folder, create/clean as necessary
@@ -2159,14 +2167,13 @@ doMLModelling <- function(outFolderName,
     write.table(c(responseVar,touse), file = paste0(outFolderName,'/inputData/',mN,'_trSet_prep_features.csv'),sep=',',row.names = F)
     write.table(inData, file = paste0(outFolderName,'/inputData/',mN,'_trSet_prep.csv'),sep=',',row.names = F)
   }
-  
     
   # make learning curves
   # =============================================
   if (doLC) {
     print (" > MAKING LEARNING CURVES:")
     if (!dir.exists(paste(outFolderName,'/lcurves',sep=''))) {dir.create(paste(outFolderName,'/lcurves',sep=''))}
-    trB = tBut; trRep = tRep # training parameters for each step of learning curve
+    #trB = tButLC; trRep = tRep # training parameters for each step of learning curve
     for (mtd in mtds) {
       for (c in c(1:length(allDM))) {
         mN <- allDMn[[c]]
@@ -2176,8 +2183,9 @@ doMLModelling <- function(outFolderName,
         } else {
           inData <- read.table(file = paste0(outFolderName,'/inputData/',mN,'_trSet.csv'),header = T,sep=',')  
         }
-        lCurve <- prepLearningCurve(dataIn = inData,mdl = mtd,boots = lcB,trBoot = trB,trNumber = trRep,trainType="cv",trSet = 0.75,
-                                    saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 10,samStep = 1.5)
+        lCurve <- prepLearningCurve(dataIn = inData,mdl = mtd,lcBoots = tButLC,trBoot = tButXV,trNumber = tRep,trainType="cv",trSet = 0.75,
+                                    saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 10,samStep = 1.5,
+                                    pProc = )
         write.table(lCurve,file=paste0(outFolderName,"/lcurves/",mN,"_lc_",mtd,".csv"),sep=',',row.names = F)
         lp <- plotLearningCurves(lCurve,tit=paste('Learning curve (',mN,' [',ncol(inData)-1,'f], ',mtd,')',sep=''),metrics = c("Kappa"))
         ggsave(plot = lp,file=paste0(outFolderName,"/lcurves/",mN,"_lc_",mtd,"_k.png"),width = 8,height = 6)
@@ -2198,7 +2206,7 @@ doMLModelling <- function(outFolderName,
     print (" > DOING RFE RUNS:")
     if (!dir.exists(paste(outFolderName,'/opt_RFE',sep=''))) {dir.create(paste(outFolderName,'/opt_RFE',sep=''))}
     # RFE parameters
-    xvn = rfeR; xvr = tBut
+    xvn = rfeR; xvr = tButXV
     # do RFE
     
     for (mtd in mtds) {
@@ -2245,8 +2253,9 @@ doMLModelling <- function(outFolderName,
           
           # debug
           #dModel=allDM[[c]];xvnr=xvn;xvreps = xvr; rfeMethod = mtd; parallel = T;testMethod = mtd; dModelName=allDMn[[c]];positive = posC
-          rfeRes <- dataModelOptimiseRFE(dModel=inData,xvnr=xvn,xvreps = xvr, rfeMethod = mtd,parallel = T,
-                                         testMethod = mtd, dModelName=allDMn[[c]],positive = posC,responseVar = responseVar)
+          rfeRes <- dataModelOptimiseRFE(dModel=inData,xvnr=xvn,xvreps = xvr, rfeMethod = mtd,
+                                         testMethod = mtd, dModelName=allDMn[[c]],positive = posC,responseVar = responseVar,
+                                         parallel = allowParallel)
           print('RFE done!')
           write.table(rfeRes[[1]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_vmax.csv"),row.names = F,col.names = F)
           write.table(rfeRes[[2]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v2.csv"),row.names = F,col.names = F)
@@ -2275,7 +2284,7 @@ doMLModelling <- function(outFolderName,
   if (doOptLC) {
     if (!dir.exists(paste(outFolderName,'/opt_lcurves',sep=''))) {dir.create(paste(outFolderName,'/opt_lcurves',sep=''))}
     defMethod = "glm"
-    trB = tBut; trRep = tRep # training parameters for each step of learning curve
+    #trB = tButLC; trRep = tRep # training parameters for each step of learning curve
     print ("BUILDING OPTIMISED LEARNING CURVES")
     for (mtd in mtds) {
       for (c in c(1:length(allDM))) {
@@ -2307,8 +2316,8 @@ doMLModelling <- function(outFolderName,
           #print (paste('building optimised model for',allDMn[[c]],'; method:',mtd))
           dmOpt <- dm[,c(responseVar,optVarsV)]
           print (paste('prepping learning curve for',mN,'; method:',mtd))
-          lCurve <- prepLearningCurve(dataIn = dmOpt,mdl = mtd,boots = lcB,trBoot = trB,trNumber = trRep,trainType="cv",trSet = 0.75,
-                                      saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 10,samStep = 1.5)
+          lCurve <- prepLearningCurve(dataIn = dmOpt,mdl = mtd,lcBoots = tButLC,trBoot = tButXV,trNumber = tRep,trainType="cv",trSet = 0.75,
+                                      saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 10,samStep = 1.5,allowParallel=allowParallel)
           lp <- plotLearningCurves(lCurve,tit=paste('Opt learning curve (',mN,' [',ncol(dmOpt)-1,'f], ',mtd,')',sep=''),metrics = c("Kappa"))
           ggsave(plot = lp,paste(outFolderName,"/opt_lcurves/lc_",mtd,"_",mN,'_k.png',sep=''),width = 8,height = 6)
           lp <- plotLearningCurves(lCurve,tit=paste('Opt learning curve (',mN,' [',ncol(dmOpt)-1,'f], ',mtd,')',sep=''),metrics = c("Sensitivity","Specificity","ACC"))
@@ -2330,7 +2339,11 @@ doMLModelling <- function(outFolderName,
     if (!dir.exists(paste(outFolderName,'/raw_fittedmdls',sep=''))) {dir.create(paste(outFolderName,'/raw_fittedmdls',sep=''))}
     if (!dir.exists(paste(outFolderName,'/raw_mdlResults',sep=''))) {dir.create(paste(outFolderName,'/raw_mdlResults',sep=''))}
     # general training parameters
-    trC <- trainControl(method="repeatedcv",number=tBut,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = T)
+    if (optimiseMetric=="ROC") {
+      trC <- trainControl(method="repeatedcv",number=tButXV,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = allowParallel,summaryFunction = twoClassSummary)
+    } else {
+      trC <- trainControl(method="repeatedcv",number=tButXV,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = allowParallel)
+    }
     # go through methods and data models
     fitRaw <- list()
     for (mtd in mtds) {
@@ -2355,9 +2368,9 @@ doMLModelling <- function(outFolderName,
         # do training
         frm <- reformulate(response = responseVar, termlabels = ".")
         if (mtd == "glm") {
-          fitRaw[[c]] <- train(frm,data = trSet,trControl = trC,method=mtd,metric="Kappa",family="binomial") # logistic reg.
+          fitRaw[[c]] <- train(frm,data = trSet,trControl = trC,method=mtd,metric=optimiseMetric,family="binomial") # logistic reg.
         } else {
-          fitRaw[[c]] <- train(frm,data = trSet,trControl = trC,method=mtd,metric="Kappa")
+          fitRaw[[c]] <- train(frm,data = trSet,trControl = trC,method=mtd,metric=optimiseMetric)
         }
         # save models
         if (saveMdls) {
@@ -2392,7 +2405,11 @@ doMLModelling <- function(outFolderName,
     if (!dir.exists(paste(outFolderName,'/opt_mdlResults',sep=''))) {dir.create(paste(outFolderName,'/opt_mdlResults',sep=''))}
     defMethod = "glm"
     # general training parameters
-    trC <- trainControl(method="repeatedcv",number=tBut,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = T)
+    if (optimiseMetric=="ROC") {
+      trC <- trainControl(method="repeatedcv",number=tButXV,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = allowParallel,summaryFunction = twoClassSummary)
+    } else {
+      trC <- trainControl(method="repeatedcv",number=tButXV,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = allowParallel)
+    }
     print ("BUILDING FINAL OPTIMISED MODELS:")
     for (mtd in mtds) {
       for (c in c(1:length(allDM))) {
