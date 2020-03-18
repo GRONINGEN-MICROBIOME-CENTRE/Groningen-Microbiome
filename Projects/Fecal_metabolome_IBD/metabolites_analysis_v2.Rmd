@@ -472,20 +472,20 @@ Normalize and impute missing metabolites
 
 ```{r, echo=T, message=F, warning=F}
 
-all_new_ID_tmp=as.data.frame(t(all_new_ID_raw))
+all_new_ID_tmp=as.data.frame(all_new_ID_raw)
 
 
 #apply log10 transformation + scale
 all_new_ID_tmp=log10(all_new_ID_tmp)
 
 #scale date, mean =0 , sd =1
-all_new_ID_tmp <- scale(all_new_ID_tmp)
+all_new_ID_tmp <- as.data.frame(scale(all_new_ID_tmp))
 
 #Impute na's 
 ### WARNING: now we are using the half of the minimum observed value per metabolite, in the future => KNN imputation
 all_new_ID=impute_missing_values(all_new_ID_tmp,samples_row = T, method = "hfmin", missing_filter = 0)
 
-all_new_ID=as.data.frame(t(all_new_ID))
+all_new_ID=as.data.frame(all_new_ID)
 ```
 
 
@@ -498,9 +498,7 @@ Summary stats per metabolite per cohort
 select=cc_pheno[,1, drop=F]
 summary_met=summary_stats(all_new_ID_raw,select)
 summary_met=as.data.frame(summary_met)
-#Transformed data
-summary_met_trans=summary_stats(all_new_ID, select)
-summary_met_trans=as.data.frame(summary_met_trans)
+
 ```
 
 
@@ -646,11 +644,6 @@ taxa_filt=transform_and_filter_taxa(taxa2,samples_row = T,method = "clr",missing
 
 print (paste("Number of taxa after filtering",ncol(taxa_filt)))
 
-#Merge taxa and metabolites
-taxa_and_mb=merge(taxa_filt,norm_filt,by="row.names")
-rownames(taxa_and_mb)=taxa_and_mb$Row.names
-taxa_and_mb$Row.names=NULL
-
 #Merge taxa and phenotypes
 cc_pheno3=merge(cc_pheno2,taxa_filt,by="row.names", all = T)
 rownames(cc_pheno3)=cc_pheno3$Row.names
@@ -680,6 +673,10 @@ __Metabolites that are present between 20% to 70% of the samples will be subset 
 
 mtb_logistic=subset(summary_short2,prevalence_Control>20 & prevalence_Control<70 & prevalence_UC>20 & prevalence_UC<70 & prevalence_CD>20 & prevalence_CD<70 )
 
+bi_mtb=all_new_ID_raw[,colnames(all_new_ID_raw) %in%mtb_logistic$Metabolite]
+bi_mtb[!is.na(bi_mtb)]=1
+bi_mtb[is.na(bi_mtb)]=0
+
 print(paste("Number of metabolites for presence/absence analysis:",length(mtb_logistic$Metabolite)))
 ```
 
@@ -689,12 +686,31 @@ __Metabolites present in more than 70% of the samples will be analyzed quantitat
 ```{r,echo=F}
 
 to_keep=subset(summary_short2,prevalence_Control>70 & prevalence_CD>70 & prevalence_UC>70)
-
-print(paste("Number of metabolites removed:",length(to_keep$Metabolite)))
+q_mtb=all_new_ID[,colnames(all_new_ID) %in%to_keep$Metabolite]
+print(paste("Number of metabolites for quantitative analysis:",length(to_keep$Metabolite)))
 ```
 
 
-4.SCFA
+__Merge taxa and metabolites__
+
+```{r, echo=F}
+#Merge taxa and metabolites
+taxa_and_mb=merge(taxa_filt,q_mtb,by="row.names")
+rownames(taxa_and_mb)=taxa_and_mb$Row.names
+taxa_and_mb$Row.names=NULL
+```
+
+
+__Summary statistics on transformed & filtered metabolites__
+
+```{r, echo=F}
+#Transformed data
+summary_met_trans=summary_stats(q_mtb, select)
+summary_met_trans=as.data.frame(summary_met_trans)
+```
+
+
+4.Summary of SCFA
 ===
 
 __Show SCFA names__
@@ -752,7 +768,8 @@ __Merge phenotypes to SCFA__
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
 
-SCFA_with_phenos=merge(SCFA_new_ID,cc_pheno2, by="row.names")
+SCFA_with_phenos=merge(SCFA_new_ID,cc_pheno3, by="row.names")
+cc_pheno4=merge(SCFA_new_ID,cc_pheno3, by="row.names")
 
 ```
 
@@ -763,7 +780,7 @@ __Plot SCFA per diagnosis__
 plot_SCFA=SCFA_with_phenos[,c("Row.names","ibd_Diagnosis","Methylbutyric_acid", "acetic_acid", "butyric_acid", "hexanoic_acid", "isobutyric_acid","isovaleric_acid" ,"propionic_acid", "valeric_acid")]
 
 plot_SCFA_m=melt(plot_SCFA, id.vars = c("Row.names","ibd_Diagnosis"))
-plot_SCFA_m=subset(plot_SCFA_m, plot_SCFA_m$diag2!="IBDU")
+plot_SCFA_m=subset(plot_SCFA_m, plot_SCFA_m$ibd_Diagnosis!="IBDU")
 #my_comparisions=list( c("CD","Control"), c("Control","Pouch_Stoma"), c("UC","Pouch_Stoma"), c("Control","UC"), c("CD","Pouch_Stoma"), c("CD","UC"))
 #Check NA's per SCFA per Cohort
 #table(plot_SCFA_m$diag2, plot_SCFA_m$variable, is.na(plot_SCFA_m$value))
@@ -771,19 +788,58 @@ my_comparisions=list( c("CD","Control"), c("Control","UC"), c("CD","UC"))
 ```
 
 ```{r, warning=F,message=FALSE, echo=F, fig.height=15}
-ggplot (plot_SCFA_m, aes (ibd_Diagnosis,log10(as.numeric(as.character(value))), fill=ibd_Diagnosis)) + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2) + facet_wrap(~ variable, ncol=2) + theme_bw() +scale_fill_brewer(palette ="RdBu")  + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA yg/g)") + xlab ("Cohort") + scale_x_discrete(labels=c("(n=239)","(n=255)", "(n=68)", "(n=176)"))
+ggplot (plot_SCFA_m, aes (ibd_Diagnosis,log10(as.numeric(as.character(value))), fill=ibd_Diagnosis)) + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2) + facet_wrap(~ variable, nrow=2) + theme_bw() +scale_fill_brewer(palette ="RdBu")  + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA µg/g)") + xlab ("Cohort") + scale_x_discrete(labels=c("(n=239)","(n=255)", "(n=68)", "(n=176)"))
+```
+
+```{r, warning=F,message=FALSE, echo=T}
+
+montreal= read.delim("~/Documents/Project_Metabolome/1.Input_files/only_montreal.txt", row.names=1)
+rownames(plot_SCFA)=plot_SCFA$Row.names
+plot_SCFA$Row.names=NULL
+tkd_SCFA=merge(montreal,plot_SCFA,by="row.names")
+tkd_SCFA_m=melt(tkd_SCFA, id.vars = c("Row.names","ibd_Diagnosis", "ibd_montreal_B","ibd_montreal_Bperianal","ibd_montreal_S" ))
+tkd_SCFA_m=subset(tkd_SCFA_m, tkd_SCFA_m$ibd_Diagnosis!="IBDU")
+
+tkd_SCFA_b=subset(tkd_SCFA_m, tkd_SCFA_m$ibd_Diagnosis!="UC")
+tkd_SCFA_b=tkd_SCFA_b[complete.cases(tkd_SCFA_b$ibd_montreal_B), ]
+
+my_comparisions=list(  c("B1","B2"), c("B2","B3"), c("Control","B3"),c("B1","B3"),c("Control","B2"))
+
+ggplot (tkd_SCFA_b, aes (ibd_montreal_B,log10(as.numeric(as.character(value))), fill=ibd_montreal_B)) + geom_violin(na.rm = T) + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2,na.rm = T) + facet_wrap(~ variable, nrow=2) + theme_bw() + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA µg/g)") + xlab ("Cohort") + scale_x_discrete(labels=c("(n=129)","(n=76)", "(n=29)", "(n=255)")) +  scale_fill_manual(values=c("lightsalmon","tomato","red4","snow"))
+
+
+tkd_SCFA_s=subset(tkd_SCFA_m, tkd_SCFA_m$ibd_Diagnosis!="CD")
+tkd_SCFA_s=tkd_SCFA_s[complete.cases(tkd_SCFA_s$ibd_montreal_S), ]
+
+my_comparisions=list(  c("Control","S0"), c("S0","S1"), c("S1","S2"), c("S2","S3"), c("Control","S1"),c("Control","S2"),c("Control","S3"))
+
+ggplot (tkd_SCFA_s, aes (ibd_montreal_S,log10(as.numeric(as.character(value))), fill=ibd_montreal_S)) + geom_violin(na.rm = T) + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2,na.rm = T) + facet_wrap(~ variable, nrow=2) + theme_bw() + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA µg/g)") + xlab ("Cohort")  + scale_fill_manual(values=c("snow","lightcyan2","lightblue2","steelblue1","blue3"))
+
+
+plot_SCFA_cal=SCFA_with_phenos[,c("Row.names","ibd_Diagnosis","ibd_FecalCalprotectinOver200yesno","Methylbutyric_acid", "acetic_acid", "butyric_acid", "hexanoic_acid", "isobutyric_acid","isovaleric_acid" ,"propionic_acid", "valeric_acid")]
+plot_SCFA_cal=melt(plot_SCFA_cal, id.vars = c("Row.names","ibd_Diagnosis", "ibd_FecalCalprotectinOver200yesno"))
+plot_SCFA_cal=subset(plot_SCFA_cal, plot_SCFA_cal$ibd_Diagnosis!="IBDU")
+plot_SCFA_cal=plot_SCFA_cal[complete.cases(plot_SCFA_cal$ibd_FecalCalprotectinOver200yesno), ]
+my_comparisions=list( c("no","yes"))
+
+ggplot (plot_SCFA_cal, aes (ibd_FecalCalprotectinOver200yesno,log10(as.numeric(as.character(value))), fill=ibd_FecalCalprotectinOver200yesno)) + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2) + facet_wrap(ibd_Diagnosis~ variable , nrow=3) + theme_bw() +scale_fill_brewer(palette ="RdBu")  + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA µg/g)")  
+
 ```
 
 
 
-5.PCA analysis
+5.PCA analysis on metabolites present in more than 20% of the samples
 ===
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
+filt_1=subset(summary_short2,prevalence_Control>20 | prevalence_UC>20 | prevalence_CD>20  )
+
+norm_filt=all_new_ID[,colnames(all_new_ID) %in%filt_1$Metabolite]
+
 
 pca_log= prcomp(norm_filt,scale. = T, center = T)
 cmp_log=as.data.frame(pca_log$x[,1:5])
-cc_pheno2=read.delim("~/Documents/Project_Metabolome/1.Input_files/mini_pheno2.txt", row.names=1)
+#cc_pheno2=read.delim("~/Documents/Project_Metabolome/1.Input_files/mini_pheno2.txt", row.names=1)
 cmp_log2=merge(cc_pheno2,cmp_log,by="row.names")
 v_exp = pca_log$sdev^2
 prop_v_exp= data.frame( PC=1:length(v_exp),perc= 100*(v_exp / sum(v_exp)))
@@ -792,36 +848,390 @@ prop_v_exp= data.frame( PC=1:length(v_exp),perc= 100*(v_exp / sum(v_exp)))
 
 
 
+Percentage of variance explained per component
+---
+
+```{r}
+prop_v_exp2=prop_v_exp[1:20,]
+ggplot(prop_v_exp2, aes (PC,perc)) + geom_bar (stat="identity") + geom_text(aes(label=round(perc, 2)), size=3, vjust=-.5) + theme_bw() + xlab ("Principal components") + ylab ("% explained variance")
+```
+
+
+PC1 & PC2: Diagnosis
+---
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=ibd_Diagnosis)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+```
+
+PC2 & PC3: Diagnosis
+---
+
+```{r}
+ggplot(cmp_log2, aes(-PC2,-PC3, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+```
+
+
+Exploring different phenotypes
+---
+
+__PC1 & PC2: Bowel Movements a day__
+
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
+```
+
+
+__PC1 & PC2: Bristol stool scale binary (soft vs hard)__
+
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=clinical_BinaryBSS)) + geom_point() + theme_bw()
+```
+
+
+
+__PC1 & PC2: Number of months that the sample spend in the -80 freezer__
+
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=metabolon_Month_in_freezer)) + geom_point() + theme_bw()
+```
+
+
+
+__PC1 & PC2:Activity__
+
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=ibd_ActiveDisease)) + geom_point() + theme_bw() + scale_colour_manual(values=c("red2","gray32","blue2","snow"))
+```
+
+
+
+
+__PC1 & PC2: Food frequency: Sum of Carhydrates__
+
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=diet_SUMOFKHTOT.Res)) + geom_point() + theme_bw() + scale_colour_viridis()
+```
+
+
+__PC1 & PC2: Food frequency: Sum of fat__
+
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=diet_SUMOFVETTOT.Res)) + geom_point() + theme_bw() + scale_colour_viridis()
+```
+
+
+__PC1 & PC2: Food frequency: plant protein vs animal proten__
+
+
+```{r}
+ggplot(cmp_log2, aes(PC1,-PC2, color=diet_PlanttoAnimal)) + geom_point() + theme_bw() + scale_colour_viridis()
+```
+
+
+
+__PC1 & PC2: Montreal (B and S) classifications__
+
+
+Montreal B: 
+
+
+B1: Inflammatory
+
+B2: Stricturing
+
+B3: Penetrating
+
+
+```{r, warning=F, echo=F}
+rownames(cmp_log2)=cmp_log2$Row.names
+cmp_log2$Row.names=NULL
+montreal=read.table("~/Documents/Project_Metabolome/1.Input_files/only_montreal.txt", sep = "\t", header = T, row.names = 1)
+cmp_log3=merge(montreal,cmp_log2, by="row.names")
+
+table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_B)
+
+ggplot(cmp_log3, aes(PC1,-PC2, color=ibd_montreal_B)) + geom_point() + theme_bw() + scale_colour_manual(values=c("lightsalmon","tomato","red4","gray32","snow"))
+
+
+```
+
+Montreal perianal: 
+
+```{r, warning=F, echo=F}
+table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_Bperianal)
+ggplot(cmp_log3, aes(PC1,-PC2, color=ibd_montreal_Bperianal)) + geom_point() + theme_bw() + scale_colour_manual(values=c("gray32","blue2","red2","snow"))
+```
+
+
+Montreal S: 
+
+
+S0: remission
+
+S1: Mild
+
+S2: Moderate
+
+S3: Severe
+
+
+```{r, warning=F}
+table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_S)
+ggplot(cmp_log3, aes(PC1,-PC2, color=ibd_montreal_S)) + geom_point() + theme_bw() + scale_colour_manual(values=c("gray32","lightcyan2","lightblue2","steelblue1","blue3","snow"))
+```
+
+
+Calculate PCA per subphenotypes: CD or UC
+---
+
+```{r}
+
+norm_filt_CD=subset(norm_filt, row.names(norm_filt) %in% row.names(cc_pheno)[cc_pheno$ibd_Diagnosis=="CD"])
+
+pca_log_CD= prcomp(norm_filt_CD,scale. = T, center = T)
+cmp_log_CD=as.data.frame(pca_log_CD$x[,1:5])
+cmp_log_CD=merge(cc_pheno2,cmp_log_CD,by="row.names")
+v_exp_CD = pca_log_CD$sdev^2
+prop_v_exp_CD= data.frame( PC=1:length(v_exp_CD),perc= 100*(v_exp_CD / sum(v_exp_CD)))
+prop_v_exp_CD=prop_v_exp_CD[1:20,]
+ggplot(prop_v_exp_CD, aes (PC,perc)) + geom_bar (stat="identity") + geom_text(aes(label=round(perc, 2)), size=3, vjust=-.5) + theme_bw() + xlab ("Principal components") + ylab ("% explained variance")
+
+row.names(cmp_log_CD)=cmp_log_CD$Row.names
+cmp_log_CD$Row.names=NULL
+
+cmp_log_CD=merge(montreal,cmp_log_CD, by="row.names")
+table(cmp_log_CD$ibd_Diagnosis,cmp_log_CD$ibd_montreal_B)
+ggplot(cmp_log_CD, aes(PC1,PC2, color=ibd_montreal_B)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values=c("lightsalmon","tomato","red4","gray32","snow"))
+
+
+
+
+
+
+norm_filt_UC=subset(norm_filt, row.names(norm_filt) %in% row.names(cc_pheno)[cc_pheno$ibd_Diagnosis=="UC"])
+
+pca_log_UC= prcomp(norm_filt_UC,scale. = T, center = T)
+cmp_log_UC=as.data.frame(pca_log_UC$x[,1:5])
+cmp_log_UC=merge(cc_pheno2,cmp_log_UC,by="row.names")
+v_exp_UC = pca_log_UC$sdev^2
+prop_v_exp_UC= data.frame( PC=1:length(v_exp_UC),perc= 100*(v_exp_UC / sum(v_exp_UC)))
+prop_v_exp_UC=prop_v_exp_UC[1:20,]
+ggplot(prop_v_exp_UC, aes (PC,perc)) + geom_bar (stat="identity") + geom_text(aes(label=round(perc, 2)), size=3, vjust=-.5) + theme_bw() + xlab ("Principal components") + ylab ("% explained variance")
+
+row.names(cmp_log_UC)=cmp_log_UC$Row.names
+cmp_log_UC$Row.names=NULL
+
+cmp_log_UC=merge(montreal,cmp_log_UC, by="row.names")
+table(cmp_log_UC$ibd_Diagnosis,cmp_log_UC$ibd_montreal_S)
+ggplot(cmp_log_UC, aes(PC1,PC2, color=ibd_montreal_S)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values=c("gray32","lightcyan2","lightblue2","steelblue1","blue3","snow"))
+
+```
+
+
+
+
+
+
+5.PCA & PCoA analysis on bacteria present in more than 20% of the samples
+===
+
+__Calculate PCA based on filtered clr relative abundaces__
+
+```{r, echo=F}
+print(paste("Number of species used for PCA analysis:", ncol(taxa_filt)))
+```
+
+```{r, echo=T}
+pca_clr= prcomp(taxa_filt,scale. = T, center = T)
+cmp_clr=as.data.frame(pca_clr$x[,1:5])
+cmp_clr2=merge(cc_pheno2,cmp_clr,by="row.names")
+
+```
+
+```{r, echo=F}
+
+ggplot(cmp_clr2, aes(-PC1,PC2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+
+```
+
+```{r, echo=F}
+
+ggplot(cmp_clr2, aes(-PC1,PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
+
+```
+
+
+__Repeat for disease scores Monteral B and S__
+
+```{r}
+
+rownames(cmp_clr2)=cmp_clr2$Row.names
+cmp_clr2$Row.names=NULL
+montreal=read.table("~/Documents/Project_Metabolome/1.Input_files/only_montreal.txt", sep = "\t", header = T, row.names = 1)
+cmp_clr3=merge(montreal,cmp_clr2, by="row.names")
+
+table(cmp_clr3$ibd_Diagnosis,cmp_clr3$ibd_montreal_B)
+
+ggplot(cmp_clr3, aes(-PC1,PC2, color=ibd_montreal_B)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values=c("lightsalmon","tomato","red4","gray32","snow"))
+ggplot(cmp_clr3, aes(-PC1,PC2, color=ibd_montreal_S)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values=c("gray32","lightcyan2","lightblue2","steelblue1","blue3","snow"))
+
+
+
+taxa_filt_CD=subset(taxa_filt, row.names(taxa_filt) %in% row.names(cc_pheno)[cc_pheno$ibd_Diagnosis=="CD"])
+
+pca_log_CD= prcomp(taxa_filt_CD,scale. = T, center = T)
+cmp_log_CD=as.data.frame(pca_log_CD$x[,1:5])
+cmp_log_CD=merge(cc_pheno2,cmp_log_CD,by="row.names")
+v_exp_CD = pca_log_CD$sdev^2
+prop_v_exp_CD= data.frame( PC=1:length(v_exp_CD),perc= 100*(v_exp_CD / sum(v_exp_CD)))
+prop_v_exp_CD=prop_v_exp_CD[1:20,]
+ggplot(prop_v_exp_CD, aes (PC,perc)) + geom_bar (stat="identity") + geom_text(aes(label=round(perc, 2)), size=3, vjust=-.5) + theme_bw() + xlab ("Principal components") + ylab ("% explained variance")
+
+row.names(cmp_log_CD)=cmp_log_CD$Row.names
+cmp_log_CD$Row.names=NULL
+
+cmp_log_CD=merge(montreal,cmp_log_CD, by="row.names")
+table(cmp_log_CD$ibd_Diagnosis,cmp_log_CD$ibd_montreal_B)
+ggplot(cmp_log_CD, aes(PC1,-PC2, color=ibd_montreal_B)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values=c("lightsalmon","tomato","red4","gray32","snow"))
+
+
+
+taxa_filt_UC=subset(taxa_filt, row.names(taxa_filt) %in% row.names(cc_pheno)[cc_pheno$ibd_Diagnosis=="UC"])
+
+pca_log_UC= prcomp(taxa_filt_UC,scale. = T, center = T)
+cmp_log_UC=as.data.frame(pca_log_UC$x[,1:5])
+cmp_log_UC=merge(cc_pheno2,cmp_log_UC,by="row.names")
+v_exp_UC = pca_log_UC$sdev^2
+prop_v_exp_UC= data.frame( PC=1:length(v_exp_UC),perc= 100*(v_exp_UC / sum(v_exp_UC)))
+prop_v_exp_UC=prop_v_exp_UC[1:20,]
+ggplot(prop_v_exp_UC, aes (PC,perc)) + geom_bar (stat="identity") + geom_text(aes(label=round(perc, 2)), size=3, vjust=-.5) + theme_bw() + xlab ("Principal components") + ylab ("% explained variance")
+
+row.names(cmp_log_UC)=cmp_log_UC$Row.names
+cmp_log_UC$Row.names=NULL
+
+cmp_log_UC=merge(montreal,cmp_log_UC, by="row.names")
+table(cmp_log_UC$ibd_Diagnosis,cmp_log_UC$ibd_montreal_S)
+ggplot(cmp_log_UC, aes(-PC1,PC2, color=ibd_montreal_S)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values=c("gray32","lightcyan2","lightblue2","steelblue1","blue3","snow"))
+
+
+
+
+
+```
+
+
+__Calculate PCoA based on Bray-Curtis distances__
 
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
-#to_remove=subset(summary_met, summary_met$perc_missing>85)
-to_remove_80=subset(summary_short2,prevalence_CT<20 | prevalence_CD<20 | prevalence_CD<20)
+#Filter present in at least 20% of the samples
+taxa2=taxa2/100
+taxa2[taxa2=="NA"]=0
+taxa2[taxa2=="NaN"]=0
+taxa_filt=taxa2[,((colSums(taxa2 !=0) / nrow(taxa2)) *100 )>20]
+#Data transformation
+#Choose square root arcsine transformation
+taxa_asin=asin(sqrt(taxa_filt))
 
-keepCT=subset(summary_short2,prevalence_CT>20)
-keepCT=factor(keepCT$Metabolite)
-keepCD=subset(summary_short2,prevalence_CD>20)
-keepCD=factor(keepCD$Metabolite)
-keepUC=subset(summary_short2,prevalence_UC>20)
-keepUC=factor(keepUC$Metabolite)
-```
-
-Numbers of metabolites to keep after removing metabolites present in less than 20% of the samples
-
-```{r, warning=F,message=FALSE, echo=F}
-plot(euler(list(A = keepCT, B = keepCD, C = keepUC)),quantities=T, label=c("Controls","CD", "UC"))
-```
-
-
-Removing metabolites in the normalized metabolite tables and merge phenotypes
-
-```{r, warning=F,message=FALSE, echo=T}
-
-# Select metabolites to remove
-to_remove=subset(summary_short2,prevalence_CT<20 & prevalence_CD<20 & prevalence_UC<20)
-to_remove1=to_remove
-rownames(to_remove1)=to_remove1$Metabolite
-to_remove1=merge(annot,to_remove1,by="row.names")
-to_remove2=factor(to_remove$Metabolite)
+#Calculate bray curtis dissimilarity
+bc_dis=vegdist(taxa_asin,method = "bray")
+tax_mds <- metaMDS(comm=bc_dis,k=5, autotransform = FALSE)
+data.scores <- as.data.frame(scores(tax_mds))
+data.scores$site <- rownames(tax_mds) 
+bc_mds=merge(cc_pheno2,data.scores,by="row.names")
 
 ```
+
+
+```{r, echo=F}
+
+ggplot(bc_mds, aes(-NMDS1,-NMDS2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+
+```
+
+
+6. Clustering metabolites
+===
+
+
+__Regress batch & diseases effects__
+
+Here we use all metabolites present in more than 20% of the samples. 
+
+We extract residuals from the following linear model (lm) : 
+
+__lm(Metabolite ~ Day_of_measurment + Sample_box + Amount_of_input_material + LC Column + Months_sample_in_freezer + ibd_Diagnosis (Control/CD/UC) )__
+
+```{r}
+rownames(cc_pheno4)=cc_pheno4$Row.names
+cc_pheno4$Row.names=NULL
+cc_pheno5=merge(my_batch_id,cc_pheno4, by="row.names")
+my_regress_phenos=cc_pheno5[,c("Row.names","run_day_cat","COMMENT", "Amount_sample_gram", "LC.COLUMN" , "metabolon_Month_in_freezer" , "ibd_Diagnosis")]
+rownames(my_regress_phenos)=my_regress_phenos$Row.names
+my_regress_phenos$Row.names=NULL
+rgs_mb=merge(my_regress_phenos,norm_filt, by="row.names")
+
+rgs_mb2=matrix(nrow=nrow(my_regress_phenos), ncol = ncol(norm_filt))
+ n=1
+for (i in 8:ncol(rgs_mb)){
+ my_lm=lm(rgs_mb[,i] ~ run_day_cat+COMMENT+Amount_sample_gram+LC.COLUMN+metabolon_Month_in_freezer+ibd_Diagnosis,data = rgs_mb)
+ rgs_mb2[,n] = my_lm$residuals
+ n=n+1
+}
+rgs_mb2=as.data.frame(rgs_mb2)
+rownames(rgs_mb2)=rgs_mb$Row.names
+colnames(rgs_mb2)=colnames(rgs_mb)[8:ncol(rgs_mb)]
+```
+
+```{r}
+#Select metabolite annotation
+annot_v2=annot
+annot_v2$SUB.PATHWAY=NULL
+annot_v2=subset(annot_v2, rownames(annot_v2) %in% colnames(rgs_mb2))
+#heatmaply_cor(cor(rgs_mb2, method = "spearman"), showticklabels = c(FALSE, FALSE), main ="Spearman correlation between metabolites", plot_method = 'plotly', scale="none", row_side_colors =annot_v2)
+```
+
+
+7. Univariate analysis
+===
+
+```{r}
+
+rownames(cc_pheno5)=cc_pheno5$Row.names
+cc_pheno5$Row.names=NULL
+cc_pheno6=cc_pheno5
+cc_pheno6=subset(cc_pheno6,select = -c(Preparation_batch,Preparation_day,Preparation_order,CLIENT.IDENTIFIER,Box,Preparation_day_cat))
+#q_mtb
+#bi_mtb
+test_mtb_quantitative=merge(cc_pheno6,q_mtb,by="row.names")
+rownames(test_mtb_quantitative)=test_mtb_quantitative$Row.names
+test_mtb_quantitative$Row.names=NULL
+
+test_mtb_presence=merge(cc_pheno6,q_mtb,by="row.names")
+rownames(test_mtb_presence)=test_mtb_presence$Row.names
+test_mtb_presence$Row.names=NULL
+
+
+my_univariate=matrix(nrow = , ncol=8)
+
+
+for ( i in 1:ncol(cc_pheno6)){
+  for (a in (ncol(cc_pheno6)+1):ncol(test_mtb_quantitative)){
+    my_row=1
+    my_trait=ncol(test_mtb_quantitative)[i]
+    my_pheno=ncol(test_mtb_quantitative)[a]
+    my_univariate[my_row,2]=my_pheno
+    my_univariate[my_row,1]=my_trait
+    
+  }
+}
+
+```
+
