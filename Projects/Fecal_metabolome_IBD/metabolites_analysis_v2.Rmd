@@ -75,6 +75,8 @@ library(DT)
 library(pvclust)
 library(compositions)
 library(RColorBrewer)
+library (ggvegan)
+library (VIM)
 ```
 
 Create functions
@@ -97,7 +99,7 @@ invrank= function(x) {qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x)))}
 #Imputation and filtering metabolites
 #####################################
 
-impute_missing_values=function(x, samples_row=T, method="hfmin", missing_filter=0){
+impute_missing_values=function(x, samples_row=T, method="knn", missing_filter=0){
   #if samples are in columns transpose
   if (!samples_row){
     x=as.data.frame(t(x))
@@ -125,6 +127,9 @@ impute_missing_values=function(x, samples_row=T, method="hfmin", missing_filter=
   }
   else if (method=="median"){
     x[sapply(x, is.numeric)] <- lapply(x[sapply(x, is.numeric)], function(a) ifelse(is.na(a), median(a, na.rm = TRUE), a))
+  }
+  else if (method=="knn"){
+    x=kNN(x,k=10,metric = "euclidean", imp_var = F)
   }
   else if (method=="none"){
     x=x
@@ -296,10 +301,10 @@ transform_and_filter_taxa=function(x, samples_row=T, method="asin", missing_filt
     #replace 0 by the half of the smallest value observed
     my_min=min(x_filt[x_filt>0]/2)
     x_filt=x_filt+my_min
-    #clr transformation (adapted from microbiome package function)
-    d <- apply(x_filt, 2, function(b) {
-      log(b) - mean(log(b))
-    })
+    d <- t(apply(x_filt, 1, function(b) {
+      my_mean=exp(sum(log(b))/length(b))
+      log(b/my_mean)
+    }))
     x_filt=d
   
   }
@@ -467,25 +472,24 @@ cc_pheno=cc_pheno[row.names(cc_pheno)%ni%remove_pouch_stoma,]
 print (paste("Number of samples excluded due to pouch or stoma:", length(remove_pouch_stoma)))
 ```
 
-Normalize and impute missing metabolites
+[REMOVE: Implemented below after filtering]Normalize and impute missing metabolites
 ---
 
 ```{r, echo=T, message=F, warning=F}
 
-all_new_ID_tmp=as.data.frame(all_new_ID_raw)
-
-
-#apply log10 transformation + scale
-all_new_ID_tmp=log10(all_new_ID_tmp)
-
-#scale date, mean =0 , sd =1
-all_new_ID_tmp <- as.data.frame(scale(all_new_ID_tmp))
+#all_new_ID_tmp=as.data.frame(all_new_ID_raw)
 
 #Impute na's 
 ### WARNING: now we are using the half of the minimum observed value per metabolite, in the future => KNN imputation
-all_new_ID=impute_missing_values(all_new_ID_tmp,samples_row = T, method = "hfmin", missing_filter = 0)
+#all_new_ID=impute_missing_values(all_new_ID_tmp,samples_row = T, method = "hfmin", missing_filter = 0)
 
-all_new_ID=as.data.frame(all_new_ID)
+#apply log10 transformation + scale
+#all_new_ID_tmp=log10(all_new_ID)
+
+#scale date, mean =0 , sd =1
+#all_new_ID_tmp <- as.data.frame(scale(all_new_ID_tmp))
+
+#all_new_ID=as.data.frame(all_new_ID_tmp)
 ```
 
 
@@ -498,7 +502,7 @@ Summary stats per metabolite per cohort
 select=cc_pheno[,1, drop=F]
 summary_met=summary_stats(all_new_ID_raw,select)
 summary_met=as.data.frame(summary_met)
-
+#write.table(summary_met, "~/Documents/Project_Metabolome/4.Summary_stats/Metabolites_summary_2020.txt", sep = "\t", quote = F)
 ```
 
 
@@ -507,7 +511,7 @@ __Check prevalence per phenotype__
 ```{r, echo=T, message=F, warning=F}
 summary_short=summary_met[,c("Metabolite", "Non_NAs")]
 summary_short2=summary_met[,c("Metabolite","Non_NAs","Non_NAs_Control","Non_NAs_CD", "Non_NAs_UC")]
-summary_short2$prevalence_all=((as.numeric(as.character(summary_short2$Non_NAs))/nrow(all_new_ID))*100)
+summary_short2$prevalence_all=((as.numeric(as.character(summary_short2$Non_NAs))/nrow(all_new_ID_raw))*100)
 summary_short2$prevalence_Control=((as.numeric(as.character(summary_short2$Non_NAs_Control))/length(select[select$ibd_Diagnosis=="Control",])*100))
 summary_short2$prevalence_CD=((as.numeric(as.character(summary_short2$Non_NAs_CD))/length(select[select$ibd_Diagnosis=="CD",])*100))
 summary_short2$prevalence_UC=((as.numeric(as.character(summary_short2$Non_NAs_UC))/length(select[select$ibd_Diagnosis=="UC",])*100))
@@ -546,6 +550,7 @@ rownames(summary_short4)=summary_short4$Row.names
 summary_short4$Row.names=NULL
 colnames(summary_short4)=c("Super pathway","Annotation", "Detected in cohort (%)", "Detected in controls (%)", "Detected in CD (%)", "Dectected in UC (%)")
 datatable(summary_short4)
+#write.table(summary_short4, "~/Documents/Project_Metabolome/4.Summary_stats/Metabolites_prevalence_short_2020.txt", sep = "\t", quote = F)
 ```
 
 
@@ -686,10 +691,31 @@ __Metabolites present in more than 70% of the samples will be analyzed quantitat
 ```{r,echo=F}
 
 to_keep=subset(summary_short2,prevalence_Control>70 & prevalence_CD>70 & prevalence_UC>70)
-q_mtb=all_new_ID[,colnames(all_new_ID) %in%to_keep$Metabolite]
+q_mtb=all_new_ID_raw[,colnames(all_new_ID_raw) %in%to_keep$Metabolite]
 print(paste("Number of metabolites for quantitative analysis:",length(to_keep$Metabolite)))
 ```
 
+Normalize and impute missing metabolites
+---
+
+```{r, echo=T, message=F, warning=F}
+
+q_mtb_t=as.data.frame(q_mtb)
+
+#apply log10 transformation + scale
+q_mtb_t=log10(q_mtb_t)
+
+#scale date, mean =0 , sd =1
+q_mtb_t <- as.data.frame(scale(q_mtb_t))
+
+#Impute na's 
+### WARNING: KNN imputation takes a while, take a nap or a coffee (in case of re-run save and load results of this stage)
+q_mtb=impute_missing_values(q_mtb_t,samples_row = T, method = "knn", missing_filter = 0)
+rownames(q_mtb)=row.names(q_mtb_t)
+#write.table(q_mtb, "~/Documents/Project_Metabolome/1.Input_files/Imputed_metabolites", sep = "\t",quote = F)
+
+q_mtb=as.data.frame(q_mtb)
+```
 
 __Merge taxa and metabolites__
 
@@ -767,9 +793,10 @@ colnames(SCFA_new_ID)=c("Amount_sample_gram", "Box", "Methylbutyric_acid", "acet
 __Merge phenotypes to SCFA__
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
-
+SCFA2=SCFA_new_ID
+SCFA2[,3:10]=sapply(SCFA2[,c(3:10)], function(x) log10(as.numeric(as.character(x))) )
 SCFA_with_phenos=merge(SCFA_new_ID,cc_pheno3, by="row.names")
-cc_pheno4=merge(SCFA_new_ID,cc_pheno3, by="row.names")
+cc_pheno4=merge(SCFA2,cc_pheno3, by="row.names")
 
 ```
 
@@ -788,7 +815,7 @@ my_comparisions=list( c("CD","Control"), c("Control","UC"), c("CD","UC"))
 ```
 
 ```{r, warning=F,message=FALSE, echo=F, fig.height=15}
-ggplot (plot_SCFA_m, aes (ibd_Diagnosis,log10(as.numeric(as.character(value))), fill=ibd_Diagnosis)) + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2) + facet_wrap(~ variable, nrow=2) + theme_bw() +scale_fill_brewer(palette ="RdBu")  + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA µg/g)") + xlab ("Cohort") + scale_x_discrete(labels=c("(n=239)","(n=255)", "(n=68)", "(n=176)"))
+ggplot (plot_SCFA_m, aes (ibd_Diagnosis,log10(as.numeric(as.character(value))), fill=ibd_Diagnosis)) + geom_violin() + geom_boxplot(width=0.1,position=position_dodge(1), alpha=0.2) + facet_wrap(~ variable, nrow=2) + theme_bw() +scale_fill_brewer(palette ="RdBu")  + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("log10(SCFA µg/g)") + xlab ("Cohort") + scale_x_discrete(labels=c("(n=239)","(n=255)", "(n=176)"))
 ```
 
 ```{r, warning=F,message=FALSE, echo=T}
@@ -834,8 +861,8 @@ ggplot (plot_SCFA_cal, aes (ibd_FecalCalprotectinOver200yesno,log10(as.numeric(a
 ```{r, warning=F,message=FALSE, echo=TRUE}
 filt_1=subset(summary_short2,prevalence_Control>20 | prevalence_UC>20 | prevalence_CD>20  )
 
-norm_filt=all_new_ID[,colnames(all_new_ID) %in%filt_1$Metabolite]
-
+#norm_filt=all_new_ID[,colnames(all_new_ID) %in%filt_1$Metabolite]
+norm_filt=q_mtb[,colnames(q_mtb) %in%filt_1$Metabolite]
 
 pca_log= prcomp(norm_filt,scale. = T, center = T)
 cmp_log=as.data.frame(pca_log$x[,1:5])
@@ -861,14 +888,14 @@ PC1 & PC2: Diagnosis
 ---
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=ibd_Diagnosis)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+ggplot(cmp_log2, aes(-PC1,PC2, color=ibd_Diagnosis)) + geom_point(size=2) + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
 ```
 
 PC2 & PC3: Diagnosis
 ---
 
 ```{r}
-ggplot(cmp_log2, aes(-PC2,-PC3, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+ggplot(cmp_log2, aes(PC2,PC3, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
 ```
 
 
@@ -879,7 +906,7 @@ __PC1 & PC2: Bowel Movements a day__
 
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
+ggplot(cmp_log2, aes(-PC1,PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
 ```
 
 
@@ -887,7 +914,7 @@ __PC1 & PC2: Bristol stool scale binary (soft vs hard)__
 
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=clinical_BinaryBSS)) + geom_point() + theme_bw()
+ggplot(cmp_log2, aes(-PC1,PC2, color=clinical_BinaryBSS)) + geom_point() + theme_bw()
 ```
 
 
@@ -896,7 +923,7 @@ __PC1 & PC2: Number of months that the sample spend in the -80 freezer__
 
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=metabolon_Month_in_freezer)) + geom_point() + theme_bw()
+ggplot(cmp_log2, aes(-PC1,PC2, color=metabolon_Month_in_freezer)) + geom_point() + theme_bw()
 ```
 
 
@@ -905,7 +932,7 @@ __PC1 & PC2:Activity__
 
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=ibd_ActiveDisease)) + geom_point() + theme_bw() + scale_colour_manual(values=c("red2","gray32","blue2","snow"))
+ggplot(cmp_log2, aes(-PC1,PC2, color=ibd_ActiveDisease)) + geom_point() + theme_bw() + scale_colour_manual(values=c("red2","gray32","blue2","snow"))
 ```
 
 
@@ -915,7 +942,7 @@ __PC1 & PC2: Food frequency: Sum of Carhydrates__
 
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=diet_SUMOFKHTOT.Res)) + geom_point() + theme_bw() + scale_colour_viridis()
+ggplot(cmp_log2, aes(-PC1,PC2, color=diet_SUMOFKHTOT.Res)) + geom_point() + theme_bw() + scale_colour_viridis()
 ```
 
 
@@ -923,7 +950,7 @@ __PC1 & PC2: Food frequency: Sum of fat__
 
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=diet_SUMOFVETTOT.Res)) + geom_point() + theme_bw() + scale_colour_viridis()
+ggplot(cmp_log2, aes(-PC1,PC2, color=diet_SUMOFVETTOT.Res)) + geom_point() + theme_bw() + scale_colour_viridis()
 ```
 
 
@@ -931,7 +958,7 @@ __PC1 & PC2: Food frequency: plant protein vs animal proten__
 
 
 ```{r}
-ggplot(cmp_log2, aes(PC1,-PC2, color=diet_PlanttoAnimal)) + geom_point() + theme_bw() + scale_colour_viridis()
+ggplot(cmp_log2, aes(-PC1,PC2, color=diet_PlanttoAnimal)) + geom_point() + theme_bw() + scale_colour_viridis()
 ```
 
 
@@ -957,7 +984,7 @@ cmp_log3=merge(montreal,cmp_log2, by="row.names")
 
 table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_B)
 
-ggplot(cmp_log3, aes(PC1,-PC2, color=ibd_montreal_B)) + geom_point() + theme_bw() + scale_colour_manual(values=c("lightsalmon","tomato","red4","gray32","snow"))
+ggplot(cmp_log3, aes(-PC1,PC2, color=ibd_montreal_B)) + geom_point() + theme_bw() + scale_colour_manual(values=c("lightsalmon","tomato","red4","gray32","snow"))
 
 
 ```
@@ -966,7 +993,7 @@ Montreal perianal:
 
 ```{r, warning=F, echo=F}
 table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_Bperianal)
-ggplot(cmp_log3, aes(PC1,-PC2, color=ibd_montreal_Bperianal)) + geom_point() + theme_bw() + scale_colour_manual(values=c("gray32","blue2","red2","snow"))
+ggplot(cmp_log3, aes(-PC1,PC2, color=ibd_montreal_Bperianal)) + geom_point() + theme_bw() + scale_colour_manual(values=c("gray32","blue2","red2","snow"))
 ```
 
 
@@ -984,7 +1011,7 @@ S3: Severe
 
 ```{r, warning=F}
 table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_S)
-ggplot(cmp_log3, aes(PC1,-PC2, color=ibd_montreal_S)) + geom_point() + theme_bw() + scale_colour_manual(values=c("gray32","lightcyan2","lightblue2","steelblue1","blue3","snow"))
+ggplot(cmp_log3, aes(-PC1,PC2, color=ibd_montreal_S)) + geom_point() + theme_bw() + scale_colour_manual(values=c("gray32","lightcyan2","lightblue2","steelblue1","blue3","snow"))
 ```
 
 
@@ -1057,13 +1084,13 @@ cmp_clr2=merge(cc_pheno2,cmp_clr,by="row.names")
 
 ```{r, echo=F}
 
-ggplot(cmp_clr2, aes(-PC1,PC2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+ggplot(cmp_clr2, aes(PC1,-PC2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
 
 ```
 
 ```{r, echo=F}
 
-ggplot(cmp_clr2, aes(-PC1,PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
+ggplot(cmp_clr2, aes(PC1,-PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
 
 ```
 
@@ -1167,27 +1194,27 @@ Here we use all metabolites present in more than 20% of the samples.
 
 We extract residuals from the following linear model (lm) : 
 
-__lm(Metabolite ~ Day_of_measurment + Sample_box + Amount_of_input_material + LC Column + Months_sample_in_freezer + ibd_Diagnosis (Control/CD/UC) )__
+__lm(Metabolite ~ Day_of_measurment  + Amount_of_input_material + LC Column + Months_sample_in_freezer + ibd_Diagnosis (Control/CD/UC) )__
 
 ```{r}
 rownames(cc_pheno4)=cc_pheno4$Row.names
 cc_pheno4$Row.names=NULL
 cc_pheno5=merge(my_batch_id,cc_pheno4, by="row.names")
-my_regress_phenos=cc_pheno5[,c("Row.names","run_day_cat","COMMENT", "Amount_sample_gram", "LC.COLUMN" , "metabolon_Month_in_freezer" , "ibd_Diagnosis")]
+my_regress_phenos=cc_pheno5[,c("Row.names","run_day_cat", "Amount_sample_gram", "LC.COLUMN" , "metabolon_Month_in_freezer" , "ibd_Diagnosis")]
 rownames(my_regress_phenos)=my_regress_phenos$Row.names
 my_regress_phenos$Row.names=NULL
 rgs_mb=merge(my_regress_phenos,norm_filt, by="row.names")
 
 rgs_mb2=matrix(nrow=nrow(my_regress_phenos), ncol = ncol(norm_filt))
  n=1
-for (i in 8:ncol(rgs_mb)){
- my_lm=lm(rgs_mb[,i] ~ run_day_cat+COMMENT+Amount_sample_gram+LC.COLUMN+metabolon_Month_in_freezer+ibd_Diagnosis,data = rgs_mb)
+for (i in 7:ncol(rgs_mb)){
+ my_lm=lm(rgs_mb[,i] ~ run_day_cat+Amount_sample_gram+LC.COLUMN+metabolon_Month_in_freezer+ibd_Diagnosis,data = rgs_mb)
  rgs_mb2[,n] = my_lm$residuals
  n=n+1
 }
 rgs_mb2=as.data.frame(rgs_mb2)
 rownames(rgs_mb2)=rgs_mb$Row.names
-colnames(rgs_mb2)=colnames(rgs_mb)[8:ncol(rgs_mb)]
+colnames(rgs_mb2)=colnames(rgs_mb)[7:ncol(rgs_mb)]
 ```
 
 ```{r}
@@ -1195,11 +1222,14 @@ colnames(rgs_mb2)=colnames(rgs_mb)[8:ncol(rgs_mb)]
 annot_v2=annot
 annot_v2$SUB.PATHWAY=NULL
 annot_v2=subset(annot_v2, rownames(annot_v2) %in% colnames(rgs_mb2))
+cor_metabolites=cor(rgs_mb2, method = "spearman")
+cor_p=cor_pmat(rgs_mb2)
 #heatmaply_cor(cor(rgs_mb2, method = "spearman"), showticklabels = c(FALSE, FALSE), main ="Spearman correlation between metabolites", plot_method = 'plotly', scale="none", row_side_colors =annot_v2)
+ggcorrplot(cor_metabolites, hc.order = TRUE, outline.col = "white", colors = c("#6D9EC1", "white", "#E46726"), type = "upper", p.mat = cor_p, insig = "blank", tl.cex=0.9)
 ```
 
 
-7. Univariate analysis
+7. Evaluating the effect of technical factors and host age and sex
 ===
 
 ```{r}
@@ -1207,31 +1237,303 @@ annot_v2=subset(annot_v2, rownames(annot_v2) %in% colnames(rgs_mb2))
 rownames(cc_pheno5)=cc_pheno5$Row.names
 cc_pheno5$Row.names=NULL
 cc_pheno6=cc_pheno5
-cc_pheno6=subset(cc_pheno6,select = -c(Preparation_batch,Preparation_day,Preparation_order,CLIENT.IDENTIFIER,Box,Preparation_day_cat))
+table(cc_pheno6$run_day_cat, cc_pheno6$COMMENT)
+cc_pheno6=subset(cc_pheno6,select = -c(Preparation_batch,Preparation_day,Preparation_order,CLIENT.IDENTIFIER,Box,Preparation_day_cat, RUN.DAY,SPL_AMNT_GRAM))
+
+#Correction factors: day measurment was done, LC column, ammount sample per gram, month sample in a freezer, sex and age. 
+my_correction_factors=cc_pheno6[,c("run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","host_Sex","host_Age_sampling")]
+my_correction_factors_test=merge(my_correction_factors,q_mtb,by="row.names")
+rownames(my_correction_factors_test)=my_correction_factors_test$Row.names
+my_correction_factors_test$Row.names=NULL
+
+#Box and day are correlated (i.e Box1 was analyzed between day 1 and 3, box10 only on day21)
+#Therefore I will only use day for correction
+#table(my_correction_factors_test$run_day_cat, test_mtb_quantitative$COMMENT)
+
+my_corr_factors_results=matrix(ncol = 5, nrow = 4626)
+b=1
+for ( a in 1:ncol(my_correction_factors)){
+  for (x in (ncol(my_correction_factors)+1):ncol(my_correction_factors_test)){
+    if(is.numeric(my_correction_factors[,a])){
+      my_corr_factors_results[b,1]=colnames(my_correction_factors_test)[a]
+      my_corr_factors_results[b,2]=colnames(my_correction_factors_test)[x]
+      my_test=cor.test(my_correction_factors_test[,a],my_correction_factors_test[,x], method = "spearman")
+      my_corr_factors_results[b,3]=my_test$estimate
+      my_corr_factors_results[b,4]=my_test$p.value
+      my_corr_factors_results[b,5]="spearman"
+      b=b+1
+    } else{
+      my_corr_factors_results[b,1]=colnames(my_correction_factors_test)[a]
+      my_corr_factors_results[b,2]=colnames(my_correction_factors_test)[x]
+      my_test=kruskal.test(my_correction_factors_test[,x]~my_correction_factors_test[,a])
+      my_corr_factors_results[b,3]=my_test$statistic
+      my_corr_factors_results[b,4]=my_test$p.value
+      my_corr_factors_results[b,5]="krustal"
+      b=b+1
+    }
+  }
+}
+
+my_corr_factors_results=as.data.frame(my_corr_factors_results)
+colnames(my_corr_factors_results)=c("Factor", "Metabolite","Estimate","p.value")
+my_corr_factors_results$p.value=as.numeric(as.character(my_corr_factors_results$p.value))
+my_corr_factors_results$FDR=p.adjust(my_corr_factors_results$p.value,method = "fdr")
+my_corr_factors_results$Bonferroni=p.adjust(my_corr_factors_results$p.value,method = "bonferroni")
+
+x=as.data.frame(table(my_corr_factors_results$Factor[my_corr_factors_results$Bonferroni<0.05]))
+y=as.data.frame(table(my_corr_factors_results$Factor[my_corr_factors_results$FDR<0.05]))
+associations_factors=as.data.frame(cbind(x,y))
+associations_factors[,3]=NULL
+colnames(associations_factors)=c("Name","Bonferroni","FDR")
+plot_asso=melt(associations_factors)
+
+ggplot(plot_asso,aes(Name,value, fill=variable)) + geom_bar(stat="identity", position =position_dodge(), colour="black") + theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +ylab ("Number of associations")+ scale_x_discrete(labels=c("Amount_sample_gram" = "Amount_input_sample", "run_day_cat" = "Run day","host_Age_sampling" = "Age", "host_Sex"="Sex", "LC.COLUMN"="LC-Column","metabolon_Month_in_freezer"="storage_time"))
+
+test_plot=merge(cc_pheno6,q_mtb,by="row.names")
+ggplot(test_plot, aes(run_day_cat,alpha_ketoglutarate)) + geom_violin(fill="gray88") + geom_jitter(aes(color=ibd_Diagnosis), position=position_jitter(0.2))+ theme_bw() + scale_color_manual(values = c("firebrick2", "black", "gray88","blue2")) 
+
+
+my_correction_factors_test_bi=merge(my_correction_factors,bi_mtb,by="row.names")
+rownames(my_correction_factors_test_bi)=my_correction_factors_test_bi$Row.names
+my_correction_factors_test_bi$Row.names=NULL
+colnames(my_correction_factors_test_bi)=make.names(colnames(my_correction_factors_test_bi))
+
+my_corr_factors_results_bi=matrix(ncol = 5, nrow = 4626)
+b=1
+for ( a in 1:ncol(my_correction_factors)){
+  for (x in (ncol(my_correction_factors)+1):ncol(my_correction_factors_test_bi)){
+    if(is.numeric(my_correction_factors[,a])){
+      my_corr_factors_results_bi[b,1]=colnames(my_correction_factors_test_bi)[a]
+      my_corr_factors_results_bi[b,2]=colnames(my_correction_factors_test_bi)[x]
+      my_frm=as.formula(paste(colnames(my_correction_factors_test_bi)[x], "~ ", colnames(my_correction_factors_test_bi)[a]))
+      my_test=summary(glm(my_frm, family = binomial(link="logit"), data =my_correction_factors_test_bi))
+      my_corr_factors_results_bi[b,3]=my_test$coefficients[2,1]
+      my_corr_factors_results_bi[b,4]=my_test$coefficients[2,4]
+      my_corr_factors_results_bi[b,5]="logit"
+      b=b+1
+    } else{
+      my_corr_factors_results_bi[b,1]=colnames(my_correction_factors_test_bi)[a]
+      my_corr_factors_results_bi[b,2]=colnames(my_correction_factors_test_bi)[x]
+      my_test=chisq.test(my_correction_factors_test_bi[,x],my_correction_factors_test_bi[,a])
+      my_corr_factors_results_bi[b,3]=my_test$statistic
+      my_corr_factors_results_bi[b,4]=my_test$p.value
+      my_corr_factors_results_bi[b,5]="chisq"
+      b=b+1
+    }
+  }
+}
+
+
+my_corr_factors_results_bi=as.data.frame(my_corr_factors_results_bi)
+colnames(my_corr_factors_results_bi)=c("Factor", "Metabolite","Estimate","p.value")
+my_corr_factors_results_bi$p.value=as.numeric(as.character(my_corr_factors_results_bi$p.value))
+my_corr_factors_results_bi$FDR=p.adjust(my_corr_factors_results_bi$p.value,method = "fdr")
+my_corr_factors_results_bi$Bonferroni=p.adjust(my_corr_factors_results_bi$p.value,method = "bonferroni")
+
+x=as.data.frame(table(my_corr_factors_results_bi$Factor[my_corr_factors_results_bi$Bonferroni<0.05]))
+y=as.data.frame(table(my_corr_factors_results_bi$Factor[my_corr_factors_results_bi$FDR<0.05]))
+association_corr_bi=as.data.frame(cbind(x,y))
+association_corr_bi[,3]=NULL
+colnames(association_corr_bi)=c("Name","Bonferroni","FDR")
+plot_asso_bi=melt(association_corr_bi)
+
+ggplot(plot_asso_bi,aes(Name,value, fill=variable)) + geom_bar(stat="identity", position =position_dodge(), colour="black") + theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +ylab ("Number of associations")+ scale_x_discrete(labels=c("Amount_sample_gram" = "Amount_input_sample", "COMMENT" = "Box","host_Age_sampling" = "Age", "host_Sex"="Sex", "LC.COLUMN"="LC-Column","metabolon_Month_in_freezer"="storage_time"))
+
+
+test_plot2=merge(cc_pheno6,bi_mtb,by="row.names")
+test_pv=as.data.frame(table(test_plot2$run_day_cat, test_plot2$`cerotoylcarnitine__C26*`))
+ggplot(test_pv, aes(Var1,Freq, fill=Var2)) + geom_bar(stat = "identity") +coord_flip()+ theme_bw() + ylab ("Presence of Cerotoylcarnitine") + xlab ("Day of the experiment")
+```
+
+
+8. Univariate analyses, covariates: age, sex, day measuring (run day), amount of sample, month sample in a freezer
+===
+
+
+```{r}
+
 #q_mtb
 #bi_mtb
 test_mtb_quantitative=merge(cc_pheno6,q_mtb,by="row.names")
+test_mtb_quantitative=as.data.frame(lapply(test_mtb_quantitative, gsub, pattern="Control", replacement="A_Control", fixed=T))
 rownames(test_mtb_quantitative)=test_mtb_quantitative$Row.names
 test_mtb_quantitative$Row.names=NULL
+test_mtb_quantitative$ibd_FecalCalprotectin=NULL
+test_mtb_quantitative$COMMENT=NULL
 
+write.table(test_mtb_quantitative,"~/Documents/Project_Metabolome/1.Input_files/Univariate_cc.txt",sep="\t", quote = F, row.names = T)
+
+##REMOVE DIET & IBD PHENOS##
+mtb_quantitative_ibd=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/Univariate_quant_ibd_meds.txt",sep="\t", header = T, row.names = 1)
+mtb_quantitative_diet=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/Univariate_quant_diet.txt",sep="\t", header = T, row.names = 1)
+mtb_quantitative_bugs=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/Univariate_quant_bugs.txt",sep="\t", header = T, row.names = 1)
+
+#corr_vars=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer")
+
+
+flag=1
+for ( i in 1:61) {
+  my_pheno=colnames(mtb_quantitative_ibd)[i]
+  if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling") {
+    print (paste("Skipping phenotype:",my_pheno))
+  } else {
+    print (paste("Testing:",my_pheno))
+    for (a in 62:ncol(mtb_quantitative_ibd)){
+      my_trait=colnames(mtb_quantitative_ibd)[a]
+      my_uni_test=mtb_quantitative_ibd[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno,my_trait)]
+      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno)
+      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
+      my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
+      my_samples=nrow(my_uni_test)
+      my_lm=summary(lm(my_f,data = my_uni_test ))
+      my_lm_coef=as.data.frame(my_lm$coefficients)
+      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
+      my_lm_pheno$metabolite=my_trait
+      my_lm_pheno$phenotype=my_pheno
+      my_lm_pheno$factor=rownames(my_lm_pheno)
+      if (flag!=1){
+          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
+      }else{
+          my_univariate_results=my_lm_pheno
+          flag=5
+      }
+    }
+  }
+}
+
+my_univariate_ibd=my_univariate_results
+
+
+flag=1
+for ( i in 1:130) {
+  my_pheno=colnames(mtb_quantitative_bugs)[i]
+  if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling"| my_pheno=="ibd_Diagnosis") {
+    print (paste("Skipping phenotype:",my_pheno))
+  } else {
+    print (paste("Testing:",my_pheno))
+    for (a in 131:ncol(mtb_quantitative_bugs)){
+      my_trait=colnames(mtb_quantitative_bugs)[a]
+      my_uni_test=mtb_quantitative_bugs[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
+      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
+      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
+      my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
+      my_samples=nrow(my_uni_test)
+      my_lm=summary(lm(my_f,data = my_uni_test ))
+      my_lm_coef=as.data.frame(my_lm$coefficients)
+      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
+      my_lm_pheno$metabolite=my_trait
+      my_lm_pheno$phenotype=my_pheno
+      my_lm_pheno$factor=rownames(my_lm_pheno)
+      if (flag!=1){
+          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
+      }else{
+          my_univariate_results=my_lm_pheno
+          flag=5
+      }
+    }
+  }
+}
+
+my_univariate_bugs=my_univariate_results
+
+
+flag=1
+for ( i in 1:151) {
+  my_pheno=colnames(mtb_quantitative_diet)[i]
+  if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling") {
+    print (paste("Skipping phenotype:",my_pheno))
+  } else {
+    print (paste("Testing:",my_pheno))
+    for (a in 152:ncol(mtb_quantitative_diet)){
+      my_trait=colnames(mtb_quantitative_diet)[a]
+      my_uni_test=mtb_quantitative_diet[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno,my_trait)]
+      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno)
+      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
+      my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
+      my_samples=nrow(my_uni_test)
+      my_lm=summary(lm(my_f,data = my_uni_test ))
+      my_lm_coef=as.data.frame(my_lm$coefficients)
+      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
+      my_lm_pheno$metabolite=my_trait
+      my_lm_pheno$phenotype=my_pheno
+      my_lm_pheno$factor=rownames(my_lm_pheno)
+      if (flag!=1){
+          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
+      }else{
+          my_univariate_results=my_lm_pheno
+          flag=5
+      }
+    }
+  }
+}
+
+my_univariate_diet=my_univariate_results
+
+my_univariate_ibd2=my_univariate_ibd[my_univariate_ibd$phenotype!="ibd_CurrentStomaOrPouch",]
+my_univariate_ibd2=my_univariate_ibd2[my_univariate_ibd2$phenotype!="ibd_comb_diag_stoma",]
+my_univariate_ibd2=my_univariate_ibd2[my_univariate_ibd2$phenotype!="host_BMI",]
+my_univariate_bugs2=my_univariate_bugs[my_univariate_bugs$phenotype!="host_BMI",]
+
+
+all_uni_quant=rbind(my_univariate_ibd2, my_univariate_diet)
+all_uni_quant=rbind(all_uni_quant, my_univariate_bugs2)
+all_uni_quant$FDR=p.adjust(all_uni_quant$`Pr(>|t|)`,method = "BH")
+all_uni_quant$Bonferroni=p.adjust(all_uni_quant$`Pr(>|t|)`,method = "bonferroni")
+
+quant_significant=all_uni_quant[all_uni_quant$FDR<0.05,]
+quant_significant=all_uni_quant[all_uni_quant$Bonferroni<0.05,]
+quant_significant=quant_significant[quant_significant$metabolite!="Veillonella_unclassified",]
+
+
+diet=unlist(quant_significant$metabolite[grep("diet_", quant_significant$phenotype)])
+meds=unlist(quant_significant$metabolite[grep("med_", quant_significant$phenotype)])
+CD=unlist(quant_significant$metabolite[quant_significant$factor=="ibd_DiagnosisCD"])
+UC=unlist(quant_significant$metabolite[quant_significant$factor=="ibd_DiagnosisUC"])
+Bugs=unlist(quant_significant$metabolite[quant_significant$phenotype%in%colnames(taxa_filt)])
+BMI=unlist(quant_significant$metabolite[quant_significant$phenotype=="host_BMI"])
+
+my_test_list=list(CD =CD, UC=UC,BMI = BMI, Diet = diet, Bugs=Bugs ,Meds=meds)
+upset(fromList(my_test_list), order.by = "freq", nsets = 6)
+
+
+ggplot(mtb_quantitative_diet, aes(host_BMI, X7_ketocholesterol)) + geom_point() + theme_bw() + geom_smooth(method='lm')
+ggplot(mtb_quantitative_diet, aes(diet_coffee.Res, caffeine)) + geom_point() + theme_bw() + geom_smooth(method='lm')
+
+plot_cd=quant_significant[quant_significant$factor=="ibd_DiagnosisCD",]
+annot$clean = make.names(rownames(annot))
+plot_cd2=merge(plot_cd,annot, by.x = "metabolite", by.y = "clean")
+plot_cd2$dir=-1
+plot_cd2[plot_cd2$Estimate>0,]$dir=1
+
+ggplot(plot_cd2, aes(SUB.PATHWAY,dir, fill=as.factor(dir))) + geom_bar(stat = "identity") + coord_flip() + scale_fill_manual(values=c("blue2", "red3")) + theme_bw()
+
+
+
+
+
+plot_uc=quant_significant[quant_significant$factor=="ibd_DiagnosisUC",]
+
+plot_uc2=merge(plot_uc,annot, by.x = "metabolite", by.y = "clean")
+plot_uc2$dir=-1
+plot_uc2[plot_uc2$Estimate>0,]$dir=1
+
+ggplot(plot_uc2, aes(SUB.PATHWAY,dir, fill=as.factor(dir))) + geom_bar(stat = "identity") + coord_flip() + scale_fill_manual(values=c("blue2", "red3")) + theme_bw()
+
+```
+
+
+9. Logistic regression, univariate
+===
+
+
+```{r}
 test_mtb_presence=merge(cc_pheno6,q_mtb,by="row.names")
 rownames(test_mtb_presence)=test_mtb_presence$Row.names
 test_mtb_presence$Row.names=NULL
 
 
-my_univariate=matrix(nrow = , ncol=8)
 
-
-for ( i in 1:ncol(cc_pheno6)){
-  for (a in (ncol(cc_pheno6)+1):ncol(test_mtb_quantitative)){
-    my_row=1
-    my_trait=ncol(test_mtb_quantitative)[i]
-    my_pheno=ncol(test_mtb_quantitative)[a]
-    my_univariate[my_row,2]=my_pheno
-    my_univariate[my_row,1]=my_trait
-    
-  }
-}
+as.formula(paste(my_trait, paste(corr_vars, collapse = " + "), sep = " ~ "))
 
 ```
 
