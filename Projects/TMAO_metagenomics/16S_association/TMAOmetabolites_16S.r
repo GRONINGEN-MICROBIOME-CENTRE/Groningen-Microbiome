@@ -12,7 +12,6 @@ library(microbiome) #Library for clr
 #Phenos = option[4] #Should contain a column called ID, the rest will be used as dependent variables in the model
 
 ######Running from desktop
-setwd("~/PhD/WORK/TMAO_16S")
 Count_table =  "LLD_rarefDefault.taxonomyTable.txt.gz"
 Linking_table = "coupling_pheno_16s.txt"
 Covariates = "Cov_file.tsv"
