@@ -145,6 +145,7 @@ for (Level in taxonomic_levels){
   Count_table$SampleID -> Sample_ID
   colnames(Count_table)[grepl(Level, colnames(Count_table))] -> Level_filter
   Count_table %>% select(Level_filter) %>% mutate(SampleID =  Sample_ID) -> Taxa_table
+  Taxa_table = Filter_by_abundance(Taxa_table)
   
   #Merging SeqID and cohort ID
   Linking_table %>% arrange(X2) %>% filter(X2 %in% Taxa_table$SampleID) -> Linking_table_taxa
