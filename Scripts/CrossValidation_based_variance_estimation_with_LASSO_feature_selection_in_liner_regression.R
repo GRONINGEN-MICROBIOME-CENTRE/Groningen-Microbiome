@@ -1,3 +1,5 @@
+##For questions, please contact Lianmin Chen (LianminChen@yeah.net).
+
 ###estimate inter-individual variations of bile acid explained by predictors (use micorbiome as an example, i.e., included LASSO to selecte features) by using 5-fold cross validation (CV) 
 predictor=microbiome #a matrix with subjects in row while microbial features in column
 responder=ba #a matrix with subjects in row while bile acid entities in column
