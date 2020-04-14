@@ -1,5 +1,5 @@
 ####main codes for microbial co-abundance network analysis (for questions, please contact Lianmin Chen, lianminchen@yeah.net)
-#1.sparcc for network inference
+#1.sparcc and spiec-easi for network inference
 #2.compute FDR for edges
 #3.heterogeneity test
 #4.cohort-specific edges selection
@@ -7,7 +7,8 @@
 #6.partial correlation to check the confunding effect from covariates
 
 
-###1.sparcc for network inference (Python)
+###1.sparcc (Python) and spiec-easi (R) for network inference
+## sparcc
 python SparCC.py $INPUT_PATH --cor_file=$OUTPUT_PATH/real_cors_sparcc_sp.txt
 python MakeBootstraps.py $INPUT_PATH -n $BOOT_ITER -t permutation_#.txt -p $OUTPUT_PATH/Resamplings/
 # compute sparcc on permutated datasets
@@ -17,6 +18,17 @@ python SparCC.py $OUTPUT_PATH/Resamplings/permutation_$i.txt --cor_file=$OUTPUT_
 done
 # compute p-value from bootstraps
 python PseudoPvals.py $OUTPUT_PATH/real_cors_sparcc_sp_fg.txt $OUTPUT_PATH/Bootstraps/sim_cor_#.txt $BOOT_ITER -o $OUTPUT_PATH/pvals_two_sided_sp_fg.txt -t two_sided
+## spiec-easi
+library(SpiecEasi)
+data=sp #species abundance table, sample ids as rownames
+pargs=list(seed=666,ncores=6)
+spiec = spiec.easi(as.matrix(data), method='glasso',sel.criterion = "stars",lambda.min.ratio=1e-3, nlambda=30, pulsar.params=pargs)
+cor=cov2cor(apply(getOptCov(spiec),2,as.numeric))
+row.names(cor)=colnames(data)
+colnames(cor)=colnames(data)
+cor[lower.tri(cor, diag = T)]=NA
+ind = which(is.na(cor)==F,arr.ind = T)
+result = data.frame(start = colnames(cor)[ind[,1]],end = colnames(cor)[ind[,2]],Cor = cor[ind],stringsAsFactors = F)
 
 
 ###2.compute FDR for network edges (R language)
