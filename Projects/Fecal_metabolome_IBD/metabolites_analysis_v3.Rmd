@@ -73,6 +73,7 @@ library(ggbiplot)
 library(coin)
 library(DT)
 library(pvclust)
+library(glmnet)
 library(compositions)
 library(RColorBrewer)
 library (ggvegan)
@@ -320,16 +321,38 @@ transform_and_filter_taxa=function(x, samples_row=T, method="asin", missing_filt
 
 calculate_all_ratios=function(x,is_log=T,feature_in_column=T){
   print (paste("Number of features detected:",ncol(x)))
-  print (paste("Number of ratios being computed:", (ncol(x)*(ncol(x)-1))))
-  if(feature_in_column=F){
+  if(feature_in_column==F){
     x=as.data.frame(t(x))
+    print ("transposing")
   }
-  for (a in 1:ncol(x)-1){
+  flag=1
+  n=1
+  l=c()
+  for (a in 1:(ncol(x)-1)){
     for (b in (a+1):ncol(x)){
-      my_ratio=paste(colnames(x)[a],colnames(x)[b], sep = "_vs_")
-      
+      my_ratio_names=paste(colnames(x)[a],colnames(x)[b], sep = "_vs_")
+      l[[n]]=my_ratio_names
+      n=n+1
+      if (is_log==T){
+        my_ratios=x[,a]-x[,b]
+        #colnames(my_ratios)=my_ratio_names
+      }else{
+        my_ratios=log10(x[,a]/x[,b])
+        #colnames(my_ratios)=my_ratio_names
+      }
+      if (flag==1){
+        my_out=my_ratios
+        #colnames(my_out)=my_ratio_names
+        flag=5
+      }else{
+        my_out=cbind(my_out,my_ratios)
+      }
     }
   }
+  my_out=as.data.frame(my_out)
+  colnames(my_out)=l
+  rownames(my_out)=row.names(x)
+  return(my_out)
 }
 
 
@@ -1579,7 +1602,7 @@ all_uni_prev=rbind(all_uni_prev, prev_univariate_bugs2)
 all_uni_prev$FDR=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "BH")
 all_uni_prev$Bonferroni=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "bonferroni")
 
-#write.table(all_uni_prev,"~/Documents/Project_Metabolome/6.Results/Results_prevalence_mtb_042020.txt",sep="\t", quote = F, row.names = T)
+#write.table(all_uni_prev,"~/Documents/Project_Metabolome/6.Results/Results_prevalence_mtb_042020_v2.txt",sep="\t", quote = F, row.names = T)
 
 prev_significant=all_uni_prev[all_uni_prev$FDR<0.05,]
 prev_significant=all_uni_prev[all_uni_prev$Bonferroni<0.05,]
@@ -1596,7 +1619,6 @@ my_test_list=list(CD =CD, UC=UC,BMI = BMI, Diet = diet, Bugs=Bugs ,Meds=meds, Ri
 upset(fromList(my_test_list), order.by = "freq", nsets = 7)
 
 ggplot(mtb_prev_bugs, aes(as.factor(succinoyltaurine),Bilophila_wadsworthia, fill=as.factor(succinoyltaurine))) + geom_boxplot(outlier.colour = "white") + geom_jitter(alpha=0.3) + theme_classic() + scale_fill_manual(values = c("#E69F00", "#56B4E9"))
-
 
 
 test_pv=as.data.frame(table(mtb_prev_ibd$ibd_FecalCalprotectinOver200yesno, mtb_prev_ibd$lignoceroyl_sphingomyelin_d18_1_24_0))
@@ -1694,8 +1716,6 @@ ibd_only_sig=ibd_only_res_clean[ibd_only_res_clean$Bonferroni<0.05,]
 
 
 
-
-
 diet=unlist(ibd_only_sig$metabolite[grep("diet_", ibd_only_sig$phenotype)])
 meds=unlist(ibd_only_sig$metabolite[grep("med_", ibd_only_sig$phenotype)])
 CD_vs_UC=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_DiagnosisUC"])
@@ -1724,18 +1744,313 @@ my_plot$my_ord="Without valve"
 my_plot$my_ord[my_plot$ibd_IleocecalValveInSitu=="yes"]="in situ"
 ggplot(my_plot, aes( my_ord, X7_ketodeoxycholate, fill=my_ord)) + geom_boxplot(outlier.color = "white") + theme_bw() + geom_jitter(alpha=0.2) + xlab("") + scale_fill_manual(values=c("lightblue","firebrick2"))
 
+
+
+#####################################
+
+#Prevalence
+
+####################################
+
+
+
+
+only_ibd_quant=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/IBD_only_prevalence.txt",sep="\t", header = T, row.names = 1)
+only_ibd_quant$ibd_CurrentStomaOrPouch=NULL
+only_ibd_quant$host_Sex.1=NULL
+only_ibd_quant$med_parasympathicolytic_inhaler=NULL
+only_ibd_quant$med_ranitidine=NULL
+
+flag=1
+for ( i in 1:428) {
+  my_pheno=colnames(only_ibd_quant)[i]
+  if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling") {
+    print (paste("Skipping phenotype:",my_pheno))
+    
+  } 
+  else if ( my_pheno=="ibd_Diagnosis"){
+    print (paste("Testing:",my_pheno))
+    for (a in 429:ncol(only_ibd_quant)){
+      my_trait=colnames(only_ibd_quant)[a]
+      my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno,my_trait)]
+      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno)
+      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
+      #my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
+      my_samples=nrow(my_uni_test)
+      my_lm=summary(glm(my_f, family = binomial(link="logit"), data =my_uni_test))
+      my_lm_coef=as.data.frame(my_lm$coefficients)
+      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
+      my_lm_pheno$metabolite=my_trait
+      my_lm_pheno$phenotype=my_pheno
+      my_lm_pheno$factor=rownames(my_lm_pheno)
+      if (flag!=1){
+          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
+      }else{
+          my_univariate_results=my_lm_pheno
+          flag=5
+      }
+    }
+  }else {
+    print (paste("Testing:",my_pheno))
+    for (a in 429:ncol(only_ibd_quant)){
+      my_trait=colnames(only_ibd_quant)[a]
+      my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
+      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
+      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
+      #my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
+      my_samples=nrow(my_uni_test)
+      my_lm=summary(glm(my_f, family = binomial(link="logit"), data =my_uni_test))
+      my_lm_coef=as.data.frame(my_lm$coefficients)
+      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
+      my_lm_pheno$metabolite=my_trait
+      my_lm_pheno$phenotype=my_pheno
+      my_lm_pheno$factor=rownames(my_lm_pheno)
+      if (flag!=1){
+          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
+      }else{
+          my_univariate_results=my_lm_pheno
+          flag=5
+      }
+    }
+  }
+}
+
+ibd_only_results_prevalence=my_univariate_results
+
+ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_2_anacardic_acid",]
+ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_3_anacardic_acid",]
+ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylcytidine",]
+ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylguanosine.",]
+
+ibd_only_results_prevalence$FDR=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "BH")
+ibd_only_results_prevalence$Bonferroni=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "bonferroni")
+
+#write.table(ibd_only_results_prevalence,"~/Documents/Project_Metabolome/6.Results/IBD_only_results_prevalence_mtb_042020_v2.txt",sep="\t", quote = F, row.names = T)
+
+
+test_pv=as.data.frame(table(only_ibd_quant$host_SmokeCurrentSmoker, only_ibd_quant$cotinine))
+setDT(test_pv)[,prop:=Freq/sum(Freq),by=Var1]
+ggplot(test_pv, aes(Var1,prop, fill=Var2)) + geom_bar(stat = "identity") + theme_bw() + ylab ("Cotinine") + xlab ("Current smoking")
+
+```
+
+
+11. Calculate ratios
+===
+
+
+12. Random forest for IBD prediction
+===
+
+IBD vs non-IBD
+---
+
+```{r}
+library(mlbench)
+library(caret)
+library(ggplot2)
+library(MLeval)
+library(plyr)
+library(MLmetrics)
+library(pROC)
+
+#Define what to test
+rf_IBD=mtb_quantitative_ibd
+rf_IBD=rf_IBD[,c(4,70:ncol(rf_IBD))]
+levels(rf_IBD$ibd_Diagnosis) <- c(levels(rf_IBD$ibd_Diagnosis), "IBD", "nonCD", "nonUC") 
+rf_IBD[rf_IBD$ibd_Diagnosis!="A_Control",]$ibd_Diagnosis="IBD"
+rf_IBD$ibd_Diagnosis=droplevels(rf_IBD$ibd_Diagnosis)
+
+
+#Create testing / prediction datasets, splitting 70%
+my_Train70 = createDataPartition( y = rf_IBD$ibd_Diagnosis,p = .70,list = FALSE )
+training = rf_IBD[ my_Train70,]
+testing  = rf_IBD[-my_Train70,]
+
+
+#Defining resampling
+
+fitControl = trainControl( method = "repeatedcv", number = 10, classProbs = T, savePredictions = T,repeats = 3,summaryFunction = twoClassSummary)
+
+# Training with Random Forest 
+
+model <- train( ibd_Diagnosis ~ ., data = training, method = "rf", trControl = fitControl,tuneLength = 15, metric = "ROC",na.action=na.omit)
+#model2 <- train( ibd_Diagnosis ~ ., data = training, method = "rf", trControl = fitControl, metric = "ROC",na.action=na.omit)
+
+print ("Final model training")
+print ("Variable importance")
+varImpPlot(model$finalModel)
+print ("Training model")
+model$finalModel
+
+ddply(model$pred, "Resample", summarise, accuracy = Accuracy(pred, obs))
+
+#for_roc=as.data.frame(model$pred[model$pred$mtry==model$bestTune$mtry,])
+
+my_mtry=model$pred$mtry==model$bestTune$mtry
+
+# Check and plot the training model ROC curve
+my_model_eval <- evalm(model)
+my_model_eval$roc
+my_model_eval$stdres
+
+
+#Prediction time :D
+my_pred_class = predict(model,testing)
+my_pred = predict(model,testing,type="prob")
+confusionMatrix(data=my_pred_class, testing$ibd_Diagnosis)
+my_roc=pROC::roc(testing$ibd_Diagnosis,my_pred[["IBD"]], auc=T, ci=T, smooth=F)
+
+my_roc$auc
+pROC::ggroc(my_roc, col="firebrick2", size=1.5, ci=T) + theme_bw() + geom_abline(intercept = 1, col="black", size=1, linetype="dashed")
+
+```
+
+
+CD vs non-CD (including UC)
+---
+
+```{r}
+
+#Define what to test
+rf_IBD=mtb_quantitative_ibd
+rf_IBD=rf_IBD[,c(4,70:ncol(rf_IBD))]
+levels(rf_IBD$ibd_Diagnosis) <- c(levels(rf_IBD$ibd_Diagnosis), "IBD", "a_nonCD", "a_nonUC") 
+rf_IBD[rf_IBD$ibd_Diagnosis!="CD",]$ibd_Diagnosis="a_nonCD"
+rf_IBD$ibd_Diagnosis=droplevels(rf_IBD$ibd_Diagnosis)
+
+
+#Create testing / prediction datasets, splitting 70%
+my_Train70 = createDataPartition( y = rf_IBD$ibd_Diagnosis,p = .70,list = FALSE )
+training = rf_IBD[ my_Train70,]
+testing  = rf_IBD[-my_Train70,]
+
+
+#Defining resampling
+
+fitControl = trainControl( method = "repeatedcv", number = 10, classProbs = T, savePredictions = T,summaryFunction = twoClassSummary)
+
+# Training with Random Forest 
+
+model <- train( ibd_Diagnosis ~ ., data = training, method = "rf", trControl = fitControl,tuneLength = 15, metric = "ROC",na.action=na.omit)
+#model2 <- train( ibd_Diagnosis ~ ., data = training, method = "rf", trControl = fitControl, metric = "ROC",na.action=na.omit)
+
+print ("Final model training")
+print ("Variable importance")
+varImpPlot(model$finalModel)
+print ("Training model")
+model$finalModel
+
+#ddply(model$pred, "Resample", summarise, accuracy = Accuracy(pred, obs))
+
+#for_roc=as.data.frame(model$pred[model$pred$mtry==model$bestTune$mtry,])
+
+my_mtry=model$pred$mtry==model$bestTune$mtry
+
+# Check and plot the training model ROC curve
+my_model_eval <- evalm(model)
+my_model_eval$roc
+my_model_eval$stdres
+
+
+#Prediction time :D
+my_pred_class = predict(model,testing)
+my_pred = predict(model,testing,type="prob")
+confusionMatrix(data=my_pred_class, testing$ibd_Diagnosis)
+my_roc=pROC::roc(testing$ibd_Diagnosis,my_pred[["CD"]], auc=T, ci=T, smooth=F)
+
+my_roc$auc
+pROC::ggroc(my_roc, col="darkblue", size=1.5, ci=T) + theme_bw() + geom_abline(intercept = 1, col="black", size=1, linetype="dashed")
+
+```
+
+
+UC vs non-UC (including CD)
+---
+
+```{r}
+
+#Define what to test
+rf_IBD=mtb_quantitative_ibd
+rf_IBD=rf_IBD[,c(4,70:ncol(rf_IBD))]
+levels(rf_IBD$ibd_Diagnosis) <- c(levels(rf_IBD$ibd_Diagnosis), "IBD", "a_nonCD", "a_nonUC") 
+rf_IBD[rf_IBD$ibd_Diagnosis!="UC",]$ibd_Diagnosis="a_nonUC"
+rf_IBD$ibd_Diagnosis=droplevels(rf_IBD$ibd_Diagnosis)
+
+
+#Create testing / prediction datasets, splitting 70%
+my_Train70 = createDataPartition( y = rf_IBD$ibd_Diagnosis,p = .70,list = FALSE )
+training = rf_IBD[ my_Train70,]
+testing  = rf_IBD[-my_Train70,]
+
+
+#Defining resampling
+
+fitControl = trainControl( method = "repeatedcv", number = 10, classProbs = T, savePredictions = T,summaryFunction = twoClassSummary)
+
+# Training with Random Forest 
+
+model <- train( ibd_Diagnosis ~ ., data = training, method = "rf", trControl = fitControl,tuneLength = 15, metric = "ROC",na.action=na.omit)
+#model2 <- train( ibd_Diagnosis ~ ., data = training, method = "rf", trControl = fitControl, metric = "ROC",na.action=na.omit)
+
+print ("Final model training")
+print ("Variable importance")
+varImpPlot(model$finalModel)
+print ("Training model")
+model$finalModel
+
+ddply(model$pred, "Resample", summarise, accuracy = Accuracy(pred, obs))
+
+#for_roc=as.data.frame(model$pred[model$pred$mtry==model$bestTune$mtry,])
+
+my_mtry=model$pred$mtry==model$bestTune$mtry
+
+# Check and plot the training model ROC curve
+my_model_eval <- evalm(model)
+my_model_eval$roc
+my_model_eval$stdres
+
+
+#Prediction time :D
+my_pred_class = predict(model,testing)
+my_pred = predict(model,testing,type="prob")
+confusionMatrix(data=my_pred_class, testing$ibd_Diagnosis)
+my_roc=pROC::roc(testing$ibd_Diagnosis,my_pred[["UC"]], auc=T, ci=T, smooth=F, levels=c("a_nonUC", "UC"))
+
+my_roc$auc
+pROC::ggroc(my_roc, col="purple", size=1.5, ci=T) + theme_bw() + geom_abline(intercept = 1, col="black", size=1, linetype="dashed")
+
 ```
 
 
 
 
 
-11. Calculate ratios
+13. LASSO
 ===
 
 ```{r}
+cc_pheno7=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/cc_phenos_tested.txt", sep = "\t", header = T, row.names = 1)
+my_results_for_lasso=all_uni_quant
 
+for ( i in unique (my_results_for_lasso$metabolite)){
+  my_mtb_selection= subset (my_results_for_lasso, my_results_for_lasso$metabolite==i & my_results_for_lasso$FDR<0.05)
+  my_list_of_phenos= my_mtb_selection$phenotype
+  my_phenos_lasso=cc_pheno7[, colnames(cc_pheno7) %in% my_list_of_phenos, drop=F]
+  my_feature_lasso=q_mtb[,i, drop=F]
+  my_phenos_lasso2=my_phenos_lasso[order(row.names(my_phenos_lasso)),,drop=F ]
+  my_feature_lasso2=my_feature_lasso[order(row.names(my_feature_lasso)),,drop=F ]
+  
+  n_samples=nrow(my_feature_lasso2)
+  
+  alpha1.fit = cv.glmnet(x.train, y.train, type.measure="mse", alpha=1, family="gaussian")
 
+  alpha1.predicted = predict(alpha1.fit, s=alpha1.fit$lambda.1se, newx=x.test)
+
+  mean((y.test - alpha1.predicted)^2)
+  
+  
+}
 
 
 ```
