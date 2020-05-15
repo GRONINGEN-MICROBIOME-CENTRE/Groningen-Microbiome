@@ -234,6 +234,7 @@ summary_stats=function(feature_matrix,pheno){
           pos=pos+1 
           summary_met[i,pos]="NA"
           } else {
+          #nor=NA
           nor=shapiro.test(tmp_all[,i])
           pos=pos+1 
           summary_met[i,pos]=nor$p.value>=0.05
@@ -405,6 +406,7 @@ SCFA <- read.delim("~/Documents/Project_Metabolome/1.Input_files/old/SCFA.txt")
 phenos_ibd=read.delim("~/Documents/Project_Metabolome/1.Input_files/Merged_IBD_phenos_clean_v2.txt",row.names = 1)
 phenos_lld=read.delim("~/Documents/Project_Metabolome/1.Input_files/Merged_LLD_phenos_clean_v2.txt", row.names=1)
 cc_pheno=read.delim("~/Documents/Project_Metabolome/1.Input_files/case_control_meta_v1.txt", row.names=1)
+cc_stoma=cc_pheno[,c("ibd_CurrentStomaOrPouch"),drop=F]
 
 # d) Experiment variables 
 
@@ -421,7 +423,10 @@ my_batch=read.delim("~/Documents/Project_Metabolome/1.Input_files/Metabolon_prep
 #LLD_taxa <- read.delim("~/Documents/Project_Metabolome/2.taxa/LLD_taxonomy_unstrat_clean.txt", row.names=1)
 
 #mOTUs2
-my_taxa = read.delim("~/Documents/Project_Metabolome/2.taxa/mOTUs_prediction_v2.txt", row.names=1, check.names = F)
+#my_taxa = read.delim("~/Documents/Project_Metabolome/2.taxa/mOTUs_prediction_v2.txt", row.names=1, check.names = F)
+
+#MetaPhlAn v3
+my_taxa = read.delim("~/Documents/Project_Metabolome/2.taxa/taxa_metabolomics_samples_mpa3_3.txt", row.names=1, check.names = F)
 
 # g) Metabolites annotation
 annot <- read.delim("~/Documents/Project_Metabolome/1.Input_files/info_metabolites_v2.txt", row.names=1)
@@ -432,6 +437,29 @@ annot$SUPER.PATHWAY.1=NULL
 
 IDs_LLD <- read.delim("~/Documents/Project_Metabolome/1.Input_files/IDs_LLD.txt", header=FALSE)
 IDs_IBD <- read.delim("~/Documents/Project_Metabolome/1.Input_files/IDs_IBD.txt", header=FALSE)
+```
+
+Check phenotypes files (count NA's)
+---
+
+```{r}
+na_count = sapply(cc_pheno, function(y) sum(length(which(is.na(y)))))
+na_count=data.frame(na_count)
+cc_pheno$host_BMI[is.na(cc_pheno$host_BMI)]=median(cc_pheno$host_BM, na.rm = T)
+cc_pheno$med_ACE_inhibitor[is.na(cc_pheno$med_ACE_inhibitor)]="Non_user"
+cc_pheno$med_PPI[is.na(cc_pheno$med_PPI)]="Non_user"
+
+diet=colnames(cc_pheno)[grep("diet",colnames(cc_pheno))]
+
+for (a in diet){
+  cc_pheno[,a][is.na(cc_pheno[,a])]=median(cc_pheno[,a], na.rm = T)
+}
+
+cc_pheno$host_smk_current[is.na(cc_pheno$host_smk_current)]="no"
+
+na_count = sapply(cc_pheno, function(y) sum(length(which(is.na(y)))))
+na_count=data.frame(na_count)
+
 ```
 
 
@@ -479,6 +507,14 @@ my_batch_id$V5=NULL
 #all_new_ID=all_new_ID[row.names(all_new_ID)%ni%remove_pouch_stoma,]
 #all_new_ID_with_stoma=all_new_ID
 
+tract_id=data.frame(row.names(all_new_ID_raw))
+rownames(tract_id)=tract_id$row.names.all_new_ID_raw.
+tract_id$In_metabolomics="Yes"
+tract_id$row.names.all_new_ID_raw.=NULL
+tract_id=merge(tract_id,cc_stoma, by="row.names")
+rownames(tract_id)=tract_id$Row.names
+tract_id$Row.names=NULL
+
 ```
 
 
@@ -521,6 +557,7 @@ all_new_ID_raw_with_stoma=all_new_ID_raw
 all_new_ID_raw=all_new_ID_raw[row.names(all_new_ID_raw)%ni%remove_pouch_stoma,]
 cc_pheno=cc_pheno[row.names(cc_pheno)%ni%remove_pouch_stoma,]
 print (paste("Number of samples excluded due to pouch or stoma:", length(remove_pouch_stoma)))
+print (paste("Number of samples left:", length(rownames(all_new_ID_raw))))
 ```
 
 
@@ -616,6 +653,8 @@ ggplotly(cc)
 ```
 
 
+
+
 __Summary statistics microbiome__
 
 1. Focus only at species taxa level
@@ -626,30 +665,64 @@ __Summary statistics microbiome__
 
 ```{r, warning=F,message=FALSE, echo=T}
 
-##Taxa predicted from MetaPhlAn 2.7###
+#Remove the percentage of unaligned reads
+taxa=my_taxa[-1,]
+preFilt=data.frame(colnames(taxa))
+preFilt$In_MGS="Yes"
 
+#Remove samples that failed in the microbiome prediction: IBDFEC0535, IBDFEC1024,IBDFEC0515
+taxa=taxa[, colSums(taxa != 0) > 0]
+
+#Keep track of the samples that failed microbiome prediction 
+preFilt[preFilt$colnames.taxa.%ni%colnames(taxa),]$In_MGS="Failed"
+rownames(preFilt)=preFilt$colnames.taxa.
+preFilt$colnames.taxa.=NULL
+tract_id=merge(tract_id,preFilt, by="row.names", all=T)
+tract_id=tract_id[complete.cases(tract_id$In_metabolomics),]
+row.names(tract_id)=tract_id$Row.names
+
+
+###################################
+### Taxa predicted from mOTUS 2 ###
+###################################
+
+
+#Select species level
+#taxa=taxa[unlist(lapply(rownames(taxa),function(x) length(unlist(strsplit(x, "|", fixed=TRUE)))==7)),]
+#Remove other taxa levels from names
+#rownames(taxa)=sapply(strsplit(rownames(taxa), "|", fixed=TRUE), tail, 1)
+#Remove non-alpha-numeric characters from the row.names
+#rownames(taxa)=make.names(rownames(taxa))
+
+#################################
+
+######################################
+##Taxa predicted from MetaPhlAn2 & 3 #
 ######################################
 #Clean names
 #LLD_sp=LLD_taxa[grep("s__", rownames(LLD_taxa)), ]
 #IBD_sp=IBD_taxa[grep("s__", rownames(IBD_taxa)), ]
 #LLD_sp=LLD_sp[!grepl("t__", rownames(LLD_sp)), ]
 #IBD_sp=IBD_sp[!grepl("t__", rownames(IBD_sp)), ]
-#row.names(LLD_sp)=gsub(".*s__","",row.names(LLD_sp))
+
 #row.names(IBD_sp)=gsub(".*s__","",row.names(IBD_sp))
 #Merge
 #taxa=as.data.frame(t(merge(IBD_sp,LLD_sp, by="row.names")))
 #taxa=merge(IBD_sp,LLD_sp, by="row.names")
 #row.names(taxa)=taxa$Row.names
 #taxa$Row.names=NULL
-##########################################
 
-##Taxa predicted from mOTUS 2###
-taxa=my_taxa[unlist(lapply(rownames(my_taxa),function(x) length(unlist(strsplit(x, "|", fixed=TRUE)))==7)),]
+
 
 
 #Remove samples that miss microbiome data: IBDFEC0535, IBDFEC1024,IBDFEC0515
-taxa=taxa[, colSums(taxa != 0) > 0]
-taxa=as.data.frame(t(taxa))
+taxa_sp=taxa[grep("s__", rownames(taxa)), ]
+taxa_sp=taxa_sp[!grepl("t__", rownames(taxa_sp)), ]
+row.names(taxa_sp)=gsub(".*s__","",row.names(taxa_sp))
+##########################################
+
+
+taxa=as.data.frame(t(taxa_sp))
 
 my_shannon=as.data.frame(diversity(taxa, index="shannon"))
 colnames(my_shannon)=c("Shannon_Index")
@@ -658,10 +731,18 @@ colnames(my_simpson)=c("Simpson_Index")
 richness_microbiota=merge(my_shannon,my_simpson,by="row.names")
 rownames(richness_microbiota)=richness_microbiota$Row.names
 richness_microbiota$Row.names=NULL
+
+norich=rownames(richness_microbiota)[richness_microbiota$Shannon_Index==0] 
+tract_id[rownames(tract_id)==norich,]$In_MGS="Failed"
+
 richness_microbiota2=subset(richness_microbiota,rownames(richness_microbiota) %in% rownames(summary_sample))
-cc_pheno2=merge(richness_microbiota2,cc_pheno,by="row.names", all = T)
+richness_microbiota2=richness_microbiota2[richness_microbiota2$Shannon_Index>0,]
+cc_pheno2=merge(richness_microbiota2,cc_pheno,by="row.names")
 rownames(cc_pheno2)=cc_pheno2$Row.names
 cc_pheno2$Row.names=NULL
+
+print (paste("Number of samples excluded due failed metagenomics:", length(tract_id[tract_id$In_MGS!="yes",])))
+print (paste("Number of samples left:", length(rownames(cc_pheno2))))
 ```
 
 __Microbial richness indexes (Shannon & Simpson)__
@@ -679,8 +760,8 @@ __Filter bacteria (detection in >20% of the samples) and normalization__
 
 ```{r}
 
-#Subset samples from the taxonomic table for which we also have metagenomics 
-taxa2=subset(taxa,rownames(taxa) %in% rownames(summary_sample))
+#Subset samples from the taxonomic table for which we also have metabolomics 
+taxa2=subset(taxa,rownames(taxa) %in% rownames(cc_pheno2))
 
 print (paste("Number of taxa detected:",ncol(taxa2)))
 
@@ -759,7 +840,7 @@ q_mtb_t <- as.data.frame(scale(q_mtb_t))
 ### WARNING: KNN imputation takes a while, take a nap or a coffee (in case of re-run save and load results of this stage)
 q_mtb=impute_missing_values(q_mtb_t,samples_row = T, method = "knn", missing_filter = 0)
 rownames(q_mtb)=row.names(q_mtb_t)
-#write.table(q_mtb, "~/Documents/Project_Metabolome/1.Input_files/Imputed_metabolites_v2", sep = "\t",quote = F)
+write.table(q_mtb, "~/Documents/Project_Metabolome/1.Input_files/Imputed_metabolites_v3", sep = "\t",quote = F)
 
 q_mtb=as.data.frame(q_mtb)
 ```
@@ -767,7 +848,9 @@ q_mtb=as.data.frame(q_mtb)
 __Merge taxa and metabolites__
 
 ```{r, echo=F}
-#Merge taxa and metabolites
+
+print("Missing metagenomic data:")
+setdiff( rownames(q_mtb), rownames(taxa_filt))
 taxa_and_mb=merge(taxa_filt,q_mtb,by="row.names")
 rownames(taxa_and_mb)=taxa_and_mb$Row.names
 taxa_and_mb$Row.names=NULL
@@ -780,7 +863,7 @@ __Summary statistics on transformed & filtered metabolites__
 #Transformed data
 summary_met_trans=summary_stats(q_mtb, select)
 summary_met_trans=as.data.frame(summary_met_trans)
-write.table(summary_met_trans, "~/Documents/Project_Metabolome/4.Summary_stats/Metabolites_summary_post_filtering_2020_v2", sep = "\t", quote = F)
+write.table(summary_met_trans, "~/Documents/Project_Metabolome/4.Summary_stats/Metabolites_summary_post_filtering_2020_v3", sep = "\t", quote = F)
 ```
 
 
@@ -819,8 +902,11 @@ table(SCFA$Analyte,is.na(SCFA$Result))
 #Remove unecessary columns (sample type, group/project name, detection limits and comments)
 
 SCFAsub=SCFA[,c("Unique.Sample.ID...as.labeled.on.tube.","Sample.Amount..gram.","Comment","Analyte","Result")]
+
+#Reshape the SCFA table
 SCFA_table <- dcast(SCFAsub, ...~Analyte)
 
+#Chance sample names to match metadata
 IDs=data.frame(rbind(as.matrix(IDs_IBD), as.matrix(IDs_LLD)))
 rownames(SCFA_table)=SCFA_table$Unique.Sample.ID...as.labeled.on.tube.
 SCFA_table$Unique.Sample.ID...as.labeled.on.tube.=NULL
@@ -897,7 +983,7 @@ ggplot (plot_SCFA_cal, aes (ibd_FecalCalprotectinOver200yesno,log10(as.numeric(a
 
 
 
-5.PCA analysis on metabolites present in more than 20% of the samples
+5.PCA analysis on metabolites present in more than 70% of the samples
 ===
 
 ```{r, warning=F,message=FALSE, echo=TRUE}
@@ -1044,14 +1130,14 @@ cmp_clr2=merge(cc_pheno2,cmp_clr,by="row.names")
 
 ```{r, echo=F}
 
-ggplot(cmp_clr2, aes(PC1,-PC2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+ggplot(cmp_clr2, aes(PC1,PC2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
 
 ```
 
 
 ```{r, echo=F}
 
-ggplot(cmp_clr2, aes(PC1,-PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
+ggplot(cmp_clr2, aes(PC1,PC2, color=clinical_BowelMovementADayDef)) + geom_point() + theme_bw()
 
 ```
 
@@ -1099,6 +1185,12 @@ bc_mds=merge(cc_pheno2,data.scores,by="row.names")
 ggplot(bc_mds, aes(NMDS1,NMDS2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
 
 ```
+
+```{r, echo=F}
+ggplot(bc_mds, aes(NMDS1,NMDS2, color=ibd_Diagnosis)) + geom_point() + theme_bw() + scale_colour_manual(values =c("firebrick3","black","gold3" ,"steelblue2"))
+
+```
+
 
 
 6. Clustering metabolites
@@ -1838,8 +1930,73 @@ ggplot(test_pv, aes(Var1,prop, fill=Var2)) + geom_bar(stat = "identity") + theme
 11. Calculate ratios
 ===
 
+```{r}
+#Needs improvement now it takes forever!
+#my_ratios=calculate_all_ratios(q_mtb)
+```
 
-12. Random forest for IBD prediction
+
+12. LASSO
+===
+
+```{r}
+cc_pheno7=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/cc_phenos_tested.txt", sep = "\t", header = T, row.names = 1)
+tot=merge(cc_pheno7,q_mtb,by="row.names")
+my_results_for_lasso=all_uni_quant
+flag=1
+for ( i in unique (my_results_for_lasso$metabolite)){
+  #Select phenotypes associated to metabolite in the previous analysis
+  my_mtb_selection= subset (my_results_for_lasso, my_results_for_lasso$metabolite==i & my_results_for_lasso$FDR<0.05)
+  
+  #Subset them from the phenotype table
+  my_list_of_phenos= my_mtb_selection$phenotype
+  #my_list_of_phenos= my_list_of_phenos[3:42]
+  my_phenos_lasso=cc_pheno7[, colnames(cc_pheno7) %in% my_list_of_phenos, drop=F]
+  
+  #my_phenos_lasso=my_phenos_lasso[,complete.cases(my_phenos_lasso)]
+  
+  #Select metabolite to test
+  my_feature_lasso=q_mtb[,i, drop=F]
+  
+  #Sample sample order for phenos and metabolites tables 
+  my_phenos_lasso2=my_phenos_lasso[order(row.names(my_phenos_lasso)), ]
+  my_feature_lasso2=my_feature_lasso[order(row.names(my_phenos_lasso)),, drop=F]
+  n_samples=nrow(my_phenos_lasso2)
+  
+  #Use 70% for training (lambda estimation)
+  lasso_train_samples=sample(1:n_samples, 0.7*n_samples)
+  
+  #Subset features 
+  lasso_train_feature = my_feature_lasso2[lasso_train_samples,, drop=F]
+  lasso_test_feature = my_feature_lasso2[-lasso_train_samples,, drop=F]
+  #Subset phenos
+  lasso_train_phenos = my_phenos_lasso2[lasso_train_samples,]
+  lasso_test_phenos = my_phenos_lasso2[-lasso_train_samples,]
+  #Cross validation
+  lasso_fit = cv.glmnet( x=data.matrix(lasso_train_phenos),y=as.matrix(lasso_train_feature), type.measure="mse", alpha=1, family="gaussian")
+  #Prediction
+  lasso_predicted = predict(lasso_fit, s=lasso_fit$lambda.min, newx=data.matrix(lasso_test_phenos), type="coefficients")
+  #Select phenotypes with coefficients !=0
+  sel_phenos_2=names(data.matrix(lasso_predicted)[data.matrix(lasso_predicted)!=0,][-1])
+  #Run lm on the selected features 
+  my_f=as.formula(paste(colnames(my_feature_lasso), paste(sel_phenos_2, collapse = " + "), sep = " ~ ")) 
+  my_lm=summary(lm(my_f,data = tot ))
+  my_lm_coef=as.data.frame(my_lm$coefficients[-1,])
+  my_lm_coef$metabolite=colnames(my_feature_lasso)
+  if (flag!=1){
+    my_lasso_results=rbind(my_lasso_results,my_lm_coef)
+  }else{
+    my_lasso_results=my_lm_coef
+    flag=5
+  }
+}
+
+
+```
+
+
+
+13. Random forest for IBD prediction
 ===
 
 IBD vs non-IBD
@@ -1850,6 +2007,7 @@ library(mlbench)
 library(caret)
 library(ggplot2)
 library(MLeval)
+library(randomForest)
 library(plyr)
 library(MLmetrics)
 library(pROC)
@@ -1957,7 +2115,7 @@ my_model_eval$stdres
 my_pred_class = predict(model,testing)
 my_pred = predict(model,testing,type="prob")
 confusionMatrix(data=my_pred_class, testing$ibd_Diagnosis)
-my_roc=pROC::roc(testing$ibd_Diagnosis,my_pred[["CD"]], auc=T, ci=T, smooth=F)
+my_roc=pROC::roc(testing$ibd_Diagnosis,my_pred[["CD"]], auc=T, ci=T, smooth=F, levels=c("a_nonCD", "CD"))
 
 my_roc$auc
 pROC::ggroc(my_roc, col="darkblue", size=1.5, ci=T) + theme_bw() + geom_abline(intercept = 1, col="black", size=1, linetype="dashed")
@@ -2023,34 +2181,3 @@ pROC::ggroc(my_roc, col="purple", size=1.5, ci=T) + theme_bw() + geom_abline(int
 ```
 
 
-
-
-
-13. LASSO
-===
-
-```{r}
-cc_pheno7=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/cc_phenos_tested.txt", sep = "\t", header = T, row.names = 1)
-my_results_for_lasso=all_uni_quant
-
-for ( i in unique (my_results_for_lasso$metabolite)){
-  my_mtb_selection= subset (my_results_for_lasso, my_results_for_lasso$metabolite==i & my_results_for_lasso$FDR<0.05)
-  my_list_of_phenos= my_mtb_selection$phenotype
-  my_phenos_lasso=cc_pheno7[, colnames(cc_pheno7) %in% my_list_of_phenos, drop=F]
-  my_feature_lasso=q_mtb[,i, drop=F]
-  my_phenos_lasso2=my_phenos_lasso[order(row.names(my_phenos_lasso)),,drop=F ]
-  my_feature_lasso2=my_feature_lasso[order(row.names(my_feature_lasso)),,drop=F ]
-  
-  n_samples=nrow(my_feature_lasso2)
-  
-  alpha1.fit = cv.glmnet(x.train, y.train, type.measure="mse", alpha=1, family="gaussian")
-
-  alpha1.predicted = predict(alpha1.fit, s=alpha1.fit$lambda.1se, newx=x.test)
-
-  mean((y.test - alpha1.predicted)^2)
-  
-  
-}
-
-
-```
