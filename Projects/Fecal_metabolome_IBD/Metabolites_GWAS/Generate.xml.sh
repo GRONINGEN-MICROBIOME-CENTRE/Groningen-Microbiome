@@ -51,7 +51,7 @@ sed "s|cd_trait|${trait}\/CD_numeric.metabolic.000${batch}.txt|g" /groups/umcg-g
 sed "s|uc_trait|${trait}\/UC_numeric.metabolic.000${batch}.txt|g" /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.tmp.xml \
 > /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.${chr}.xml 
 
-sed "s/lld_annot|${trait}\/CT_numeric.metabolic.txt.annot|g" /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.tmp.xml \
+sed "s|lld_annot|${trait}\/CT_numeric.metabolic.txt.annot|g" /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.tmp.xml \
 > /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.${chr}.xml 
 
 sed "s|cd_annot|${trait}\/CD_numeric.metabolic.txt.annot|g" /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.tmp.xml \
