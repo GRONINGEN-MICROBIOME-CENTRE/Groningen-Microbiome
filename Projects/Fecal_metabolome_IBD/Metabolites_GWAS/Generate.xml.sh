@@ -60,6 +60,8 @@ sed "s|cd_annot|${trait}\/CD_numeric.metabolic.txt.annot|g" /groups/umcg-gastroc
 sed "s|uc_annot|${trait}\/UC_numeric.metabolic.txt.annot|g" /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.tmp.xml \
 > /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/Marc_XML.chr.${chr}.xml 
 
+echo -e "batch $batch ---- chr $chr is done"
+
 done
 
 done
