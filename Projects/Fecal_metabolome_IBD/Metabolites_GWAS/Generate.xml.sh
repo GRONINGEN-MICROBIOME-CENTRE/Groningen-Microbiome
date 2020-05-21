@@ -6,7 +6,7 @@ coupling="/groups/umcg-gastrocol/tmp04/Metabolic_Project/Metabolics/"
 trait="/groups/umcg-gastrocol/tmp04/Metabolic_Project/Metabolics/Numeric/"
 
 
-for batch in {1..87}
+for batch in {01..87}
 
 do
 
