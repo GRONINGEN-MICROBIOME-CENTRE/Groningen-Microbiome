@@ -57,6 +57,8 @@ sed -i "s|Marc_XML.xml|Marc_XML.chr.${chr}.xml|g" /groups/umcg-gastrocol/tmp04/M
 
 echo -e "batch $batch ---- chr $chr is done"
 
+rm /groups/umcg-gastrocol/tmp04/Metabolic_Project/Numeric_meta/Batch.$batch/*tmp.*
+
 done
 
 done
