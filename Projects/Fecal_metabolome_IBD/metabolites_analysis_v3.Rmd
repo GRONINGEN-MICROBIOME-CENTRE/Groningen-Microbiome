@@ -76,6 +76,7 @@ library(pvclust)
 library(glmnet)
 library(compositions)
 library(RColorBrewer)
+library(iClusterPlus)
 library (ggvegan)
 library (VIM)
 ```
@@ -1197,6 +1198,9 @@ ggplot(bc_mds, aes(NMDS1,NMDS2, color=ibd_Diagnosis)) + geom_point() + theme_bw(
 ===
 
 
+Method 1: Regress disease and (potential) technical confouders and perform spearman correlation
+---
+
 __Regress batch & diseases effects__
 
 Here we use all metabolites present in more than 20% of the samples. 
@@ -1236,6 +1240,12 @@ cor_p=cor_pmat(rgs_mb2)
 #heatmaply_cor(cor(rgs_mb2, method = "spearman"), showticklabels = c(FALSE, FALSE), main ="Spearman correlation between metabolites", plot_method = 'plotly', scale="none", row_side_colors =annot_v2)
 ggcorrplot(cor_metabolites, hc.order = TRUE, outline.col = "white", colors = c("#6D9EC1", "white", "#E46726"), type = "upper", p.mat = cor_p, insig = "blank", tl.cex=0.9)
 ```
+
+
+Method 2:iClust
+----
+
+
 
 
 
