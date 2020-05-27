@@ -2,8 +2,9 @@
 args<-commandArgs(T)
 meta = args[1]
 
+require(data.table)
 library(qqman)
-summary=read.table(meta,sep=" ",header = F,stringsAsFactors = F)
+summary=fread(meta,sep=" ",header = F,stringsAsFactors = F)
 colnames(summary)=c("P","SNP","CHR","BP")
 summary=na.omit(summary)
 
