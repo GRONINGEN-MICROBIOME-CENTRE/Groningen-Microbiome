@@ -1,4 +1,4 @@
-####main codes for Lifelines microbiome four-year follow-up study
+####main codes for Lifelines-DEEP microbiome four-year follow-up study
 ###for questions, please contact LianminChen (lianminchen@yeah.net)
 
 ###############################################part 1 metagenomic raw data processing###################################################
