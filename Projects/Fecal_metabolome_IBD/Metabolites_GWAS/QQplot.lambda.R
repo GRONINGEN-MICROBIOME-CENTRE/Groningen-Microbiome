@@ -1,14 +1,18 @@
 # plot QQ plot and calculate lamda of genomics inflation index
-library(qqman)
 args<-commandArgs(T)
 meta = args[1]
 
+library(qqman)
 summary=read.table(meta,sep=" ",header = F,stringsAsFactors = F)
 colnames(summary)=c("P","SNP","CHR","BP")
 summary=na.omit(summary)
 
-pdf(paste0(meta,".QQplot.pdf"))
+png(paste0(meta,".QQplot.png"))
 qq(summary$P)
+dev.off()
+
+png(paste0(meta,".MahattanPlot.png"))
+manhattan(summary, chr="CHR", bp="BP", snp="SNP", p="P" )
 dev.off()
 
 z = qnorm(summary$P/2)
