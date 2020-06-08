@@ -433,20 +433,20 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
     if (verbose) {print(paste0(' > FOUND ',length(nonPhenoColsCARDs),' CARDs'))}
   }
   divCols <- grep("^DIV\\.",colnames(inDF))
-  nonPhenoCols <- c(nonPhenoCols,nonPhenoColsTaxa,nonPhenoColsPWYs,nonPhenoColsVFs,nonPhenoColsCARDs,divCols)
-  phenoCols <- c(1:ncol(inDF)); phenoCols <- phenoCols[!(phenoCols %in% nonPhenoCols)]
-  if (getPhenos) {
-    toGet <- c(phenoCols,toGet)
-    if (verbose) {print(paste0(' > FOUND ',length(phenoCols),' *Phenotypes*'))}
-  }
   if (getDivs) {
     if (verbose) {print(paste0(' > FOUND ',length(divCols),' *Diversity metrics*'))}
     toGet <- c(toGet,divCols)
   }
+  idCols <- grep("^",idName,"$",colnames(inDF))
   if (getID) {
-    idCols <- grep("^",idName,"$",colnames(inDF))
     toGet <- unique(c(toGet,idCols))
-    if (verbose) {print(paste0(' > FOUND ',length(idCols),' ID COLUMNS'))}
+    if (verbose) {print(paste0(' > FOUND ',length(idCols),' *ID COLUMNS*'))}
+  }
+  nonPhenoCols <- c(nonPhenoCols,nonPhenoColsTaxa,nonPhenoColsPWYs,nonPhenoColsVFs,nonPhenoColsCARDs,divCols,idCols)
+  phenoCols <- c(1:ncol(inDF)); phenoCols <- phenoCols[!(phenoCols %in% nonPhenoCols)]
+  if (getPhenos) {
+    toGet <- c(phenoCols,toGet)
+    if (verbose) {print(paste0(' > FOUND ',length(phenoCols),' *Phenotypes*'))}
   }
   inDF <- inDF[, unique(toGet)]
 }
@@ -660,9 +660,9 @@ filterMetaGenomeDF <- function(inDF,presPerc = 0.1,minMRelAb = 0.01,minMedRelAb=
   for (c in tCols) {
     nrnZ = as.numeric(sum(inDF[,c]!=0.0))
     if ( (nrnZ/as.numeric(nrow(inDF))) < presPerc) {
-      if (verbose) {
-        print (paste('col',c,': ',colnames(inDF)[c],'; nr non Zero:',nrnZ,'=',nrnZ/as.numeric(nrow(inDF)),'>> Column removed!'))
-      }
+      # if (verbose) {
+      #   print (paste('col',c,': ',colnames(inDF)[c],'; nr non Zero:',nrnZ,'=',nrnZ/as.numeric(nrow(inDF)),'>> Column removed!'))
+      # }
       nrRemoved = nrRemoved + 1
       toRemove <- c(toRemove,c)
     }
@@ -1660,10 +1660,11 @@ testOneFeaturePrevalence <- function(dataIn,saveFolder,feature=NA,doSave=T,displ
 # - calculates p nominal, p adjusted (holm), FDR, and 
 # - plots and outputs to saveFolder
 # => stTest should be "wilcox" or "permutation"
+# -> if controlClass is not NA, does only one-way testing (all classes VS control class)
 # ====================================================================================================
 testOneFeature <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onlyShowSig=T,yLab=NA, doViolin=T,title=NA,na.rem=T,
                            responseVar="Diagnosis",stTest="wilcox",doPlots = T,nrTests=-1,xLab=NA,retPlot=F,ylim=NA,alpha=0.25,
-                           discardZeros=F,cutoff=0.05)
+                           discardZeros=F,cutoff=0.05,controlClass=NA)
 {
   ret = NULL
   if (is.na(feature)) {
@@ -1718,9 +1719,15 @@ testOneFeature <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onl
   
   # do pairwise combination tests
   #      calculate combinations
-  combos <- as.data.frame(t(combn(as.character(classes),2)))
-  combos$V1 <- as.character(combos$V1)
-  combos$V2 <- as.character(combos$V2)
+  if (is.na(controlClass)) {
+    combos <- as.data.frame(t(combn(as.character(classes),2)))
+    combos$V1 <- as.character(combos$V1)
+    combos$V2 <- as.character(combos$V2)
+  } else {
+    combos <- cbind.data.frame(as.character(classes),rep(controlClass,length(classes) ))
+    colnames(combos) <- c("V1","V2")
+    combos <- combos[combos$V1 != controlClass,]
+  }
   nCombos <- nrow(combos)
   #      do tests
   tTests <- list()

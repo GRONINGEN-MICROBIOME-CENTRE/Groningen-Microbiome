@@ -9,6 +9,19 @@ library(caret)
 library(plotROC)
 library(pROC)
 
+
+# analysis of RFE profiles
+# ======================================
+rfeMakePlots <- function(rfeProfile) {
+  g1 <- ggplot(rfeProfile[[3]],aes(x=Variables,y=Kappa)) + geom_line(size=1.15) + geom_point(col="blue",size=3) +
+    geom_errorbar(aes(ymin=Kappa-KappaSD,ymax=Kappa+KappaSD),width=0.1)
+  
+  g2 <- ggplot(rfeProfile[[3]],aes(x=Variables,y=Accuracy)) + geom_line(size=1.15) + geom_point(col="blue",size=3) +
+    geom_errorbar(aes(ymin=Accuracy-AccuracySD,ymax=Accuracy+AccuracySD),width=0.1)
+  
+  list(g1,g2)
+}
+
 # do train & testing, make confusion matrices
 
 doTrainTest <- function(dataI,mdl,trainPerc=0.7) {
@@ -1640,11 +1653,14 @@ prepModel <- function(dFrame,mdl) {
 #'@param xvreps : how many times to repeat x-validation [def=1]
 #'@param parallel : if parallel processing allowed [def=T]
 #'@param verb : should it prints out debug info [def=T]
+#'@param optimiseMetric : what to optimise (Kappa/ROC) [def='Kappa']
 #'@return list of 1) max accuracy vars, 2) 2% tolerance vars, 3) 5% tolerance vars, 4) test set ROCs, 5) x-validation ROCs, 6) RFE plot
 #'}
 # =================================================================================
 dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",trP=0.75,positive="IBD",rfeMethod="glm",
-                                 testMethod="glm",xvnr=5,xvreps=1,parallel=T,verb=T,szs=F,trainMethod="repeatedcv",optimiseMetric="Kappa") {
+                                 testMethod="glm",xvnr=5,xvreps=1,rfeReps=3,
+                                 parallel=T,verb=T,szs=F,trainMethod="repeatedcv",optimiseMetric="Kappa",
+                                 saveRFE=T,saveRFEpath='rfe_model.RDS') {
   
   #trC <- trainControl(method=rfeMethod,number=tBut,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = parallel)
   inTrain <- createDataPartition(dModel[[responseVar]],p=trP,list=F)
@@ -1652,9 +1668,23 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
   trSet <- dModel[inTrain,]
   testSet <- dModel[-inTrain,]
   
-  rfeCtrl <- rfeControl(functions = caretFuncs, method = trainMethod, repeats = xvreps,
-                        number=xvnr, verbose = verb,allowParallel = parallel)
-  
+  if (optimiseMetric == "ROC") {
+    caretFuncs$summary <- twoClassSummary
+    trC <- trainControl(method="repeatedcv",number=xvnr,
+                        repeats = xvreps,savePredictions = T,
+                        classProbs = T,allowParallel = parallel,
+                        summaryFunction = twoClassSummary)
+    rfeCtrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = rfeReps,
+                          number=xvnr, verbose = T,allowParallel = parallel,returnResamp="final")
+  } else {
+    trC <- trainControl(method="repeatedcv",number=xvnr,
+                        repeats = xvreps,savePredictions = T,
+                        classProbs = T,allowParallel = parallel)
+    rfeCtrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = rfeReps,
+                          number=xvnr, verbose = T,allowParallel = parallel)
+  }
+  # rfeCtrl <- rfeControl(functions = caretFuncs, method = trainMethod, repeats = xvreps,
+  #                       number=xvnr, verbose = verb,allowParallel = parallel,trControl=trC,metric=optimiseMetric)
   if (!szs) {
     if (ncol(trSet) <= 50) {szs=seq(1,ncol(trSet)-1,1)
     } else if (ncol(trSet) <= 105) {szs=c(seq(1,50,1),seq(50,ncol(trSet)-1,2))  
@@ -1665,7 +1695,7 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
   #print(szs)
   print ('  >> doing RFE profile')
   rfeProfile <- rfe(x=trSet[,-grep(responseVar,colnames(trSet))], y=trSet[[responseVar]], sizes=szs, rfeControl = rfeCtrl,
-                    metric=optimiseMetric,method=rfeMethod,maximize = T)
+                    metric=optimiseMetric,method=rfeMethod,maximize = T,trControl = trC)
   print ('    >>> DONE!')
   # save output
   varImpPlot <- cbind.data.frame(rownames(varImp(rfeProfile)),varImp(rfeProfile))
@@ -1686,7 +1716,8 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
   varSel5 <- caretFuncs$selectVar(y = rfeProfile$variables,size=varNr5)
   # build new model with these only, compare to original model
   if (optimiseMetric == "ROC") {
-    trC <- trainControl(method=trainMethod,number=xvnr,repeats = xvreps,savePredictions = T,classProbs = T,allowParallel = parallel,summaryFunction = twoClassSummary)
+    trC <- trainControl(method=trainMethod,number=xvnr,repeats = xvreps,savePredictions = T,classProbs = T,allowParallel = parallel,
+                        summaryFunction = twoClassSummary)
   } else {
     trC <- trainControl(method=trainMethod,number=xvnr,repeats = xvreps,savePredictions = T,classProbs = T,allowParallel = parallel)
   }
@@ -1711,7 +1742,11 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
   rfeplot <- ggplot(rfeProfile) + geom_vline(xintercept = varNrMax,linetype='longdash') + geom_vline(xintercept = varNr2,linetype='longdash')+
     geom_vline(xintercept = varNr5,linetype='longdash')+ggtitle(paste("RFE plot (",dModelName,' / ',rfeMethod,')',sep=""))
   
-  return(list(varSelMax,varSel2,varSel5,testComp,cvComp,rfeplot,varImpPlot ,c("Vars:Max","Vars:2%","Vars:5%","plot:testset","plot:X-val","RFE-plot","VarImp-DF")))
+  if (saveRFE) {
+    saveRDS(rfeProfile,file = saveRFEpath)
+  }
+  
+  return(list(varSelMax,varSel2,varSel5,testComp,cvComp,rfeplot,varImpPlot,c("Vars:Max","Vars:2%","Vars:5%","plot:testset","plot:X-val","RFE-plot","VarImp-DF")))
 }
 
 # ===============================================================================
@@ -2075,7 +2110,7 @@ doMLModelling <- function(outFolderName,
                         #lcB=5,         # learning curves bootstraps
                         rfeR=5,        # repeats of RFE
                         saveMdls = T,   # save fitted models
-                        smoothROCs = T, # if T, make smooth ROC curves
+                        smoothROCs = F, # if T, make smooth ROC curves <warning: buggy!>
                         mtds = c("glm","svmRadial"),
                         optimiseMetric="Kappa",  # what to optimise (usually Kappa, TODO: ROC)
                         allowParallel=T
@@ -2253,9 +2288,9 @@ doMLModelling <- function(outFolderName,
           
           # debug
           #dModel=allDM[[c]];xvnr=xvn;xvreps = xvr; rfeMethod = mtd; parallel = T;testMethod = mtd; dModelName=allDMn[[c]];positive = posC
-          rfeRes <- dataModelOptimiseRFE(dModel=inData,xvnr=xvn,xvreps = xvr, rfeMethod = mtd,
+          rfeRes <- dataModelOptimiseRFE(dModel=inData,xvnr=xvn,xvreps = xvr,rfeReps = rfeR,rfeMethod = mtd,optimiseMetric = optimiseMetric,
                                          testMethod = mtd, dModelName=allDMn[[c]],positive = posC,responseVar = responseVar,
-                                         parallel = allowParallel)
+                                         parallel = allowParallel,saveRFE = T,saveRFEpath = paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_RFE.RDS") )
           print('RFE done!')
           write.table(rfeRes[[1]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_vmax.csv"),row.names = F,col.names = F)
           write.table(rfeRes[[2]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v2.csv"),row.names = F,col.names = F)
