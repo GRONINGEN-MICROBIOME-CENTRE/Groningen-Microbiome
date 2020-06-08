@@ -1267,10 +1267,10 @@ clus_pheno$IBD=0
 #clus_pheno$IBD[clus_pheno$ibd_Diagnosis=="Control",]=0
 clus_pheno$IBD[clus_pheno$ibd_Diagnosis!="Control"]=1
 
-clus_pheno$Location=0
-clus_pheno$Location[clus_pheno$ibd_DiseaseLocation=="colon"]=1
-clus_pheno$Location[clus_pheno$ibd_DiseaseLocation=="ileum"]=2
-clus_pheno$Location[clus_pheno$ibd_DiseaseLocation=="both"]=2
+#clus_pheno$Location=0
+#clus_pheno$Location[clus_pheno$ibd_DiseaseLocation=="colon"]=1
+#clus_pheno$Location[clus_pheno$ibd_DiseaseLocation=="ileum"]=2
+#clus_pheno$Location[clus_pheno$ibd_DiseaseLocation=="both"]=2
 
 clus_pheno$ibd_Diagnosis=NULL
 clus_pheno$ibd_DiseaseLocation=NULL
@@ -1282,9 +1282,9 @@ clus_mtb=q_mtb[row.names(q_mtb) %in% row.names(clus_pheno),]
 clus_mtb=clus_mtb[order(row.names(clus_mtb)),]
 table(row.names(clus_mtb)==row.names(clus_pheno))
 
-write.table(clus_mtb, "~/Documents/Project_Metabolome/1.Input_files/clst_mtb", sep="\t", quote = F)
-write.table(clus_pheno, "~/Documents/Project_Metabolome/1.Input_files/clst_pheno", sep="\t", quote = F)
-write.table(clus_taxa, "~/Documents/Project_Metabolome/1.Input_files/clst_taxa", sep="\t", quote = F)
+write.table(clus_mtb, "~/Documents/Project_Metabolome/1.Input_files/clst_mtb2", sep="\t", quote = F)
+write.table(clus_pheno, "~/Documents/Project_Metabolome/1.Input_files/clst_pheno2", sep="\t", quote = F)
+write.table(clus_taxa, "~/Documents/Project_Metabolome/1.Input_files/clst_taxa2", sep="\t", quote = F)
 
 
 #Run in Boxy (hpc cluster)
@@ -1292,9 +1292,9 @@ write.table(clus_taxa, "~/Documents/Project_Metabolome/1.Input_files/clst_taxa",
 #ml Rplust
 #library (iClusterPlus)
 
-clus_mtb=read.table("./clst_mtb", sep = "\t", header = T, row.names = 1)
-clus_taxa=read.table("./clst_taxa", sep = "\t", header = T, row.names = 1)
-clus_pheno=read.table("./clst_pheno", sep = "\t", header = T, row.names = 1)
+clus_mtb=read.table("./clst_mtb2", sep = "\t", header = T, row.names = 1)
+clus_taxa=read.table("./clst_taxa2", sep = "\t", header = T, row.names = 1)
+clus_pheno=read.table("./clst_pheno2", sep = "\t", header = T, row.names = 1)
 
 #test 1 to 5 clusters
 
@@ -1304,7 +1304,7 @@ for(k in 1:5){
   }
 
 #Check BIC for each K (number of clusters)
-setwd("~/Documents/Project_Metabolome/6.Results/iClust/")
+setwd("~/Documents/Project_Metabolome/6.Results/iClust/new/")
 output=alist() 
 files=grep("cv.fit",dir())
 for(i in 1:length(files)){
@@ -1361,11 +1361,14 @@ head(sigfeatures[[3]])
 library (gplots)
 bw.col = colorpanel(2,low="white",high="black")
 col.scheme = alist()
-col.scheme[[1]] = bluered(500)
-col.scheme[[2]] = bluered(500)
+col.scheme[[1]] = bluered(800)
+col.scheme[[2]] = bluered(800)
 col.scheme[[3]] = bw.col 
 plotHeatmap(fit=best.fit,datasets=list(clus_mtb,clus_taxa,clus_pheno),
             type=c("gaussian","gaussian", "binomial"), col.scheme = col.scheme)
+
+plotHeatmap(fit=best.fit,datasets=list(clus_mtb,clus_taxa),
+            type=c("gaussian","gaussian"), col.scheme = col.scheme)
 
 
 #View solution in bacteria PCA
@@ -1373,10 +1376,76 @@ new_pc_bac=merge(clusters,cmp_clr2, by="row.names")
 ggplot (new_pc_bac, aes(PC1,PC2, color=as.factor(new_pc_bac$`K=5`))) + geom_point() + theme_bw() + scale_color_manual(values=c("black","firebrick2", "lightblue2", "gold2","purple"))
 
 #View solution in metabolite PCA
+rownames(cmp_log2)=(cmp_log2$Row.names)
+cmp_log2$Row.names=NULL
 new_pc_mtb=merge(clusters,cmp_log2, by="row.names")
+
 ggplot (new_pc_mtb, aes(PC1,PC2, color=as.factor(new_pc_bac$`K=5`))) + geom_point() + theme_bw() + scale_color_manual(values=c("black","firebrick2", "lightblue2", "gold2","purple"))
 #bla=tune.iClusterPlus(cpus = 2,dt1 = data.matrix(clus_mtb),dt2 = data.matrix(clus_taxa),dt3 = data.matrix(clus_pheno), type = c("gaussian","gaussian","multinomial"))
 plot_ly(x=new_pc_mtb$PC1,y=new_pc_mtb$PC2,z=new_pc_mtb$PC3, color = new_pc_mtb$`K=5`, colors = c("black","firebrick2", "lightblue2", "gold2","purple"))
+
+
+ph_heat=new_pc_mtb[,c("Row.names","ibd_Diagnosis","ibd_DiseaseLocation","K=5")]
+rownames(ph_heat)=ph_heat$Row.names
+ph_heat$Row.names=NULL
+htmtb=merge(ph_heat,clus_mtb, by="row.names")
+htbac=merge(ph_heat,clus_taxa,  by="row.names")
+
+htmtb=melt(htmtb,id.vars=c("Row.names","ibd_Diagnosis","ibd_DiseaseLocation","K=5"))
+htbac=melt(htbac,id.vars=c("Row.names","ibd_Diagnosis","ibd_DiseaseLocation","K=5"))
+
+colnames(htbac)=c("ID","IBD","Location","Clusters","Metabolite","Abundance")
+htbac$type="Microbiome"
+
+colnames(htmtb)=c("ID","IBD","Location","Clusters","Metabolite","Abundance")
+htmtb$type="Metabolome"
+ht_test=rbind(htbac,htmtb)
+
+ggplot(ht_test,aes(reorder(as.factor(ID),Clusters),Metabolite,fill=as.numeric(Abundance))) + geom_tile(stat = "identity") + scale_fill_viridis(discrete=FALSE) + theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank()) + facet_grid(type~Clusters, scales = "free", space="free_x")
+
+ggplot(ht_test,aes(reorder(as.factor(ID),Clusters),Metabolite,fill=as.numeric(Abundance))) + geom_tile(stat = "identity") + scale_fill_gradient2(low="navy", mid="white", high="red", midpoint=0) + theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.text.y = element_text(size=3)) + facet_grid(type~Clusters, scales = "free", space="free_x")
+
+
+htmtb_2=htmtb[ htmtb$Metabolite %in% sigfeatures[[1]], ]
+ht_test2=rbind(htbac,htmtb_2)
+
+ggplot(ht_test2,aes(reorder(as.factor(ID),Clusters),Metabolite,fill=as.numeric(Abundance))) + geom_tile(stat = "identity") + scale_fill_gradient2(low="navy", mid="white", high="red", midpoint=0) + theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), axis.text.y = element_text(size=3)) + facet_grid(type~Clusters, scales = "free", space="free_x")
+
+ggplot(ht_test2,aes(reorder(as.factor(ID),Clusters),Metabolite,fill=as.numeric(Abundance))) + geom_tile(stat = "identity") + scale_fill_viridis(discrete=FALSE) + theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank()) + facet_grid(type~Clusters, scales = "free", space="free_x")
+
+
+
+
+s1=new_pc_mtb[,c("Row.names","K=5")]
+rownames(s1)=s1$Row.names
+s1$Row.names=NULL
+s1=merge(s1,clus_mtb, by="row.names")
+s1=melt(s1, id.vars=c("Row.names","K=5"))
+s2=new_pc_mtb[,c("Row.names","K=5","ibd_Diagnosis","ibd_DiseaseLocation", "ibd_ActiveDisease","clinical_BowelMovementADayDef", "Shannon_Index")]
+s2=melt(s2, id.var=c("Row.names","K=5"))
+
+s1$type="Metabolite"
+s2$type="Phenotype"
+colnames(s1)=c("ID","Clusters","Metabolite","Abundance","type")
+colnames(s2)=c("ID","Clusters","Metabolite","Abundance","type")
+s1=s1[ s1$Metabolite %in% sigfeatures[[1]], ]
+s3=rbind(s1,s2)
+
+ggplot(s3,aes(reorder(as.factor(ID),Clusters),Metabolite,fill=as.numeric(Abundance))) + geom_tile(stat = "identity") + scale_fill_viridis(discrete=FALSE) + theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank()) + facet_grid(type~Clusters, scales = "free", space="free")
+
+
+new_pc_mtb2=new_pc_mtb[,c("Row.names","K=5","ibd_Diagnosis","ibd_DiseaseLocation", "ibd_ActiveDisease","clinical_BowelMovementADayDef", "Shannon_Index")]
+rownames(new_pc_mtb2)=new_pc_mtb2$Row.names
+new_pc_mtb2$Row.names=NULL
+new_pc_mtb2$cluster=paste("c", new_pc_mtb2$`K=5`,sep="_")
+new_pc_mtb2$`K=5`=NULL
+
+new_pc_mtb2=new_pc_mtb2[order (new_pc_mtb2$cluster),]
+new_clus_mtb2=clus_mtb[(row.names(new_pc_mtb2)),]
+new_clus_mtb3=new_clus_mtb2[ ,colnames(new_clus_mtb2) %in% sigfeatures[[1]] ]
+
+pheatmap(t(new_clus_mtb3), cluster_cols = F, cluster_rows = F,show_rownames = T, gaps_col= c(head(as.numeric(cumsum(table(new_pc_mtb2$cluster)))), -1),show_colnames = F, annotation_col = new_pc_mtb2, scale = "none", color = inferno(20),fontsize = 5, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "Control"="white", "IBDU"="black"),cluster=c("c_1"="black","c_2"="firebrick2","c_3"="lightblue2","c_4"="gold2","c_5"="purple" )))
+
 ```
 
 
@@ -2090,10 +2159,51 @@ ggplot(test_pv, aes(Var1,prop, fill=Var2)) + geom_bar(stat = "identity") + theme
 ```{r}
 #cc_pheno7=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_032020/cc_phenos_tested.txt", sep = "\t", header = T, row.names = 1)
 #tot=merge(cc_pheno7,q_mtb,by="row.names")
-tot=test_mtb_quantitative
+tot=test_mtb_quant
+
+#Check NA's
+#colnames(tot)[colSums(is.na(tot)) > 0]
+
+tot$Methylbutyric_acid=NULL
+tot$acetic_acid=NULL
+tot$butyric_acid=NULL
+tot$hexanoic_acid=NULL
+tot$isobutyric_acid=NULL
+tot$isovaleric_acid=NULL
+tot$propionic_acid=NULL
+tot$valeric_acid=NULL
+
+tot$ibd_FecalCalprotectinOver200yesno[is.na(tot$ibd_FecalCalprotectinOver200yesno)]="no"
+tot$clinical_BowelMovementADayDef[is.na(tot$clinical_BowelMovementADayDef)]=median(as.numeric(as.character(tot$clinical_BowelMovementADayDef)), na.rm = T)
+tot$ibd_ActiveDisease[is.na(tot$ibd_ActiveDisease)]="NotActive"
+tot$clinical_BinaryBSS[is.na(tot$clinical_BinaryBSS)]="Soft"
+tot$ibd_DiseaseLocation[is.na(tot$ibd_DiseaseLocation)]="colon"
+
+write.table(tot, "~/Documents/Project_Metabolome/1.Input_files/Models_052020/temp_tot.txt")
+tot=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/temp_tot.txt")
+
 my_results_for_lasso=all_uni_quant
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="Methylbutyric_acid")
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="acetic_acid")
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="butyric_acid")
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="hexanoic_acid")
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="isobutyric_acid")
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="isovaleric_acid")
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="propionic_acid")
+my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="valeric_acid")
+#
+cor_diet_bact=cor.test(tot[,64:316], method = "spearman")
+#
+highlyCorrelated <- findCorrelation(cor_diet_bact, cutoff=0.75)
+#
+q_mtb_names=q_mtb
+colnames(q_mtb_names)=make.names(colnames(q_mtb_names))
+q_mtb_names=subset(q_mtb_names,row.names(q_mtb_names) %in% row.names(tot))
+my_models=matrix(nrow = 900,ncol = 6)
 flag=1
+mycount=0
 for ( i in unique (my_results_for_lasso$metabolite)){
+  mycount=mycount+1
   #Select phenotypes associated to metabolite in the previous analysis
   my_mtb_selection= subset (my_results_for_lasso, my_results_for_lasso$metabolite==i & my_results_for_lasso$FDR<0.05)
   
@@ -2103,24 +2213,27 @@ for ( i in unique (my_results_for_lasso$metabolite)){
   my_phenos_lasso=tot[, colnames(tot) %in% my_list_of_phenos, drop=F]
   
   #my_phenos_lasso=my_phenos_lasso[,complete.cases(my_phenos_lasso)]
-  
+  print (paste("Metabolite test number:", mycount))
+  print (paste("Metabolite:",i))
   #Select metabolite to test
-  my_feature_lasso=q_mtb[,i, drop=F]
+  my_feature_lasso=q_mtb_names[,i, drop=F]
   
   #Sample sample order for phenos and metabolites tables 
   my_phenos_lasso2=my_phenos_lasso[order(row.names(my_phenos_lasso)), ]
-  my_feature_lasso2=my_feature_lasso[order(row.names(my_phenos_lasso)),, drop=F]
+  my_feature_lasso2=my_feature_lasso[order(row.names(my_feature_lasso)),, drop=F]
   n_samples=nrow(my_phenos_lasso2)
   
   #Use 70% for training (lambda estimation)
   lasso_train_samples=sample(1:n_samples, 0.7*n_samples)
-  
+  subtrain=rownames(my_phenos_lasso2)[lasso_train_samples]
   #Subset features 
-  lasso_train_feature = my_feature_lasso2[lasso_train_samples,, drop=F]
-  lasso_test_feature = my_feature_lasso2[-lasso_train_samples,, drop=F]
+  lasso_train_feature = my_feature_lasso2[subtrain,, drop=F]
+  lasso_test_feature = subset(my_feature_lasso2, row.names(my_feature_lasso2) %ni% subtrain)
+  #= my_feature_lasso2[-lasso_train_samples,, drop=F]
   #Subset phenos
-  lasso_train_phenos = my_phenos_lasso2[lasso_train_samples,]
-  lasso_test_phenos = my_phenos_lasso2[-lasso_train_samples,]
+  lasso_train_phenos = my_phenos_lasso2[subtrain,]
+  lasso_test_phenos  = subset(my_phenos_lasso2, row.names(my_phenos_lasso2) %ni% subtrain)
+  #= my_phenos_lasso2[-lasso_train_samples,]
   #Cross validation
   lasso_fit = cv.glmnet( x=data.matrix(lasso_train_phenos),y=as.matrix(lasso_train_feature), type.measure="mse", alpha=1, family="gaussian")
   #Prediction
@@ -2128,18 +2241,38 @@ for ( i in unique (my_results_for_lasso$metabolite)){
   #Select phenotypes with coefficients !=0
   sel_phenos_2=names(data.matrix(lasso_predicted)[data.matrix(lasso_predicted)!=0,][-1])
   #Run lm on the selected features 
-  my_f=as.formula(paste(colnames(my_feature_lasso), paste(sel_phenos_2, collapse = " + "), sep = " ~ ")) 
-  my_lm=summary(lm(my_f,data = tot ))
-  my_lm_coef=as.data.frame(my_lm$coefficients[-1,])
-  my_lm_coef$metabolite=colnames(my_feature_lasso)
-  if (flag!=1){
-    my_lasso_results=rbind(my_lasso_results,my_lm_coef)
-  }else{
-    my_lasso_results=my_lm_coef
-    flag=5
+  if (length(sel_phenos_2)>=1){
+    my_f=as.formula(paste(colnames(my_feature_lasso), paste(sel_phenos_2, collapse = " + "), sep = " ~ ")) 
+    my_lm=summary(lm(my_f,data = tot ))
+    if (nrow(my_lm$coefficients)<3){
+      my_lm_coef=my_lm$coefficients[-1,]
+      my_lm_coef=as.data.frame(as.matrix(t(my_lm$coefficients[-1,])))
+      my_lm_coef$metabolite=colnames(my_feature_lasso)
+      rownames(my_lm_coef)=sel_phenos_2
+      my_lm_coef$pheno=sel_phenos_2
+    } else{
+      my_lm_coef=as.data.frame(my_lm$coefficients[-1,])
+      my_lm_coef$metabolite=colnames(my_feature_lasso)
+      my_lm_coef$pheno=rownames(my_lm_coef)      
+    }
+    if (flag!=1){
+      my_lasso_results=rbind(my_lasso_results,my_lm_coef)
+    }else{
+      my_lasso_results=my_lm_coef
+      flag=5
+    }
   }
+  my_models[mycount,1]=i
+  my_models[mycount,2]=paste(my_list_of_phenos, collapse = "+")
+  my_models[mycount,3]=paste(my_f, collapse = "")
+  my_models[mycount,4]=my_lm$adj.r.squared
+  comp=data.frame( lasso_test_feature,predict(lasso_fit, s=lasso_fit$lambda.min, newx=data.matrix(lasso_test_phenos), type="response"))
+  my_models[mycount,5]=RMSE(comp[,2],comp[,1])
+  my_models[mycount,6]=caret::R2(obs = comp[,1], pred = comp[,2])
 }
-
+a_results_lasso=as.data.frame(my_lasso_results)
+a_results_lasso$bonferroni=p.adjust(as.numeric(as.character(a_results_lasso$`Pr(>|t|)`)),method = "bonferroni")
+a_results_lasso$fdr=p.adjust(as.numeric(as.character(a_results_lasso$`Pr(>|t|)`)),method = "BH")
 
 ```
 
@@ -2461,6 +2594,70 @@ for (i in 7:ncol(rgs_tx)){
 rgs_tx2=as.data.frame(rgs_tx2)
 rownames(rgs_tx2)=rgs_tx$Row.names
 colnames(rgs_tx2)=colnames(rgs_tx)[7:ncol(rgs_tx)]
+
+flag=1
+for (mtb in 1:ncol(rgs_mb2)){
+  for (tx in 1:ncol(rgs_tx2)){
+    mmtb=colnames(rgs_mb2)[mtb]
+    mtx=colnames(rgs_tx2)[tx]
+    mest=cor.test(rgs_mb2[,mtb],rgs_tx2[,tx], method = "spearman")$estimate
+    mpval=cor.test(rgs_mb2[,mtb],rgs_tx2[,tx], method = "spearman")$p.value
+    mtb_tx=data.frame(Metabolite=mmtb,Taxa=mtx,Coefficient=mest,P_val=mpval)
+    if (flag==1){
+      res_mtb_tx=mtb_tx
+      flag=7
+    } else{
+      res_mtb_tx=rbind(res_mtb_tx,mtb_tx)
+    }
+  }
+}
+
+
+
+rgs_mb3=rgs_mb
+rgs_tx3=rgs_tx
+
+rgs_mb3$run_day_cat=NULL
+rgs_mb3$Amount_sample_gram=NULL
+rgs_mb3$LC.COLUMN=NULL
+rgs_mb3$metabolon_Month_in_freezer=NULL
+
+rgs_tx3$run_day_cat=NULL
+rgs_tx3$Amount_sample_gram=NULL
+rgs_tx3$LC.COLUMN=NULL
+rgs_tx3$metabolon_Month_in_freezer=NULL
+rgs_tx3$ibd_Diagnosis=NULL
+
+mgtx=merge(rgs_mb3, rgs_tx3, by="Row.names")
+
+mgtxControl=subset(mgtx,mgtx$ibd_Diagnosis=="Control")
+mgtxCD=subset(mgtx,mgtx$ibd_Diagnosis=="CD")
+mgtxUC=subset(mgtx,mgtx$ibd_Diagnosis=="UC")
+
+flag=1
+for (mtb in 3:856){
+  for (tx in 857:ncol(mgtxControl)){
+    mmtb=colnames(mgtxControl)[mtb]
+    mtx=colnames(mgtxControl)[tx]
+    
+    mest=cor.test(mgtxControl[,mtb],mgtxControl[,tx], method = "spearman")$estimate
+    mpval=cor.test(mgtxControl[,mtb],mgtxControl[,tx], method = "spearman")$p.value
+    
+    mestcd=cor.test(mgtxCD[,mtb],mgtxCD[,tx], method = "spearman")$estimate
+    mpvalcd=cor.test(mgtxCD[,mtb],mgtxCD[,tx], method = "spearman")$p.value
+    
+    mestuc=cor.test(mgtxUC[,mtb],mgtxUC[,tx], method = "spearman")$estimate
+    mpvaluc=cor.test(mgtxUC[,mtb],mgtxUC[,tx], method = "spearman")$p.value
+    
+    mtb_tx2=data.frame(Metabolite=mmtb,Taxa=mtx,Coefficient=mest,P_val=mpval, Coefficient_CD=mestcd,P_val_CD=mpvalcd,Coefficient_UC=mestuc,P_val_UC=mpvaluc)
+    if (flag==1){
+      res_mtb_tx2=mtb_tx2
+      flag=7
+    } else{
+      res_mtb_tx2=rbind(res_mtb_tx2,mtb_tx2)
+    }
+  }
+}
 
 write.table(rgs_tx2,"./Documents/Project_Metabolome/1.Input_files/mmvec/taxa.txt", sep="\t", quote = F)
 write.table(rgs_mb2,"./Documents/Project_Metabolome/1.Input_files/mmvec/mtb.txt", sep="\t", quote = F)
