@@ -9,6 +9,21 @@ library(caret)
 library(plotROC)
 library(pROC)
 
+# helper function for exctracting best tuning prediction data from Caret model
+# ===========================================================================
+extractBestTunePred <- function(inCaret) {
+  bt <- inCaret$bestTune
+  if (bt[1] == "none") {
+    res <- inCaret$pred
+  } else {
+    res <- inCaret$pred
+    for (v in colnames(bt)) {
+      print(v)
+      res <- res[res[[v]] == bt[[v]][1], ]
+    }
+  }
+  res
+}
 
 # analysis of RFE profiles
 # ======================================
@@ -23,7 +38,7 @@ rfeMakePlots <- function(rfeProfile) {
 }
 
 # do train & testing, make confusion matrices
-
+# ======================================================================
 doTrainTest <- function(dataI,mdl,trainPerc=0.7) {
   inTrain <- createDataPartition(y=dataI$Diagnosis,p=trainPerc,list=F)
   trainSet <-dataI[inTrain,]
@@ -432,8 +447,11 @@ compareModelsTrainingCV <- function(fittedMdls,modelNames,mtd="glm",posClass="IB
   for (m in fittedMdls) {
     c = c + 1
     namen = modelNames[c]
-    rocs[[namen]] <- roc(predictor = fittedMdls[[c]]$pred[[posClass]], response = fittedMdls[[c]]$pred$obs,auc=T,percent = F,
-                         smooth = roc.smooth)
+    bestPred <- extractBestTunePred(m)
+    rocs[[namen]] <- roc(predictor = bestPred[[posClass]],response = bestPred$obs,auc=T,percent=F)
+    
+    # rocs[[namen]] <- roc(predictor = fittedMdls[[c]]$pred[[posClass]], response = fittedMdls[[c]]$pred$obs,auc=T,percent = F,
+    #                      smooth = roc.smooth)
   }
   
   # extract coordinates
@@ -629,9 +647,6 @@ trainCompareModels <- function(dataMdls,modelNames,mtd="glm",posClass="IBS",doSm
     geom_point(stroke=2,size=3,position=position_dodge(width=0.4))
   list(g,gg2,predDF)
 }
-
-
-
 
 # ===============================================================================
 # compares multiple models on multiple test datasets
@@ -846,7 +861,8 @@ prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=
     if (pp > 1.0) {pp <- 1.0; p <- c(p,pp); break}
   }
   results = data.frame()
-  results <- rbind.data.frame(results,c(0.0,"Train",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),stringsAsFactors = F)
+  #NR, Name, "Acc","Acc.SD","Kappa","Kappa.SD","SENS","SENS.SD","SPEC","SPEC.SD","BACC","BACC.SD","PPV","PPV.SD","NPV","NPV.SD","AUC","AUC.SD"
+  results <- rbind.data.frame(results,c(0.0,"Train",1.0,0.0,1.0,0.0,1.0,0.0,1.0,0.0,1.0,0.0,1.0,0.0,1.0,0.0,1.0,0.0),stringsAsFactors = F)
 #  results <- as.data.frame(apply(results,MARGIN = 2,FUN= function(x) as.character(x)))
   results <- rbind.data.frame(results,c(0.0,"Test",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),stringsAsFactors = F)
 #  results <- as.data.frame(apply(results,MARGIN = 2,FUN= function(x) as.character(x)))
@@ -1129,6 +1145,43 @@ calcPredictionMetricsTable <- function(testSet,modelNames,...)
   res <- as.data.frame(res)
   rownames(res) <- c(1:nrow(res))
   res
+}
+
+# examines list of trained models (made by Caret)
+# and outputs predictive power metrics for each of them
+# on internal cross-validation set
+# ==========================================================
+getModelsTrainingCVstats <- function(fittedMdls,modelNames,posClass)
+{
+  cnt = 0
+  resultsCV <- NULL
+  for (fittedMdl in fittedMdls) {
+    cnt = cnt + 1
+    md <- modelNames[cnt]
+    print(paste0(' >> analyzing x-validation performance for ',md))
+    predBest <- extractBestTunePred(fittedMdl)
+    
+    confM <- confusionMatrix(predBest$pred,predBest$obs)
+    # acc, kappa
+    acc <- confM[[3]][1]
+    kappa <- confM[[3]][2]
+    # sens spec ppv npv prec recall F1 prev bacc
+    sens <- confM[[4]][1]
+    spec <- confM[[4]][2]
+    ppv <- confM[[4]][3]
+    npv <- confM[[4]][4]
+    f1 <- confM[[4]][7]
+    bacc <- confM[[4]][11]
+    # get auc
+    r <- roc(predictor = predBest[[posClass]], response = predBest$obs, auc=T,percent=T,smooth=F)
+    #r <- roc(predictor = fittedMdl$pred[[posClass]], response = fittedMdl$pred$obs, auc=T,percent=T,smooth=F)
+    auc <- as.numeric(r$auc)/100
+    nrVars <- length(fittedMdl$coefnames)
+    oneRow <- data.frame(Model=md,Method=fittedMdl$method,NrVars=nrVars,ACC=acc,Kappa=kappa,Sensitivity=sens,Specificity=spec,PPV=ppv,NPV=npv,B.ACC=bacc,F1=f1,AUC=auc)
+    resultsCV <- rbind.data.frame(resultsCV,oneRow)
+    row.names(resultsCV) <- NULL
+  }
+  resultsCV
 }
 
 # MULTI CLASS PREDICTION FUNCTIONS
@@ -1674,7 +1727,7 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
                         repeats = xvreps,savePredictions = T,
                         classProbs = T,allowParallel = parallel,
                         summaryFunction = twoClassSummary)
-    rfeCtrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = rfeReps,
+    rfeCtrl <- rfeControl(method = "repeatedcv", repeats = rfeReps,
                           number=xvnr, verbose = T,allowParallel = parallel,returnResamp="final")
   } else {
     trC <- trainControl(method="repeatedcv",number=xvnr,
@@ -2220,7 +2273,7 @@ doMLModelling <- function(outFolderName,
         }
         lCurve <- prepLearningCurve(dataIn = inData,mdl = mtd,lcBoots = tButLC,trBoot = tButXV,trNumber = tRep,trainType="cv",trSet = 0.75,
                                     saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 10,samStep = 1.5,
-                                    pProc = )
+                                    pProc = T)
         write.table(lCurve,file=paste0(outFolderName,"/lcurves/",mN,"_lc_",mtd,".csv"),sep=',',row.names = F)
         lp <- plotLearningCurves(lCurve,tit=paste('Learning curve (',mN,' [',ncol(inData)-1,'f], ',mtd,')',sep=''),metrics = c("Kappa"))
         ggsave(plot = lp,file=paste0(outFolderName,"/lcurves/",mN,"_lc_",mtd,"_k.png"),width = 8,height = 6)
