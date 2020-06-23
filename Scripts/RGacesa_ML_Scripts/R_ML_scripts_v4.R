@@ -59,7 +59,7 @@ plotAllLearningCurves <- function(dataI,dataName="",dataNameShort="",
                                   mdls=c("glm","gbm","rpart2","avNNet","nnet","pcaNNet","hdrda","svmRadial","svmLinear3",
                                          "rda","rrlda","regLogistic","rf","RRFglobal"),
                                   bts=3,sStep=2,sMin=50,outTable=T,outPlots=T,outFolder='plots',trainRepNR = 2,trainBootNR = 10,
-                                  doROC = T,posClass="IBS",allowParallel=T) {
+                                  doROC = T,posClass="IBS",allowParallel=T,excludeVars=NULL) {
   # outtable
   outTbl = data.frame(Model=character(),Metric=numeric(),Value=numeric(),SD=numeric())
   # go over all models
@@ -71,7 +71,7 @@ plotAllLearningCurves <- function(dataI,dataName="",dataNameShort="",
                                 saveVarImp=paste(outFolder,'/lCurve_',dataNameShort,'_',md,'_varImp.png',sep=''),
                                 saveVarImpTit=paste('Covariate importance (',md,')',sep=''),
                                 posClass=posClass,ROCtitle=paste('ROC: ',dataName,' [',md,']',sep=''),
-                                allowParallel=allowParallel)
+                                allowParallel=allowParallel,excludeVars=excludeVars)
     g <- plotLearningCurves(lCurve,tit=paste("L-Curve",dataName,md))
     ggsave(g,filename = paste(outFolder,'/lCurve_',dataNameShort,'_',md,'.png',sep=''),width = 9,height = 9)
     endTime <- Sys.time()
@@ -846,7 +846,7 @@ findCorrelatedCovariates2 <- function(inData,cutOff)
 #'
 prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=25,scaleCenter=T,trBoot = 25,trNumber = 5,trainType="boot",
                               pProc = c("center","scale"), saveVarImp="", saveVarImpTit="",responseVar="Diagnosis",posClass="IBS",ROCtitle='',
-                              allowParallel=T,optimiseMetric="Kappa")
+                              allowParallel=T,optimiseMetric="Kappa",excludeVars=NULL)
 {
   inTrain <- createDataPartition(y=dataIn[[responseVar]],p=trSet,list=F)
   trainSet <- dataIn[inTrain,]
@@ -889,10 +889,10 @@ prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=
     auctrain <- c()
     auc <- c()
     
-    for (b in c(1:lcBoots)) { # bootstraps loop
+    for (b in seq(1:lcBoots)) { # bootstraps loop
       # another partition
       inTrain <- createDataPartition(y=dataIn[[responseVar]],p=trSet,list=F)
-      trainSet <-dataIn[inTrain,]
+      trainSet <- dataIn[inTrain,]
       testSet <- dataIn[-inTrain,]
       # subselect
       #smplTr <- createDataPartition(y=trainSet[[responseVar]],p=trSet,list=F)
@@ -919,11 +919,18 @@ prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=
         
         print (paste('test Set size =',nrow(testSet)))
         # ROC (test)
-        predP <- predict(mFit,newdata=testSet,type="prob")
-        cauc <- roc(testSet[[responseVar]],predP[[posClass]],auc=T)$auc+0.0
+        # > exclusion for testing 
+        if (!is.null(excludeVars)) {
+          testSet2 <- testSet[,!colnames(testSet) %in% excludeVars]
+        } else {
+          testSet2 <- testSet
+        }
+        
+        predP <- predict(mFit,newdata=testSet2,type="prob")
+        cauc <- roc(testSet2[[responseVar]],predP[[posClass]],auc=T)$auc+0.0
         # confusion (test)
-        pred <- predict(mFit,newdata=testSet)
-        conf <- confusionMatrix(pred,testSet[[responseVar]])
+        pred <- predict(mFit,newdata=testSet2)
+        conf <- confusionMatrix(pred,testSet2[[responseVar]])
         cacc <- conf$overall[['Accuracy']]
         ckappa <- conf$overall[['Kappa']]
         csens <- conf$byClass[['Sensitivity']]
@@ -934,6 +941,10 @@ prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=
         
         
         # ROC (train)
+        # > exclusion for testing 
+        if (!is.null(excludeVars)) {
+          smpl <- smpl[,!colnames(smpl) %in% excludeVars]
+        }
         predtP <- predict(mFit,newdata=smpl,type="prob")
         cauct <- roc(smpl[[responseVar]],predtP[[posClass]],auc=T)$auc
         # confusion (train)
@@ -1727,27 +1738,39 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
                         repeats = xvreps,savePredictions = T,
                         classProbs = T,allowParallel = parallel,
                         summaryFunction = twoClassSummary)
-    rfeCtrl <- rfeControl(method = "repeatedcv", repeats = rfeReps,
+    rfeCtrl <- rfeControl(method = "repeatedcv", repeats = rfeReps,functions = caretFuncs,
                           number=xvnr, verbose = T,allowParallel = parallel,returnResamp="final")
   } else {
     trC <- trainControl(method="repeatedcv",number=xvnr,
                         repeats = xvreps,savePredictions = T,
                         classProbs = T,allowParallel = parallel)
-    rfeCtrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = rfeReps,
+    
+    # NOTE: caretFuncs have BUG and randomly crash !!!
+    # rfeCtrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = rfeReps,
+    #                       number=xvnr, verbose = T,allowParallel = parallel)
+    
+    rfeCtrl <- rfeControl(functions = rfFuncs, method = "repeatedcv", repeats = rfeReps,
                           number=xvnr, verbose = T,allowParallel = parallel)
   }
-  # rfeCtrl <- rfeControl(functions = caretFuncs, method = trainMethod, repeats = xvreps,
-  #                       number=xvnr, verbose = verb,allowParallel = parallel,trControl=trC,metric=optimiseMetric)
   if (!szs) {
     if (ncol(trSet) <= 50) {szs=seq(1,ncol(trSet)-1,1)
     } else if (ncol(trSet) <= 105) {szs=c(seq(1,50,1),seq(50,ncol(trSet)-1,2))  
     } else if (ncol(trSet) <= 210) {szs=c(seq(1,50,1),seq(50,100,2),seq(105,ncol(trSet)-1,5))
     } else if (ncol(trSet) > 210) {szs=c(seq(1,50,1),seq(50,100,2),seq(105,200,5), seq(200,ncol(trSet)-1,10))  }
   }
+  szs <- unique(szs)
   
+  #debug
+  # trSet2 <- trSet
+  # nrRes <- grep(paste0('^',responseVar,'$'),colnames(trSet))
+  # colnames(trSet2) <- paste0("VAR",seq(1,ncol(trSet2)))
+  # colnames(trSet2)[nrRes] <- "RESPONSE"
+  # rfeProfile <- rfe(x=trSet2[,-grep('^RESPONSE$',colnames(trSet2))], y=trSet2$RESPONSE, sizes=szs, rfeControl = rfeCtrl,
+  #                   metric=optimiseMetric,method=rfeMethod,maximize = T,trControl = trC)
+    
   #print(szs)
   print ('  >> doing RFE profile')
-  rfeProfile <- rfe(x=trSet[,-grep(responseVar,colnames(trSet))], y=trSet[[responseVar]], sizes=szs, rfeControl = rfeCtrl,
+  rfeProfile <- rfe(x=trSet[,-grep(paste0('^',responseVar,'$'),colnames(trSet))], y=trSet[[responseVar]], sizes=szs, rfeControl = rfeCtrl,
                     metric=optimiseMetric,method=rfeMethod,maximize = T,trControl = trC)
   print ('    >>> DONE!')
   # save output
@@ -2166,7 +2189,8 @@ doMLModelling <- function(outFolderName,
                         smoothROCs = F, # if T, make smooth ROC curves <warning: buggy!>
                         mtds = c("glm","svmRadial"),
                         optimiseMetric="Kappa",  # what to optimise (usually Kappa, TODO: ROC)
-                        allowParallel=T
+                        allowParallel=T,
+                        excludeVars = NULL # which variables to exclude FROM TESTING (they are still used for TRAINING!)
 ) 
 {
   # root output folder, create/clean as necessary
@@ -2271,9 +2295,9 @@ doMLModelling <- function(outFolderName,
         } else {
           inData <- read.table(file = paste0(outFolderName,'/inputData/',mN,'_trSet.csv'),header = T,sep=',')  
         }
-        lCurve <- prepLearningCurve(dataIn = inData,mdl = mtd,lcBoots = tButLC,trBoot = tButXV,trNumber = tRep,trainType="cv",trSet = 0.75,
-                                    saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 10,samStep = 1.5,
-                                    pProc = T)
+        lCurve <- prepLearningCurve(dataIn = inData,mdl = mtd,lcBoots = tButLC,trBoot = 3,trNumber = 3,trainType="cv",trSet = 0.75,
+                                    saveVarImp = F,responseVar = responseVar,posClass = posC,minSam = 100,samStep = 2,
+                                    pProc = T,excludeVars=excludeVars)
         write.table(lCurve,file=paste0(outFolderName,"/lcurves/",mN,"_lc_",mtd,".csv"),sep=',',row.names = F)
         lp <- plotLearningCurves(lCurve,tit=paste('Learning curve (',mN,' [',ncol(inData)-1,'f], ',mtd,')',sep=''),metrics = c("Kappa"))
         ggsave(plot = lp,file=paste0(outFolderName,"/lcurves/",mN,"_lc_",mtd,"_k.png"),width = 8,height = 6)

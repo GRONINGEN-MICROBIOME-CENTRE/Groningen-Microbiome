@@ -1162,7 +1162,7 @@ makeMultiSummary <- function(inDF,ftrs,nrClassesToList=2) {
 #  transformValues [def=T]: if T, does -1*log transform on p-values [Padj, Pvalue], no transformation on effect, R2, Chisq
 #  logLimit [def=10]: limit log-values to entered number
 
-plotTaxaAssociationsHeatmap <- function(phenosToPlot,
+plotTaxaAssociationsBEZIHeatmap <- function(phenosToPlot,
                                         inData,
                                         nrFeaturesToPlot = 20,
                                         featuresToPlot = "G",
@@ -1429,3 +1429,687 @@ plotTaxaAssociationsHeatmap <- function(phenosToPlot,
                 cellwidth = cellWidth,cellheight = cellHeight)
   p
 }
+
+# =================================================================
+# heatmap plotter for DAG3 phenotype-taxa associations
+# =================================================================
+# Parameters:
+# 
+#  phenosToPlot : which phenotypes to plot (must match phenotype column names, no default)
+#  inData* : loaded dataframe with associations (produced by Alex)
+#  statToPlot [def=pval]: what to plot, other options: coef, qval
+#  featuresToPlot [def=G]: which features to consider, options: "Taxa" for all taxa, "S","G","F","O","P","K" for appropriate levels
+#  clusterPhenos [def=T]: if True, clusters phenotypes
+#  sigStat [def=pval]: which stat to consider for singificance, options: qval
+#  sigStatNominal [def=pval]: which stat to consider for nominal significance, options: qval
+#  sigValue [def=0.05]: significance cutoff for sigStat
+#  sigNominal [def=0.05]: significance cutoff for sigStatNominal
+#  addText [def=Direction]: other options: "","Significance"
+#  plotValuesSig [def=all]: what to plot & color: all (no significance filter), nomSig (nominal signifiance < sigNominal) or padjSig (padj significance < sigValue)
+#  plotTextSig [def=all]:   what to put text on: all (no significance filter), nomSig (nominal signifiance < sigNominal) or padjSig (padj significance < sigValue) 
+#  transformValues [def=T]: if T, does -1*log transform on p-values [qval, pval], no transformation on effect
+#  logLimit [def=10]: limit log-values to entered number
+plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
+                                            inData,
+                                            nrFeaturesToPlot = 20,
+                                            featuresToPlot = "G",
+                                            clusterPhenos = T,
+                                            clusterFeatures = T,
+                                            sigStat = "qval",
+                                            sigStatNominal = "pval",
+                                            sigValue = 0.05, 
+                                            sigNominal = 0.05, 
+                                            statToPlot = "pval", 
+                                            addText = "Direction",
+                                            plotValuesSig = "all",
+                                            plotTextSig = "all", 
+                                            transformValues=T,
+                                            logLimit = 10.0,
+                                            sigAll = 0.9, 
+                                            textSize=15, 
+                                            colLow = "Orange", 
+                                            colHigh = "Darkblue",
+                                            colTextSize = 12,
+                                            rowTextSize = 12,
+                                            legendTextSize = 10,
+                                            cellWidth=15, 
+                                            cellHeight=15,
+                                            nrColors = 13,
+                                            flipCoords = T
+)
+{
+  # other variables
+  featuresToPlotGrep = ""
+  # ================================================
+  # ERROR CHECK:
+  # =================================================
+  print ('>> Function plotTaxaAssociationsHeatmap started ...')
+  if (!sigStat %in% c("qval","pval")) {
+    stop("ERROR: sigStat parameter MUST BE one of [pval, qval]")
+  }
+  if (!statToPlot %in% c("pval","qval","coef")) {
+    stop("ERROR: statToPlot parameter MUST BE one of [pval, qval, coef]")
+  }
+  if (!addText %in% c("","Direction","Significance")) {
+    stop(paste0("ERROR: addText parameter MUST BE one of ['Direction', 'Significance', '']"))
+  }
+  if (!plotValuesSig %in% c("all","nomSig","padjSig")) {
+    stop(paste0("ERROR: plotValuesSig parameter MUST BE one of ['all', 'nomSig', 'padjSig']"))
+  }
+  if (!plotTextSig %in% c("all","nomSig","padjSig")) {
+    stop(paste0("ERROR: plotTextSig parameter MUST BE one of ['all', 'nomSig', 'padjSig']"))
+  }
+  
+  if (featuresToPlot == "Taxa" | featuresToPlot == "All") {
+    featuresToPlotGrep = "*"
+  } else if (featuresToPlot == "S") {
+    featuresToPlotGrep = "s__"
+  } else if (featuresToPlot == "G") {
+    featuresToPlotGrep = "g__"
+  } else if (featuresToPlot == "F") {
+    featuresToPlotGrep = "f__"
+  } else if (featuresToPlot == "O") {
+    featuresToPlotGrep = "o__"
+  } else if (featuresToPlot == "P") {
+    featuresToPlotGrep = 'p__'
+  } else if (featuresToPlot == "K") {
+    featuresToPlotGrep = 'k__'
+  } else {
+    stop(paste0("ERROR: featuresToPlot MUST BE one of [Taxa | All, S, G, F, O, P, K]"))
+  }
+  # ================================================
+  
+  # load data
+  # ===========================
+  print ('> loading data')
+  inDF <- inData
+  # test for missing phenotypes
+  if (sum(inDF$metadata %in% phenosToPlot) == 0) {
+    stop(paste0("ERROR: no phenotypes could be found, check phenosToPlot & dataPath parameters!"))
+  }
+  # fix column names
+  inDFf <- inDF[inDF$metadata %in% phenosToPlot,]
+  #colnames(inDFf) <- gsub('\\.full$','\\.FullModel',colnames(inDFf))
+  toPlotValue = statToPlot
+  nominalSigParameter = sigStatNominal
+  sigParameter = sigStat
+  # test for non-existing models (statistic to plot)
+  if (!toPlotValue %in% colnames(inDFf)) {
+    stop(paste0('ERROR: stat "',statToPlot,'" + model "',modelToUse,'" does not exist in data, try different modelToUse or statToPlot!'))
+  }
+  # test for non-existing models (nominal significance)
+  if (!nominalSigParameter %in% colnames(inDFf)) {
+    stop(paste0('ERROR: stat "',nominalSigParameter,'" + model "',modelToUse,'" does not exist in data, try different modelToUse or nominalSigParameter!'))
+  }
+  # test for non-existing direction values
+  if (!directionValue %in% colnames(inDFf)) {
+    stop(paste0('ERROR: directionStat "',directionStat,'" + model "',modelToUse,'" does not exist in data, try directionStat = R2'))
+  }
+  # test for non-existing direction values
+  if (!sigParameter %in% colnames(inDFf)) {
+    stop(paste0('ERROR: sigStat "',directionStat,'" + model "',modelToUse,'" does not exist in data, try different modelToUse or sigStat!'))
+  }
+  
+  # collect data from results file
+  inDFfs <- inDFf[,c("metadata","feature",toPlotValue,sigParameter,nominalSigParameter,directionValue)]
+  # collect only values within nominal significance (as defined by parameters)
+  inDFfs <- inDFfs[inDFfs[[nominalSigParameter]] < sigAll,]
+  inDFfs <- inDFfs[complete.cases(inDFfs),]
+  colnames(inDFfs) <- c("Phenotype","Feature","ValueToPlot","Significance","NominalSig","Direction")
+  if (nrow(inDFfs) == 0) {
+    stop('WARNING: No significant results found, stopping!')
+  }
+  # shorten names
+  for (r in c(1:nrow(inDFfs))) {
+    #print(inDFfs$Taxon[r])
+    inDFfs$Feature[r] <- (purgeMGNameOne(inDFfs$Feature[r]))
+  }
+  # make wide dataframe for heatmap plotting
+  # ======================================
+  inDFwide <- reshape(inDFfs, idvar = "Phenotype", timevar = "Feature", direction = "wide")
+  # subset taxa
+  rownames(inDFwide) <- inDFwide$Phenotype
+  inDFwide <- inDFwide[,grep(featuresToPlotGrep,colnames(inDFwide))]
+  
+  # extract individual dataframes
+  # >>> DIRECTION DF
+  inDirWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^Direction',colnames(inDFwide)))]
+  colnames(inDirWide) <- gsub('Direction\\.','',colnames(inDirWide))
+  #  NAs for direction: values are 0 for purposes of plotting (no direction)
+  for (cn in colnames(inDirWide)[colnames(inDirWide)!="Phenotype"] ) {
+    inDirWide[[cn]] <- as.character(inDirWide[[cn]])
+    inDirWide[[cn]][is.na(inDirWide[[cn]])] <- "0.0"
+    inDirWide[[cn]] <- as.numeric(inDirWide[[cn]])
+    inDirWide[[cn]] <- sign(as.numeric(inDirWide[[cn]]))
+  }
+  rownames(inDirWide) <- inDirWide$Phenotype
+  inDirWide$Phenotype <- NULL
+  
+  # >>> VALUE DF
+  inValueWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^ValueToPlot',colnames(inDFwide)))]
+  colnames(inValueWide) <- gsub('ValueToPlot\\.','',colnames(inValueWide))
+  #  NAs for values:
+  #  if using p-values: values are 1 for purposes of plotting (p-value 1)
+  #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
+  if (statToPlot %in% c("pval","qval")) {
+    for (cn in colnames(inValueWide)[colnames(inValueWide)!="Phenotype"]) {
+      inValueWide[[cn]] <- as.numeric(inValueWide[[cn]])
+      inValueWide[[cn]][is.na(inValueWide[[cn]])] <- 1.0
+    }
+  } else {
+    for (cn in colnames(inValueWide)[colnames(inValueWide)!="Phenotype"]) {
+      inValueWide[[cn]] <- as.numeric(inValueWide[[cn]])
+      inValueWide[[cn]][is.na(inValueWide[[cn]])] <- 0.0
+    }
+  }
+  rownames(inValueWide) <- inValueWide$Phenotype
+  inValueWide$Phenotype <- NULL
+  
+  # >>> SIGNIFICANCE DATAFRAME (adjusted SIG)
+  inSigAdjWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^Significance',colnames(inDFwide)))]
+  colnames(inSigAdjWide) <- gsub('Significance\\.','',colnames(inSigAdjWide))
+  #  NAs for values:
+  #  if using p-values: values are 1 for purposes of plotting (p-value 1)
+  #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
+  for (cn in colnames(inSigAdjWide)[colnames(inSigAdjWide)!="Phenotype"]) {
+    inSigAdjWide[[cn]][is.na(inSigAdjWide[[cn]])] <- 1.0
+  }
+  rownames(inSigAdjWide) <- inSigAdjWide$Phenotype
+  inSigAdjWide$Phenotype <- NULL
+  
+  # >>> NOMINAL SIGNIFICANCE DATAFRAME (SIG)
+  inSigNomWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^NominalSig',colnames(inDFwide)))]
+  colnames(inSigNomWide) <- gsub('NominalSig\\.','',colnames(inSigNomWide))
+  #  NAs for values:
+  #  if using p-values: values are 1 for purposes of plotting (p-value 1)
+  #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
+  for (cn in colnames(inSigNomWide)[colnames(inSigNomWide)!="Phenotype"]) {
+    inSigNomWide[[cn]][is.na(inSigNomWide[[cn]])] <- 1.0
+  }
+  rownames(inSigNomWide) <- inSigNomWide$Phenotype
+  inSigNomWide$Phenotype <- NULL
+  
+  # >>> PREP TEXT DATAFRAME (with +/- for direction or * for significance)
+  doAddText = F
+  if (addText == "Direction") {
+    doAddText = T
+    inTextWide <- as.data.frame(inDirWide)
+    for (cn in colnames(inTextWide)[colnames(inTextWide)!="Phenotype"]) {
+      inTextWide[[cn]] <- as.character(inTextWide[[cn]])
+      inTextWide[[cn]][inTextWide[[cn]]=="1"] <- "+"
+      inTextWide[[cn]][inTextWide[[cn]]=="-1"] <- "-"
+      inTextWide[[cn]][inTextWide[[cn]]=="0"] <- ""
+      # remove nonsignificant
+      #inTextWide[[cn]][inValueWide[[cn]] > sigValue] <- ""
+    }
+  } else if (addText == "Significance") {
+    doAddText = T
+    inTextWide <- as.data.frame(inDirWide)
+    for (cn in colnames(inTextWide)[colnames(inTextWide)!="Phenotype"]) {
+      inTextWide[[cn]] <- as.character(inTextWide[[cn]])
+      inTextWide[[cn]] <- "*"
+      # remove nonsignificant
+      inTextWide[[cn]][inValueWide[[cn]] > sigValue] <- ""
+    }
+  }
+  rownames(inTextWide) <- inTextWide$Phenotype
+  inTextWide$Phenotype <- NULL
+  # >>> filter dataframes by significance if needed
+  #  > heatmap values
+  #    > filter by nominal significance
+  if (plotValuesSig == "nomSig") {
+    if (statToPlot %in% c("qval","pval")) {
+      inValueWide[inSigNomWide > sigNominal] <- 1.0
+    } else {
+      inValueWide[inSigNomWide > sigNominal] <- 0.0
+    }
+  } else if (plotValuesSig == "padjSig") {
+    if (statToPlot %in% c("qval","pval")) {
+      inValueWide[inSigAdjWide > sigValue] <- 1.0
+    } else {
+      inValueWide[inSigAdjWide > sigValue] <- 0.0
+    }
+  }
+  # > heatmap text
+  #    > filter by nominal significance or padj significance
+  if (plotTextSig == "nomSig") {
+    inTextWide[inSigNomWide > sigNominal] <- ""
+  } else if (plotTextSig == "padjSig") {
+    inTextWide[inSigAdjWide > sigValue] <- ""
+  }
+  
+  # sort dataframes by number of associations
+  dfNRAS <- as.data.frame(apply(inSigAdjWide,MARGIN = 2,FUN = function(x) {sum(x <= sigValue)}))
+  dfNRAS$Var <- rownames(dfNRAS)
+  colnames(dfNRAS) <- c("NR.Associations","Variable")
+  dfNRAS <- dfNRAS[order(dfNRAS$NR.Associations,decreasing = T),]
+  toKeep <- dfNRAS$Variable[1:nrFeaturesToPlot]
+  
+  # >>> transform values
+  if (transformValues) {
+    if (statToPlot %in% c("pval","qval")) {
+      inValueWide <- log10(inValueWide)*-1
+      for (cn in colnames(inValueWide)) {
+        inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+      }
+    } else {
+      inValueWide <- abs(inValueWide)
+    }
+  }
+  # >>> now multiply values by direction (for coloring of the plot)
+  inValueMulWide <- inValueWide*inDirWide
+  
+  # >>> make heatmap
+  # ==================================
+  plotDFValues <- inValueMulWide[colnames(inValueMulWide) %in% toKeep]
+  plotDFText <- inTextWide[colnames(inTextWide) %in% toKeep]
+  
+  # set colors
+  plotDFValues <- inValueMulWide[colnames(inValueMulWide) %in% toKeep]
+  plotDFText <- inTextWide[colnames(inTextWide) %in% toKeep]
+  
+  paletteLength <- nrColors
+  myColor <- colorRampPalette(c(colLow, "white", colHigh))(paletteLength)
+  myBreaks <- c(seq(min(plotDFValues), 0, length.out=ceiling(paletteLength/2) + 1), 
+                seq(max(plotDFValues)/paletteLength, max(plotDFValues), length.out=floor(paletteLength/2)))
+  if (flipCoords) {
+    plotDFValues <- t.data.frame(plotDFValues)
+    plotDFText <- t.data.frame(plotDFText)
+  }
+  p <- pheatmap(plotDFValues,annotation_row = NULL,annotation_names_row = T,labels_row = rownames(plotDFValues),legend = T,
+                show_rownames = T, cluster_rows = clusterPhenos,cluster_cols = clusterFeatures,angle_col = 90,
+                fontsize_number = textSize,border_color = "#EEEEEE",na_col = "white",fontsize = legendTextSize,
+                treeheight_row = 0, treeheight_col = 0,legend_labels = "log(p-value)",color = myColor,
+                fontsize_col = colTextSize,fontsize_row = rowTextSize,display_numbers = plotDFText,breaks = myBreaks,
+                cellwidth = cellWidth,cellheight = cellHeight)
+  p
+}
+
+# =================================================================
+# heatmap plotter for DAG3 phenotype-feature associations (V2)
+# =================================================================
+# Notes:
+#   V1 uses (now obsolete) BEZI models, this one uses new batch of Alex's results
+# Parameters:
+# 
+#  phenosToPlot : which phenotypes to plot (must match phenotype column names, no default)
+#  inData* : loaded dataframe with associations (produced by Alex)
+#  statToPlot [def=pval]: what to plot, other options: coef, qval
+#  featuresToPlot [def=G]: which features to consider, options: "Taxa" for all taxa, "S","G","F","O","P","K" for appropriate levels
+#  clusterPhenos [def=T]: if True, clusters phenotypes
+#  sigStat [def=pval]: which stat to consider for singificance, options: qval
+#  sigStatNominal [def=pval]: which stat to consider for nominal significance, options: qval
+#  sigValue [def=0.05]: significance cutoff for sigStat
+#  sigNominal [def=0.05]: significance cutoff for sigStatNominal
+#  addText [def=Direction]: other options: "","Significance"
+#  plotValuesSig [def=all]: what to plot & color: all (no significance filter), nomSig (nominal signifiance < sigNominal) or padjSig (padj significance < sigValue)
+#  plotTextSig [def=all]:   what to put text on: all (no significance filter), nomSig (nominal signifiance < sigNominal) or padjSig (padj significance < sigValue) 
+#  transformValues [def=T]: if T, does -1*log transform on p-values [qval, pval], no transformation on effect
+#  logLimit [def=10]: limit log-values to entered number
+plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
+                                          inData,
+                                          nrFeaturesToPlot = 20,
+                                          featuresToPlot = "G",
+                                          dataType = "taxon",
+                                          clusterPhenos = T,
+                                          clusterFeatures = T,
+                                          sigStat = "PadjBH",
+                                          sigStatNominal = "Pvalue",
+                                          sigValue = 0.05, 
+                                          sigNominal = 0.05, 
+                                          statToPlot = "Pvalue", 
+                                          addText = "Direction",
+                                          plotValuesSig = "nomSig",
+                                          plotTextSig = "padjSig", 
+                                          transformValues=T,
+                                          logLimit = 10.0,
+                                          sigAll = 0.9, 
+                                          textSize=15, 
+                                          colLow = "Orange", 
+                                          colHigh = "Darkblue",
+                                          colTextSize = 12,
+                                          rowTextSize = 12,
+                                          legendTextSize = 10,
+                                          cellWidth=15, 
+                                          cellHeight=15,
+                                          nrColors = 13,
+                                          flipCoords = T,
+                                          doRefactor=F,
+                                          refactorIncludeAllClasses=F
+)
+
+{
+  # other variables
+  featuresToPlotGrep = ""
+  # ================================================
+  # ERROR CHECK:
+  # =================================================
+  print ('>> Function plotTaxaAssociationsHeatmap started ...')
+  if (!sigStat %in% c("Pvalue",	"PadjBH","PadjBonferroni") ) {
+    stop("ERROR: sigStat parameter MUST BE one of [Pvalue, PadjBH, PadjBonferroni]")
+  }
+  if (!statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni","F.stat","R2","effect.size") ) {
+    stop("ERROR: statToPlot parameter MUST BE one of [Pvalue, PadjBH, PadjBonferroni, R2, F.stat, effect.size]")
+  }
+  if (!addText %in% c("","Direction","Significance")) {
+    stop(paste0("ERROR: addText parameter MUST BE one of ['Direction', 'Significance', '']"))
+  }
+  if (!plotValuesSig %in% c("all","nomSig","padjSig")) {
+    stop(paste0("ERROR: plotValuesSig parameter MUST BE one of ['all', 'nomSig', 'padjSig']"))
+  }
+  if (!plotTextSig %in% c("all","nomSig","padjSig")) {
+    stop(paste0("ERROR: plotTextSig parameter MUST BE one of ['all', 'nomSig', 'padjSig']"))
+  }
+  if (!dataType %in% c("taxon","pathway")) {
+    stop(paste0("ERROR: dataType parameter MUST BE one of ['taxon', 'pathway']"))
+  }
+  
+  if (featuresToPlot == "All") {
+    featuresToPlotGrep = "*"
+  } else if (featuresToPlot == "Taxa") {
+    featuresToPlotGrep = "[sgfopk]__"
+  } else if (featuresToPlot == "S") {
+    featuresToPlotGrep = "s__"
+  } else if (featuresToPlot == "G") {
+    featuresToPlotGrep = "g__"
+  } else if (featuresToPlot == "F") {
+    featuresToPlotGrep = "f__"
+  } else if (featuresToPlot == "O") {
+    featuresToPlotGrep = "o__"
+  } else if (featuresToPlot == "P") {
+    featuresToPlotGrep = 'p__'
+  } else if (featuresToPlot == "K") {
+    featuresToPlotGrep = 'k__'
+  } else {
+    stop(paste0("ERROR: featuresToPlot MUST BE one of [Taxa | All, S, G, F, O, P, K]"))
+  }
+  # ================================================
+  
+  # load data
+  # ===========================
+  print ('> loading data')
+  inDF <- inData
+  # test for missing phenotypes
+  if (sum(inDF$phenotype %in% phenosToPlot) == 0) {
+    stop(paste0("ERROR: no phenotypes could be found, check phenosToPlot & dataPath parameters!"))
+  }
+  # fix column names
+  inDFf <- inDF[inDF$phenotype %in% phenosToPlot,]
+  #colnames(inDFf) <- gsub('\\.full$','\\.FullModel',colnames(inDFf))
+  toPlotValue = statToPlot
+  nominalSigParameter = sigStatNominal
+  sigParameter = sigStat
+  directionValue = "effect.size"
+  # test for non-existing models (statistic to plot)
+  if (!toPlotValue %in% colnames(inDFf)) {
+    stop(paste0('ERROR: stat "',statToPlot,' does not exist in data, try different statToPlot!'))
+  }
+  # test for non-existing models (nominal significance)
+  if (!nominalSigParameter %in% colnames(inDFf)) {
+    stop(paste0('ERROR: stat "',nominalSigParameter,' does not exist in data, try different nominalSigParameter!'))
+  }
+  # test for non-existing direction values
+  if (!directionValue %in% colnames(inDFf)) {
+    stop(paste0('ERROR: directionStat "',directionStat,' does not exist in data, try directionStat = R2'))
+  }
+  # test for non-existing direction values
+  if (!sigParameter %in% colnames(inDFf)) {
+    stop(paste0('ERROR: sigStat "',directionStat,' does not exist in data, try different sigStat!'))
+  }
+  
+
+  # ================================================================
+  # > refactor: keep 2nd and other factors, make new variables for each of there
+  # NOTE: we only do this if we plot direction!
+  # otherwise direction is average of all directions!
+  # ================================================================
+  if (doRefactor) {
+    print ('reshaping factor results to long table')
+    # refactor factor variables into multiple variables
+    # > find factors
+    phenosUnique <- unique(inDFf$phenotype)
+    phenosFac <- c()
+    for (ph in phenosUnique) {
+      tt <- inDFf$levels[inDFf$phenotype == ph][1]
+      #print(tt)
+      if (grepl('\\:', tt)) {
+        phenosFac <- c(phenosFac,ph)
+      }
+    }
+    #inDFfbak <- inDFf
+    print ('reshaping factor results to long table')
+    cntr = 0
+    newDFlist <- list() # accumulate in list for speed
+    for (ph in phenosFac) {
+      phDF <- inDFf[inDFf$phenotype==ph,]
+      inDFf <- inDFf[inDFf$phenotype!=ph,]
+      phLvls <- phDF$levels[phDF$phenotype == ph][1]
+      print(paste0(' > refactoring ',ph,' <levels: ',phLvls,'>'))
+      for (cc in c(1:nrow(phDF))) {
+        oneRow <- phDF[cc,]
+        splitLvls <- unlist(strsplit(oneRow$levels,':')) # levels split
+        splitSS <- unlist(strsplit(oneRow$levels_SampleSize,':'))   # sample size split
+        splitES <- unlist(strsplit(oneRow$effect.size,':'))  # effect size split
+        if (refactorIncludeAllClasses) {startC = 1} else {startC = 2}
+        for (ln in c(startC:length(splitLvls))) {
+          newRow <- data.frame(phenotype=paste0(oneRow$phenotype,'.C',ln-1,'_',splitLvls[ln]),
+                               taxon=oneRow$taxon,
+                               Nsamples=oneRow$Nsamples,
+                               levels=splitLvls[ln],
+                               levels_SampleSize=splitSS[ln],
+                               effect.size=splitES[ln],
+                               effect.size.asInteger=oneRow$effect.size.asInteger,
+                               R2=oneRow$R2,
+                               F.stat=oneRow$F.stat,
+                               Pvalue=oneRow$Pvalue,
+                               PadjBH=oneRow$PadjBH,
+                               PadjBonferroni=oneRow$PadjBonferroni)
+          cntr <- cntr+1
+          newDFlist[[cntr]] <- newRow
+        }
+      }
+    }
+    print ('  > making dataframe')
+    newDF <- do.call(rbind.data.frame, newDFlist)
+    print ('  > sorting dataframe')
+    newDF <- newDF[order(newDF$phenotype),]
+    print ('  > merging with original')
+    inDFf <- rbind.data.frame(inDFf,newDF)
+    print ('reshaping done!')
+  } else {
+    # average directions: if 2 classes, take 2nd, if > 3 classes, take average
+    for (cc in c(1:nrow(inDFf))) {
+      oneRow <- inDFf[cc,]
+      if (grepl('\\:',oneRow$effect.size)) {
+        splitLvls <- unlist(strsplit(oneRow$levels,':')) # levels split
+        #splitSS <- unlist(strsplit(oneRow$levels_SampleSize,':'))   # sample size split
+        splitES <- unlist(strsplit(oneRow$effect.size,':'))  # effect size split
+        if (length(splitLvls==2)) {
+          oneRow$effect.size <- splitES[2]
+          inDFf[cc,] <- oneRow
+        } else {
+          oneRow$effect.size <- oneRow$effect.size.asInteger
+          inDFf[cc,] <- oneRow
+        }
+      }
+    }
+  }
+  
+  # collect data from results file
+  inDFfs <- inDFf[,c("phenotype",dataType,statToPlot,sigParameter,nominalSigParameter,directionValue)]
+  # collect only values within nominal significance (as defined by parameters)
+  inDFfs <- inDFfs[inDFfs[[nominalSigParameter]] < sigAll,]
+  inDFfs <- inDFfs[complete.cases(inDFfs),]
+  colnames(inDFfs) <- c("Phenotype","Feature","ValueToPlot","Significance","NominalSig","Direction")
+  if (nrow(inDFfs) == 0) {
+    stop('WARNING: No significant results found, stopping!')
+  }
+  # shorten names
+  if (dataType=="taxon") {
+    for (r in c(1:nrow(inDFfs))) {
+      #print(inDFfs$Taxon[r])
+      inDFfs$Feature[r] <- (purgeMGNameOne(inDFfs$Feature[r]))
+    }
+  }
+  
+  # make wide dataframe for heatmap plotting
+  # ======================================
+  inDFwide <- reshape(inDFfs, idvar = "Phenotype", timevar = "Feature", direction = "wide")
+  # subset taxa
+  rownames(inDFwide) <- inDFwide$Phenotype
+  inDFwide <- inDFwide[,grep(featuresToPlotGrep,colnames(inDFwide))]
+  
+  # extract individual dataframes
+  # >>> DIRECTION DF
+  inDirWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^Direction',colnames(inDFwide)))]
+  colnames(inDirWide) <- gsub('Direction\\.','',colnames(inDirWide))
+  #  NAs for direction: values are 0 for purposes of plotting (no direction)
+  for (cn in colnames(inDirWide)[colnames(inDirWide)!="Phenotype"] ) {
+    inDirWide[[cn]] <- as.character(inDirWide[[cn]])
+    inDirWide[[cn]][is.na(inDirWide[[cn]])] <- "0.0"
+    inDirWide[[cn]] <- as.numeric(inDirWide[[cn]])
+    inDirWide[[cn]] <- sign(as.numeric(inDirWide[[cn]]))
+  }
+  # rownames(inDirWide) <- inDirWide$Phenotype
+  # inDirWide$Phenotype <- NULL
+  
+  # >>> VALUE DF
+  inValueWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^ValueToPlot',colnames(inDFwide)))]
+  colnames(inValueWide) <- gsub('ValueToPlot\\.','',colnames(inValueWide))
+  #  NAs for values:
+  #  if using p-values: values are 1 for purposes of plotting (p-value 1)
+  #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
+  if (statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni")) {
+    for (cn in colnames(inValueWide)[colnames(inValueWide)!="Phenotype"]) {
+      inValueWide[[cn]] <- as.numeric(inValueWide[[cn]])
+      inValueWide[[cn]][is.na(inValueWide[[cn]])] <- 1.0
+    }
+  } else {
+    for (cn in colnames(inValueWide)[colnames(inValueWide)!="Phenotype"]) {
+      inValueWide[[cn]] <- as.numeric(inValueWide[[cn]])
+      inValueWide[[cn]][is.na(inValueWide[[cn]])] <- 0.0
+    }
+  }
+  # rownames(inValueWide) <- inValueWide$Phenotype
+  # inValueWide$Phenotype <- NULL
+  
+  # >>> SIGNIFICANCE DATAFRAME (adjusted SIG)
+  inSigAdjWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^Significance',colnames(inDFwide)))]
+  colnames(inSigAdjWide) <- gsub('Significance\\.','',colnames(inSigAdjWide))
+  #  NAs for values:
+  #  if using p-values: values are 1 for purposes of plotting (p-value 1)
+  #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
+  for (cn in colnames(inSigAdjWide)[colnames(inSigAdjWide)!="Phenotype"]) {
+    inSigAdjWide[[cn]][is.na(inSigAdjWide[[cn]])] <- 1.0
+  }
+  # rownames(inSigAdjWide) <- inSigAdjWide$Phenotype
+  # inSigAdjWide$Phenotype <- NULL
+  
+  # >>> NOMINAL SIGNIFICANCE DATAFRAME (SIG)
+  inSigNomWide <- inDFwide[,c(grep('^Phenotype',colnames(inDFwide)),grep('^NominalSig',colnames(inDFwide)))]
+  colnames(inSigNomWide) <- gsub('NominalSig\\.','',colnames(inSigNomWide))
+  #  NAs for values:
+  #  if using p-values: values are 1 for purposes of plotting (p-value 1)
+  #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
+  for (cn in colnames(inSigNomWide)[colnames(inSigNomWide)!="Phenotype"]) {
+    inSigNomWide[[cn]][is.na(inSigNomWide[[cn]])] <- 1.0
+  }
+  # rownames(inSigNomWide) <- inSigNomWide$Phenotype
+  # inSigNomWide$Phenotype <- NULL
+  
+  # >>> PREP TEXT DATAFRAME (with +/- for direction or * for significance)
+  doAddText = F
+  if (addText == "Direction") {
+    doAddText = T
+    inTextWide <- as.data.frame(inDirWide)
+    for (cn in colnames(inTextWide)[colnames(inTextWide)!="Phenotype"]) {
+      inTextWide[[cn]] <- as.character(inTextWide[[cn]])
+      inTextWide[[cn]][inTextWide[[cn]]=="1"] <- "+"
+      inTextWide[[cn]][inTextWide[[cn]]=="-1"] <- "-"
+      inTextWide[[cn]][inTextWide[[cn]]=="0"] <- ""
+      # remove nonsignificant
+      #inTextWide[[cn]][inValueWide[[cn]] > sigValue] <- ""
+    }
+  } else if (addText == "Significance") {
+    doAddText = T
+    inTextWide <- as.data.frame(inDirWide)
+    for (cn in colnames(inTextWide)[colnames(inTextWide)!="Phenotype"]) {
+      inTextWide[[cn]] <- as.character(inTextWide[[cn]])
+      inTextWide[[cn]] <- "*"
+      # remove nonsignificant
+      inTextWide[[cn]][inValueWide[[cn]] > sigValue] <- ""
+    }
+  }
+  # rownames(inTextWide) <- inTextWide$Phenotype
+  # inTextWide$Phenotype <- NULL
+  # >>> filter dataframes by significance if needed
+  #  > heatmap values
+  #    > filter by nominal significance
+  if (plotValuesSig == "nomSig") {
+    if (statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni")) {
+      inValueWide[inSigNomWide > sigNominal] <- 1.0
+    } else {
+      inValueWide[inSigNomWide > sigNominal] <- 0.0
+    }
+  } else if (plotValuesSig == "padjSig") {
+    if (statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni")) {
+      inValueWide[inSigAdjWide > sigValue] <- 1.0
+    } else {
+      inValueWide[inSigAdjWide > sigValue] <- 0.0
+    }
+  }
+  # > heatmap text
+  #    > filter by nominal significance or padj significance
+  if (plotTextSig == "nomSig") {
+    inTextWide[inSigNomWide > sigNominal] <- ""
+  } else if (plotTextSig == "padjSig") {
+    inTextWide[inSigAdjWide > sigValue] <- ""
+  }
+  
+  # sort dataframes by number of associations
+  dfNRAS <- as.data.frame(apply(inSigAdjWide,MARGIN = 2,FUN = function(x) {sum(x <= sigValue)}))
+  dfNRAS$Var <- rownames(dfNRAS)
+  colnames(dfNRAS) <- c("NR.Associations","Variable")
+  dfNRAS <- dfNRAS[order(dfNRAS$NR.Associations,decreasing = T),]
+  toKeep <- dfNRAS$Variable[1:nrFeaturesToPlot]
+  
+  # >>> transform values
+  if (transformValues) {
+    if (statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni")) {
+      inValueWide <- log10(inValueWide)*-1
+      for (cn in colnames(inValueWide)) {
+        inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+      }
+    } else {
+      inValueWide <- abs(inValueWide)
+    }
+  }
+  # >>> now multiply values by direction (for coloring of the plot)
+  inValueMulWide <- inValueWide*inDirWide
+  
+  # >>> make heatmap
+  # ==================================
+  plotDFValues <- inValueMulWide[colnames(inValueMulWide) %in% toKeep]
+  plotDFText <- inTextWide[colnames(inTextWide) %in% toKeep]
+  
+  # set colors
+  plotDFValues <- inValueMulWide[colnames(inValueMulWide) %in% toKeep]
+  plotDFText <- inTextWide[colnames(inTextWide) %in% toKeep]
+  
+  paletteLength <- nrColors
+  myColor <- colorRampPalette(c(colLow, "white", colHigh))(paletteLength)
+  myBreaks <- c(seq(min(plotDFValues), 0, length.out=ceiling(paletteLength/2) + 1), 
+                seq(max(plotDFValues)/paletteLength, max(plotDFValues), length.out=floor(paletteLength/2)))
+  if (flipCoords) {
+    plotDFValues <- t.data.frame(plotDFValues)
+    plotDFText <- t.data.frame(plotDFText)
+  }
+  p <- pheatmap(plotDFValues,annotation_row = NULL,annotation_names_row = T,labels_row = rownames(plotDFValues),legend = T,
+                show_rownames = T, cluster_rows = clusterFeatures,cluster_cols = clusterPhenos,angle_col = 90,
+                fontsize_number = textSize,border_color = "#EEEEEE",na_col = "white",fontsize = legendTextSize,
+                treeheight_row = 0, treeheight_col = 0,legend_labels = "sig*log(p-value)",color = myColor,
+                fontsize_col = colTextSize,fontsize_row = rowTextSize,display_numbers = plotDFText,breaks = myBreaks,
+                cellwidth = cellWidth,cellheight = cellHeight)
+  p
+}
+
