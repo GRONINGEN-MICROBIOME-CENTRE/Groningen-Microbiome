@@ -1,9 +1,10 @@
 ---
-title: "Metabolites_analysis_v3"
+title: "Metabolites_analysis_v5"
 author: "Arnau Vich"
-date: "4/14/2020"
+date: "6/27/2020"
 output: html_document
 ---
+
 
 Introduction
 ===
@@ -858,7 +859,7 @@ q_mtb_t= t(apply(q_mtb_t, 1, function(b) {
 ### WARNING: KNN imputation takes a while, take a nap or a coffee (in case of re-run save and load results of this stage)
 q_mtb=impute_missing_values(q_mtb_t,samples_row = T, method = "knn", missing_filter = 0)
 rownames(q_mtb)=row.names(q_mtb_t)
-write.table(q_mtb, "~/Documents/Project_Metabolome/1.Input_files/Imputed_metabolites_clr_v4", sep = "\t",quote = F)
+write.table(q_mtb, "~/Documents/Project_Metabolome/6.Results/knn_Imputed_metabolites_clr.txt", sep = "\t",quote = F)
 
 q_mtb=as.data.frame(q_mtb)
 ```
@@ -879,7 +880,7 @@ __Summary statistics on transformed & filtered metabolites__
 
 ```{r, echo=F}
 #Transformed data
-summary_met_trans=summary_stats(q_mtb, select)
+summary_met_trans=summary_stats(q_mtb, select, missing_vals = "NA")
 summary_met_trans=as.data.frame(summary_met_trans)
 write.table(summary_met_trans, "~/Documents/Project_Metabolome/4.Summary_stats/Metabolites_summary_post_filtering_2020_v3", sep = "\t", quote = F)
 ```
@@ -1122,7 +1123,7 @@ cmp_log3=merge(montreal,cmp_log2, by="row.names")
 cmp_log4=cmp_log3[,c("Row.names","PC1","PC2","ibd_montreal_B","ibd_montreal_Bperianal","ibd_montreal_S","ibd_montreal_A","ibd_Montreal_L","ibd_MontrealE")]
 cmp_log4=melt(cmp_log4, id.vars=c("Row.names","PC1","PC2"))
 
-ggplot(cmp_log4, aes(-PC1,PC2, color=value)) + geom_point() + theme_bw() + facet_wrap(.~ variable , ncol=2) + scale_color_manual(values=c("lightsalmon","tomato","red4","lightsalmon","tomato","red4","gray88","lightcyan2","lightblue2","steelblue1","lightcyan2","lightblue2","steelblue1","blue3", "black", "lightsalmon","tomato","red", "red4", "red1","snow" ))
+ggplot(cmp_log4, aes(PC1,PC2, color=value)) + geom_point() + theme_bw() + facet_wrap(.~ variable , ncol=2) + scale_color_manual(values=c("lightsalmon","tomato","red4","lightsalmon","tomato","red4","gray88","lightcyan2","lightblue2","steelblue1","lightcyan2","lightblue2","steelblue1","blue3", "black", "lightsalmon","tomato","red", "red4", "red1","snow" ))
 
 table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_Bperianal)
 table(cmp_log3$ibd_Diagnosis,cmp_log3$ibd_montreal_B)
@@ -1172,7 +1173,7 @@ cmp_clr3=merge(montreal,cmp_clr2, by="row.names")
 cmp_clr4=cmp_clr3[,c("Row.names","PC1","PC2","ibd_montreal_B","ibd_montreal_Bperianal","ibd_montreal_S","ibd_montreal_A","ibd_Montreal_L","ibd_MontrealE")]
 cmp_clr4=melt(cmp_clr4, id.vars=c("Row.names","PC1","PC2"))
 
-ggplot(cmp_clr4, aes(PC1,-PC2, color=value)) + geom_point() + theme_bw() + facet_wrap(.~ variable , ncol=2) + scale_color_manual(values=c("lightsalmon","tomato","red4","lightsalmon","tomato","red4","gray88","lightcyan2","lightblue2","steelblue1","lightcyan2","lightblue2","steelblue1","blue3", "black", "lightsalmon","tomato","red", "red4", "red1","snow" ))
+ggplot(cmp_clr4, aes(PC1,PC2, color=value)) + geom_point() + theme_bw() + facet_wrap(.~ variable , ncol=2) + scale_color_manual(values=c("lightsalmon","tomato","red4","lightsalmon","tomato","red4","gray88","lightcyan2","lightblue2","steelblue1","lightcyan2","lightblue2","steelblue1","blue3", "black", "lightsalmon","tomato","red", "red4", "red1","snow" ))
 
 ```
 
@@ -1250,14 +1251,57 @@ colnames(rgs_mb2)=colnames(rgs_mb)[7:ncol(rgs_mb)]
 
 ```{r}
 #Select metabolite annotation
-library(ggcorrplot)
+library ("Hmisc")
 annot_v2=annot
 annot_v2$SUB.PATHWAY=NULL
 annot_v2=subset(annot_v2, rownames(annot_v2) %in% colnames(rgs_mb2))
-cor_metabolites=cor(rgs_mb2, method = "spearman")
-cor_p=cor_pmat(rgs_mb2)
-#heatmaply_cor(cor(rgs_mb2, method = "spearman"), showticklabels = c(FALSE, FALSE), main ="Spearman correlation between metabolites", plot_method = 'plotly', scale="none", row_side_colors =annot_v2)
-#ggcorrplot(cor_metabolites, hc.order = TRUE, outline.col = "white", colors = c("#6D9EC1", "white", "#E46726"), type = "upper", p.mat = cor_p, insig = "blank", tl.cex=0.9)
+cor_metabolites=rcorr(as.matrix(q_mtb), type="spearman")
+cor_metabolites_coef=cor_metabolites$r
+cor_metabolites_pval=cor_metabolites$P
+cor_coef=melt(cor_metabolites_coef)
+cor_pval=melt(cor_metabolites_pval)
+cor_coef$pvalue=cor_pval$value
+write.table(cor_coef, "~/Documents/Project_Metabolome/6.Results/072020/Correlation_corrected_metabolites.txt", sep = "\t", quote = F)
+
+cor_mtbs=cor_coef
+
+my_IBD=row.names(cc_pheno)[cc_pheno$ibd_Diagnosis!="Control"]
+my_CNT=row.names(cc_pheno)[cc_pheno$ibd_Diagnosis=="Control"]
+
+IBDqmtb=subset(q_mtb, rownames(q_mtb) %in% my_IBD)
+cor_metabolites=rcorr(as.matrix(IBDqmtb), type="spearman")
+cor_metabolites_coef=cor_metabolites$r
+cor_metabolites_pval=cor_metabolites$P
+cor_coef=melt(cor_metabolites_coef)
+cor_pval=melt(cor_metabolites_pval)
+cor_coef$pvalue=cor_pval$value
+write.table(cor_coef, "~/Documents/Project_Metabolome/6.Results/072020/Correlation_metabolites_IBD.txt", sep = "\t", quote = F)
+
+CNTqmtb=subset(q_mtb, rownames(q_mtb) %in% my_CNT)
+cor_metabolites=rcorr(as.matrix(CNTqmtb), type="spearman")
+cor_metabolites_coef=cor_metabolites$r
+cor_metabolites_pval=cor_metabolites$P
+cor_coef=melt(cor_metabolites_coef)
+cor_pval=melt(cor_metabolites_pval)
+cor_coef$pvalue=cor_pval$value
+write.table(cor_coef, "~/Documents/Project_Metabolome/6.Results/072020/Correlation_metabolites_CNT.txt", sep = "\t", quote = F)
+
+
+mynet=graph.adjacency(as.matrix(as.dist(cor(CNTqmtb, method = "spearman"))), mode = "undirected", weighted = T, diag = F)
+mynet=simplify(mynet, remove.multiple = T, remove.loops = T)
+# Colour negative correlation edges as blue
+E(mynet)[which(E(mynet)$weight<0)]$color <- "darkblue"
+
+# Colour positive correlation edges as red
+E(mynet)[which(E(mynet)$weight>0)]$color <- "darkred"
+
+# Convert edge weights to absolute values
+E(mynet)$weight <- abs(E(mynet)$weight)
+
+mynet <- delete_edges(mynet, E(mynet)[which(E(mynet)$weight<0.6)])
+
+mynet <- delete.vertices(mynet, degree(mynet)==0)
+
 ```
 
 
@@ -1290,9 +1334,9 @@ clus_mtb=q_mtb[row.names(q_mtb) %in% row.names(clus_pheno),]
 clus_mtb=clus_mtb[order(row.names(clus_mtb)),]
 table(row.names(clus_mtb)==row.names(clus_pheno))
 
-write.table(clus_mtb, "~/Documents/Project_Metabolome/1.Input_files/clst_mtb2", sep="\t", quote = F)
-write.table(clus_pheno, "~/Documents/Project_Metabolome/1.Input_files/clst_pheno2", sep="\t", quote = F)
-write.table(clus_taxa, "~/Documents/Project_Metabolome/1.Input_files/clst_taxa2", sep="\t", quote = F)
+#write.table(clus_mtb, "~/Documents/Project_Metabolome/1.Input_files/clst_mtb2", sep="\t", quote = F)
+#write.table(clus_pheno, "~/Documents/Project_Metabolome/1.Input_files/clst_pheno2", sep="\t", quote = F)
+#write.table(clus_taxa, "~/Documents/Project_Metabolome/1.Input_files/clst_taxa2", sep="\t", quote = F)
 
 
 #Run in Boxy (hpc cluster)
@@ -1300,9 +1344,9 @@ write.table(clus_taxa, "~/Documents/Project_Metabolome/1.Input_files/clst_taxa2"
 #ml Rplust
 #library (iClusterPlus)
 
-clus_mtb=read.table("./clst_mtb2", sep = "\t", header = T, row.names = 1)
-clus_taxa=read.table("./clst_taxa2", sep = "\t", header = T, row.names = 1)
-clus_pheno=read.table("./clst_pheno2", sep = "\t", header = T, row.names = 1)
+clus_mtb=read.table("~/Documents/Project_Metabolome/1.Input_files/clst_mtb2", sep = "\t", header = T, row.names = 1)
+clus_taxa=read.table("~/Documents/Project_Metabolome/1.Input_files/clst_taxa2", sep = "\t", header = T, row.names = 1)
+clus_pheno=read.table("~/Documents/Project_Metabolome/1.Input_files/clst_pheno2", sep = "\t", header = T, row.names = 1)
 
 #test 1 to 5 clusters
 
@@ -1336,7 +1380,7 @@ for(i in 1:nK){
 clusters=getClusters(output)
 rownames(clusters)=rownames(clus_mtb)
 colnames(clusters)=paste("K=",2:(length(output)+1),sep="")
-write.table(clusters, file="./clusterMembership.txt",sep='\t',quote=F)
+write.table(clusters, file="~/Documents/Project_Metabolome/6.Results/072020/clusterMembership_iCluster.txt",sep='\t',quote=F)
 
 #Inspect visualy the number of clusters to use
 
@@ -1458,9 +1502,9 @@ new_pc_mtb2=new_pc_mtb2[order (new_pc_mtb2$cluster),]
 new_clus_mtb2=clus_mtb[(row.names(new_pc_mtb2)),]
 new_clus_mtb3=new_clus_mtb2[ ,colnames(new_clus_mtb2) %in% sigfeatures[[1]] ]
 
-pheatmap(t(new_clus_mtb2), cluster_cols = F, cluster_rows = T,show_rownames = T, breaks = seq(-10,10,length.out=20),gaps_col= c(head(as.numeric(cumsum(table(new_pc_mtb2$cluster)))), -1),show_colnames = F, annotation_col = new_pc_mtb2, scale = "none", color = inferno(20),fontsize = 5, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "Control"="white", "IBDU"="black"),cluster=c("c_1"="black","c_2"="firebrick2","c_3"="lightblue2","c_4"="gold2" ), ibd_ActiveDisease=c("Control"="white", "Active"="red3", "NotActive"="lightblue1"), ibd_DiseaseLocation=c("Control"="white","colon"="green","ileum"="darkred","both"="gold3")))
+#pheatmap(t(new_clus_mtb2), cluster_cols = F, cluster_rows = T,show_rownames = T, breaks = seq(-10,10,length.out=20),gaps_col= c(head(as.numeric(cumsum(table(new_pc_mtb2$cluster)))), -1),show_colnames = F, annotation_col = new_pc_mtb2, scale = "none", color = inferno(20),fontsize = 5, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "Control"="white", "IBDU"="black"),cluster=c("c_1"="black","c_2"="firebrick2","c_3"="lightblue2","c_4"="gold2" ), ibd_ActiveDisease=c("Control"="white", "Active"="red3", "NotActive"="lightblue1"), ibd_DiseaseLocation=c("Control"="white","colon"="green","ileum"="darkred","both"="gold3")))
 
-pheatmap(t(new_clus_mtb3), cluster_cols = F, cluster_rows = F,show_rownames = F, gaps_col= c(head(as.numeric(cumsum(table(new_pc_mtb2$cluster)))), -1),show_colnames = F, annotation_col = new_pc_mtb2, scale = "none", color = inferno(20),fontsize = 5, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "Control"="white", "IBDU"="black"),cluster=c("c_1"="black","c_2"="firebrick2","c_3"="lightblue2","c_4"="gold2" ), ibd_ActiveDisease=c("Control"="white", "Active"="red3", "NotActive"="lightblue1"), ibd_DiseaseLocation=c("Control"="white","colon"="green","ileum"="darkred","both"="gold3")))
+#pheatmap(t(new_clus_mtb3), cluster_cols = F, cluster_rows = F,show_rownames = F, gaps_col= c(head(as.numeric(cumsum(table(new_pc_mtb2$cluster)))), -1),show_colnames = F, annotation_col = new_pc_mtb2, scale = "none", color = inferno(20),fontsize = 5, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "Control"="white", "IBDU"="black"),cluster=c("c_1"="black","c_2"="firebrick2","c_3"="lightblue2","c_4"="gold2" ), ibd_ActiveDisease=c("Control"="white", "Active"="red3", "NotActive"="lightblue1"), ibd_DiseaseLocation=c("Control"="white","colon"="green","ileum"="darkred","both"="gold3")))
 
 new_clus_tx2=clus_taxa[(row.names(new_pc_mtb2)),]
 pheatmap(t(new_clus_tx2), cluster_cols = F, cluster_rows = T,show_rownames = T,breaks = seq(-10,10,length.out=10), gaps_col= c(head(as.numeric(cumsum(table(new_pc_mtb2$cluster)))), -1),show_colnames = F, annotation_col = new_pc_mtb2, scale = "none", color = inferno(10),fontsize = 5, annotation_colors = list ( ibd_Diagnosis=c("CD"="firebrick2", "UC"="blue2", "Control"="white", "IBDU"="black"),cluster=c("c_1"="black","c_2"="firebrick2","c_3"="lightblue2","c_4"="gold2" ), ibd_ActiveDisease=c("Control"="white", "Active"="red3", "NotActive"="lightblue1"), ibd_DiseaseLocation=c("Control"="white","colon"="green","ileum"="darkred","both"="gold3")))
@@ -1513,6 +1557,8 @@ m_clus_res_mtb$FDR=p.adjust(m_clus_res_mtb$value, method = "BH")
 m_clus_res_mtb=dcast(m_clus_res_mtb, formula=Feature~variable, value.var="FDR")
 a_report_mtb=merge(clus_stats_mtb,m_clus_res_mtb, by.x="Metabolite", by.y="Feature")
 
+#write.table(a_report_mtb, "~/Documents/Project_Metabolome/6.Results/072020/iCluster_enriched_metabolites.txt", quote = F, sep = "\t")
+
 ct=merge(clus_sel,clus_taxa, by="row.names")
 
 flag=1
@@ -1535,6 +1581,8 @@ m_clus_res_taxa=dcast(m_clus_res_taxa, formula=Feature~variable, value.var="FDR"
 a_report_taxa=merge(clus_stats_taxa,m_clus_res_taxa, by.x="Metabolite", by.y="Feature")
 
 
+#write.table(a_report_taxa, "~/Documents/Project_Metabolome/6.Results/072020/iCluster_enriched_taxa.txt", quote = F, sep = "\t")
+
 cb=merge(clus_sel,bcg_fil_trans, by="row.names")
 
 flag=1
@@ -1556,9 +1604,9 @@ m_clus_res_bgc=dcast(m_clus_res_bgc, formula=Feature~variable, value.var="FDR")
 a_report_bgc=merge(clus_stats_bgc,m_clus_res_bgc, by.x="Metabolite", by.y="Feature")
 
 
-write.table(a_report_bgc,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_BGC.txt", sep = "\t", quote = F)
-write.table(a_report_mtb,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_MTB.txt", sep = "\t", quote = F)
-write.table(a_report_taxa,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_TAXA.txt", sep = "\t", quote = F)
+#write.table(a_report_bgc,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_BGC.txt", sep = "\t", quote = F)
+#write.table(a_report_mtb,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_MTB.txt", sep = "\t", quote = F)
+#write.table(a_report_taxa,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_TAXA.txt", sep = "\t", quote = F)
 
 
 ggplot(ct, aes(as.factor(ct$`K=4`),Bacteroides_fragilis, fill=as.factor(cm$`K=4`))) + geom_violin() + geom_jitter(height = 0, width = 0.1, alpha=0.4) + theme_bw() + xlab("Clusters")  + scale_fill_manual(values =c("firebrick3","gray80","steelblue2","gold3" ))
@@ -1567,15 +1615,6 @@ ggplot(ct, aes(as.factor(ct$`K=4`),Bacteroides_fragilis, fill=as.factor(cm$`K=4`
 ggplot(cm, aes(as.factor(cm$`K=4`),tryptophan, fill=as.factor(cm$`K=4`))) + geom_violin() + geom_jitter(height = 0, width = 0.1, alpha=0.4) + theme_bw() + xlab("Clusters")  + scale_fill_manual(values =c("firebrick3","gray80","steelblue2","gold3" ))
 
 ```
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1639,7 +1678,7 @@ colnames(associations_factors)=c("Name","Bonferroni","FDR")
 plot_asso=melt(associations_factors)
 
 
-write.table(my_corr_factors_results, "~/Documents/Project_Metabolome/6.Results/052020_CLR/confouders_quantitative_v3", sep = "\t", quote = F)
+write.table(my_corr_factors_results, "~/Documents/Project_Metabolome/6.Results/072020/technical_confouders_quantitative.txt", sep = "\t", quote = F)
 
 ggplot(plot_asso,aes(Name,value, fill=variable)) + geom_bar(stat="identity", position =position_dodge(), colour="black") + theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + xlab("") +ylab ("Number of associations")+ scale_x_discrete(labels=c("Amount_sample_gram" = "Amount_input_sample", "run_day_cat" = "Run day","host_Age_sampling" = "Age", "host_Sex"="Sex", "LC.COLUMN"="LC-Column","metabolon_Month_in_freezer"="storage_time"))
 
@@ -1685,7 +1724,7 @@ my_corr_factors_results_bi$FDR=p.adjust(my_corr_factors_results_bi$p.value,metho
 my_corr_factors_results_bi$Bonferroni=p.adjust(my_corr_factors_results_bi$p.value,method = "bonferroni")
 
 
-write.table(my_corr_factors_results_bi, "~/Documents/Project_Metabolome/6.Results/052020_CLR/confouders_prevalence_v3.txt", sep = "\t", quote = F)
+write.table(my_corr_factors_results_bi, "~/Documents/Project_Metabolome/6.Results/072020/technical_confouders_metabolites_prevalence.txt", sep = "\t", quote = F)
 
 x=as.data.frame(table(my_corr_factors_results_bi$Factor[my_corr_factors_results_bi$Bonferroni<0.05]))
 y=as.data.frame(table(my_corr_factors_results_bi$Factor[my_corr_factors_results_bi$FDR<0.05]))
@@ -1720,10 +1759,10 @@ test_mtb_quantitative$COMMENT=NULL
 
 #write.table(test_mtb_quantitative,"~/Documents/Project_Metabolome/1.Input_files/Models_052020/CLR/Univariate_cc_v3.txt",sep="\t", quote = F, row.names = T)
 
-##REMOVE DIET & IBD PHENOS##
-mtb_quantitative_ibd=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/CLR/quant_cc_ibd.txt",sep="\t", header = T, row.names = 1)
-mtb_quantitative_diet=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/CLR/quant_cc_diet.txt",sep="\t", header = T, row.names = 1)
-mtb_quantitative_bugs=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/CLR/quant_cc_bugs.txt",sep="\t", header = T, row.names = 1)
+
+mtb_quantitative_ibd=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/quant_cc_ibd.txt",sep="\t", header = T, row.names = 1)
+mtb_quantitative_diet=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/quant_cc_diet.txt",sep="\t", header = T, row.names = 1)
+mtb_quantitative_bugs=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/quant_cc_bugs.txt",sep="\t", header = T, row.names = 1)
 
 #corr_vars=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer")
 
@@ -1762,14 +1801,19 @@ my_univariate_ibd=my_univariate_results
 
 #HERE#
 
+mtb_quantitative_bugs2=mtb_quantitative_bugs
+#mtb_quantitative_bugs=mtb_quantitative_bugs2
+mtb_quantitative_bugs=mtb_quantitative_bugs[,c(1:10,120:ncol(mtb_quantitative_bugs))]
+
+#119 /120
 flag=1
-for ( i in 1:119) {
+for ( i in 1:10) {
   my_pheno=colnames(mtb_quantitative_bugs)[i]
   if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling"| my_pheno=="ibd_Diagnosis") {
     print (paste("Skipping phenotype:",my_pheno))
   } else {
     print (paste("Testing:",my_pheno))
-    for (a in 120:ncol(mtb_quantitative_bugs)){
+    for (a in 11:ncol(mtb_quantitative_bugs)){
       my_trait=colnames(mtb_quantitative_bugs)[a]
       my_uni_test=mtb_quantitative_bugs[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
       my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
@@ -1833,7 +1877,8 @@ my_univariate_ibd2=my_univariate_ibd[my_univariate_ibd$phenotype!="ibd_CurrentSt
 my_univariate_ibd2=my_univariate_ibd2[my_univariate_ibd2$phenotype!="ibd_comb_diag_stoma",]
 my_univariate_ibd2=my_univariate_ibd2[my_univariate_ibd2$phenotype!="host_BMI",]
 my_univariate_bugs2=my_univariate_bugs[my_univariate_bugs$phenotype!="host_BMI",]
-
+my_univariate_ibd2=my_univariate_ibd2[my_univariate_ibd2$phenotype!="ibd_DiseaseLocation",]
+my_univariate_ibd2=my_univariate_ibd2[my_univariate_ibd2$phenotype!="ibd_ActiveDisease",]
 
 all_uni_quant=rbind(my_univariate_ibd2, my_univariate_diet)
 all_uni_quant=rbind(all_uni_quant, my_univariate_bugs2)
@@ -1853,13 +1898,14 @@ quant_significant=all_uni_quant[all_uni_quant$Bonferroni<0.05,]
 
 diet=unlist(quant_significant$metabolite[grep("diet_", quant_significant$phenotype)])
 meds=unlist(quant_significant$metabolite[grep("med_", quant_significant$phenotype)])
-CD=unlist(quant_significant$metabolite[quant_significant$factor=="ibd_DiagnosisCD"])
-UC=unlist(quant_significant$metabolite[quant_significant$factor=="ibd_DiagnosisUC"])
-Bugs=unlist(quant_significant$metabolite[quant_significant$factor=="species"])
+CD=unlist(quant_significant$metabolite[quant_significant$phenotype=="ibd_CD"])
+UC=unlist(quant_significant$metabolite[quant_significant$phenotype=="ibd_UC"])
+IBD=unlist(quant_significant$metabolite[quant_significant$phenotype=="ibd_Diagnosis"])
+#Bugs=unlist(quant_significant$metabolite[quant_significant$factor=="species"])
 Richness=unlist(quant_significant$metabolite[quant_significant$factor=="sp_richness"])
 BMI=unlist(quant_significant$metabolite[quant_significant$phenotype=="host_BMI"])
 
-my_test_list=list(CD =CD, UC=UC,BMI = BMI, Diet = diet, Bugs=Bugs ,Richness=Richness,Meds=meds)
+my_test_list=list(CD =CD, UC=UC,BMI = BMI, Diet = diet,IBD=IBD ,Richness=Richness,Meds=meds)
 upset(fromList(my_test_list), order.by = "freq", nsets = 7)
 
 
@@ -1867,11 +1913,11 @@ ggplot(mtb_quantitative_diet, aes(host_BMI, X7_ketocholesterol)) + geom_point() 
 ggplot(mtb_quantitative_diet, aes(diet_coffee.Res, caffeine)) + geom_point() + theme_bw() + geom_smooth(method='lm')
 
 
-plot_cd=quant_significant[quant_significant$factor=="ibd_DiagnosisCD",]
+plot_cd=quant_significant[quant_significant$phenotype=="ibd_CD",]
 annot$clean = make.names(rownames(annot))
 plot_cd2=merge(plot_cd,annot, by.x = "metabolite", by.y = "clean")
 plot_cd2$dir=-1
-plot_cd2[plot_cd2$Estimate>0,]$dir=1
+plot_cd2[plot_cd2$Estimate<0,]$dir=1
 
 ggplot(plot_cd2, aes(SUB.PATHWAY,dir, fill=as.factor(dir))) + geom_bar(stat = "identity") + coord_flip() + scale_fill_manual(values=c("blue2", "red3")) + theme_bw()
 
@@ -1889,13 +1935,22 @@ ggplot(plot_IBD2, aes( Shannon_Index, cholate,colour=ibd_Diagnosis)) + geom_poin
 
 ggplot(plot_IBD2, aes( Faecalibacterium_prausnitzii, riboflavin__Vitamin_B2,colour=ibd_Diagnosis)) + geom_point() + theme_bw() + geom_smooth(method='lm') + scale_color_manual(values=c("black","firebrick2","blue2"))
 
-plot_uc=quant_significant[quant_significant$factor=="ibd_DiagnosisUC",]
+plot_uc=quant_significant[quant_significant$phenotype=="ibd_UC",]
 
 plot_uc2=merge(plot_uc,annot, by.x = "metabolite", by.y = "clean")
 plot_uc2$dir=-1
 plot_uc2[plot_uc2$Estimate>0,]$dir=1
 
 ggplot(plot_uc2, aes(SUB.PATHWAY,dir, fill=as.factor(dir))) + geom_bar(stat = "identity") + coord_flip() + scale_fill_manual(values=c("blue2", "red3")) + theme_bw()
+
+
+plot_ibdz=quant_significant[quant_significant$phenotype=="ibd_Diagnosis",]
+
+plot_ibdz2=merge(plot_ibdz,annot, by.x = "metabolite", by.y = "clean")
+plot_ibdz2$dir=-1
+plot_ibdz2[plot_ibdz2$Estimate>0,]$dir=1
+
+ggplot(plot_ibdz2, aes(SUB.PATHWAY,dir, fill=as.factor(dir))) + geom_bar(stat = "identity") + coord_flip() + scale_fill_manual(values=c("blue2", "red3")) + theme_bw()
 
 ```
 
@@ -1911,12 +1966,16 @@ test_mtb_presence$Row.names=NULL
 test_mtb_presence$ibd_FecalCalprotectin=NULL
 test_mtb_presence$COMMENT=NULL
 
-write.table(test_mtb_presence,"~/Documents/Project_Metabolome/1.Input_files/Models_052020/Univariate_cc_prev.txt",sep="\t", quote = F, row.names = T)
+#write.table(test_mtb_presence,"~/Documents/Project_Metabolome/1.Input_files/Models_052020/Univariate_cc_prev.txt",sep="\t", quote = F, row.names = T)
 
-mtb_prev_ibd=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/prev_cc_ibd.txt",sep="\t", header = T, row.names = 1)
-mtb_prev_diet=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/prev_cc_diet.txt",sep="\t", header = T, row.names = 1)
-mtb_prev_bugs=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/prev_cc_bugs.txt",sep="\t", header = T, row.names = 1)
+mtb_prev_ibd=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/prev_cc_ibd.txt",sep="\t", header = T, row.names = 1)
+mtb_prev_diet=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/prev_cc_diet.txt",sep="\t", header = T, row.names = 1)
+mtb_prev_bugs=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/prev_cc_bugs.txt",sep="\t", header = T, row.names = 1)
 
+#Check Correlated dietary factor
+cor_diet=cor.test(tot[,64:316], method = "spearman")
+#
+#highlyCorrelated <- findCorrelation(cor_diet_bact, cutoff=0.75)
 
 
 flag=1
@@ -1952,15 +2011,15 @@ for ( i in 1:63) {
 
 prev_univariate_ibd=my_univariate_results
 
-
+#119/120
 flag=1
-for ( i in 1:119) {
+for ( i in 1:10) {
   my_pheno=colnames(mtb_prev_bugs)[i]
   if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling"| my_pheno=="ibd_Diagnosis") {
     print (paste("Skipping phenotype:",my_pheno))
   } else {
     print (paste("Testing:",my_pheno))
-    for (a in 120:ncol(mtb_prev_bugs)){
+    for (a in 11:ncol(mtb_prev_bugs)){
       my_trait=colnames(mtb_prev_bugs)[a]
       my_uni_test=mtb_prev_bugs[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
       my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
@@ -2028,6 +2087,10 @@ prev_univariate_ibd2=prev_univariate_ibd[prev_univariate_ibd$phenotype!="ibd_Cur
 prev_univariate_ibd2=prev_univariate_ibd2[prev_univariate_ibd2$phenotype!="ibd_comb_diag_stoma",]
 prev_univariate_ibd2=prev_univariate_ibd2[prev_univariate_ibd2$phenotype!="host_BMI",]
 prev_univariate_bugs2=prev_univariate_bugs[prev_univariate_bugs$phenotype!="host_BMI",]
+prev_univariate_ibd2=prev_univariate_ibd2[prev_univariate_ibd2$phenotype!="ibd_DiseaseLocation",]
+prev_univariate_ibd2=prev_univariate_ibd2[prev_univariate_ibd2$phenotype!="ibd_ActiveDisease",]
+
+
 
 
 all_uni_prev=rbind(prev_univariate_ibd2, prev_univariate_diet)
@@ -2035,20 +2098,21 @@ all_uni_prev=rbind(all_uni_prev, prev_univariate_bugs2)
 all_uni_prev$FDR=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "BH")
 all_uni_prev$Bonferroni=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "bonferroni")
 
-write.table(all_uni_prev,"~/Documents/Project_Metabolome/6.Results/Results_prevalence_052020.txt",sep="\t", quote = F, row.names = T)
+write.table(all_uni_prev,"~/Documents/Project_Metabolome/6.Results/072020/Results_prevalence.txt",sep="\t", quote = F, row.names = T)
 
 prev_significant=all_uni_prev[all_uni_prev$FDR<0.05,]
 prev_significant=all_uni_prev[all_uni_prev$Bonferroni<0.05,]
 
 diet=unlist(prev_significant$metabolite[grep("diet_", prev_significant$phenotype)])
 meds=unlist(prev_significant$metabolite[grep("med_", prev_significant$phenotype)])
-CD=unlist(prev_significant$metabolite[prev_significant$factor=="ibd_DiagnosisCD"])
-UC=unlist(prev_significant$metabolite[prev_significant$factor=="ibd_DiagnosisUC"])
+CD=unlist(prev_significant$metabolite[prev_significant$phenotype=="ibd_CD"])
+UC=unlist(prev_significant$metabolite[prev_significant$phenotype=="ibd_UC"])
+IBD=unlist(prev_significant$metabolite[prev_significant$phenotype=="ibd_Diagnosis"])
 Bugs=unlist(prev_significant$metabolite[prev_significant$factor=="species"])
 Richness=unlist(prev_significant$metabolite[prev_significant$factor=="sp_richness"])
 BMI=unlist(prev_significant$metabolite[prev_significant$phenotype=="host_BMI"])
 
-my_test_list=list(CD =CD, UC=UC,BMI = BMI, Diet = diet, Bugs=Bugs ,Meds=meds, Richness=Richness)
+my_test_list=list(CD =CD, UC=UC,BMI = BMI, IBD=IBD, Diet = diet, Bugs=Bugs ,Meds=meds, Richness=Richness)
 upset(fromList(my_test_list), order.by = "freq", nsets = 7)
 
 ggplot(mtb_prev_bugs, aes(as.factor(succinoyltaurine),Bilophila_wadsworthia, fill=as.factor(succinoyltaurine))) + geom_boxplot(outlier.colour = "white") + geom_jitter(alpha=0.3) + theme_classic() + scale_fill_manual(values = c("#E69F00", "#56B4E9"))
@@ -2068,14 +2132,14 @@ ggplot(test_pv, aes(Var1,prop, fill=Var2)) + geom_bar(stat = "identity") + theme
 ```{r}
 
 
-only_ibd_quant=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/CLR/ibd_quant.txt",sep="\t", header = T, row.names = 1)
+only_ibd_quant=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/ibd_quant.txt",sep="\t", header = T, row.names = 1)
 only_ibd_quant$ibd_CurrentStomaOrPouch=NULL
 only_ibd_quant$host_Sex.1=NULL
 only_ibd_quant$med_parasympathicolytic_inhaler=NULL
 only_ibd_quant$med_ranitidine=NULL
-
+#346 347
 flag=1
-for ( i in 1:346) {
+for ( i in 1:237) {
   my_pheno=colnames(only_ibd_quant)[i]
   if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling") {
     print (paste("Skipping phenotype:",my_pheno))
@@ -2083,7 +2147,7 @@ for ( i in 1:346) {
   } 
   else if ( my_pheno=="ibd_Diagnosis"){
     print (paste("Testing:",my_pheno))
-    for (a in 347:ncol(only_ibd_quant)){
+    for (a in 238:ncol(only_ibd_quant)){
       my_trait=colnames(only_ibd_quant)[a]
       my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno,my_trait)]
       my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno)
@@ -2105,7 +2169,7 @@ for ( i in 1:346) {
     }
   }else {
     print (paste("Testing:",my_pheno))
-    for (a in 347:ncol(only_ibd_quant)){
+    for (a in 238:ncol(only_ibd_quant)){
       my_trait=colnames(only_ibd_quant)[a]
       my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
       my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
@@ -2141,15 +2205,14 @@ ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="isobutyric_
 ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="propionic_acid",]
 ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="valeric_acid",]
 
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$metabolite!="Veillonella_parvula",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$metabolite!="Parasutterella_excrementihominis",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$metabolite!="Bilophila_wadsworthia",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$metabolite!="Escherichia_coli",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$metabolite!="Akkermansia_muciniphila",]
-
 ibd_only_res_clean$FDR=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "BH")
 ibd_only_res_clean$Bonferroni=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "bonferroni")
-write.table(ibd_only_res_clean,"~/Documents/Project_Metabolome/6.Results/052020_CLR/Results_onlyIBD_052020.txt",sep="\t", quote = F, row.names = T)
+###
+###
+###
+###
+###
+write.table(ibd_only_res_clean,"~/Documents/Project_Metabolome/6.Results/072020/Results_lm_onlyIBD.txt",sep="\t", quote = F, row.names = T)
 
 ibd_only_sig=ibd_only_res_clean[ibd_only_res_clean$FDR<0.05,]
 ibd_only_sig=ibd_only_res_clean[ibd_only_res_clean$Bonferroni<0.05,]
@@ -2167,10 +2230,10 @@ Ileocecal_valve=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_Ileocec
 
 Num_resections=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_NumberOfResectionsAny"])
 Active_disease=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_ActiveDiseaseNotActive"])
-bugs=unlist(ibd_only_sig$metabolite[645:nrow(ibd_only_sig)])
+#bugs=unlist(ibd_only_sig$metabolite[645:nrow(ibd_only_sig)])
 
 
-my_test_list=list(CD_vs_UC =CD_vs_UC, Bowel_move=Bowel_move, Resection = Resection, Diet = diet, bugs=bugs ,Meds=meds, Richness=Richness,Ileocecal_valve=Ileocecal_valve,Num_resections=Num_resections,Active_disease=Active_disease)
+my_test_list=list(CD_vs_UC =CD_vs_UC, Bowel_move=Bowel_move, Resection = Resection, Diet = diet ,Meds=meds, Richness=Richness,Ileocecal_valve=Ileocecal_valve,Num_resections=Num_resections,Active_disease=Active_disease)
 upset(fromList(my_test_list), order.by = "freq", nsets = 10)
 
 
@@ -2195,14 +2258,14 @@ ggplot(my_plot, aes( my_ord, X7_ketodeoxycholate, fill=my_ord)) + geom_boxplot(o
 
 
 
-only_ibd_quant=read.table("~/Documents/Project_Metabolome/1.Input_files/Models_052020/ibd_prev.txt",sep="\t", header = T, row.names = 1)
+only_ibd_quant=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/ibd_prev.txt",sep="\t", header = T, row.names = 1)
 only_ibd_quant$ibd_CurrentStomaOrPouch=NULL
 only_ibd_quant$host_Sex.1=NULL
 only_ibd_quant$med_parasympathicolytic_inhaler=NULL
 only_ibd_quant$med_ranitidine=NULL
-only_ibd_quant=only_ibd_quant[,1:860]
+
 flag=1
-for ( i in 1:346) {
+for ( i in 1:237) {
   my_pheno=colnames(only_ibd_quant)[i]
   if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling") {
     print (paste("Skipping phenotype:",my_pheno))
@@ -2210,7 +2273,7 @@ for ( i in 1:346) {
   } 
   else if ( my_pheno=="ibd_Diagnosis"){
     print (paste("Testing:",my_pheno))
-    for (a in 347:ncol(only_ibd_quant)){
+    for (a in 238:ncol(only_ibd_quant)){
       my_trait=colnames(only_ibd_quant)[a]
       my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno,my_trait)]
       my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno)
@@ -2232,7 +2295,7 @@ for ( i in 1:346) {
     }
   }else {
     print (paste("Testing:",my_pheno))
-    for (a in 427:ncol(only_ibd_quant)){
+    for (a in 238:ncol(only_ibd_quant)){
       my_trait=colnames(only_ibd_quant)[a]
       my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
       my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
@@ -2257,10 +2320,10 @@ for ( i in 1:346) {
 
 ibd_only_results_prevalence=my_univariate_results
 
-ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_2_anacardic_acid",]
-ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_3_anacardic_acid",]
-ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylcytidine",]
-ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylguanosine.",]
+#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_2_anacardic_acid",]
+#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_3_anacardic_acid",]
+#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylcytidine",]
+#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylguanosine.",]
 
 ibd_only_results_prevalence$FDR=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "BH")
 ibd_only_results_prevalence$Bonferroni=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "bonferroni")
@@ -2323,9 +2386,9 @@ my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite
 my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="propionic_acid")
 my_results_for_lasso=subset(my_results_for_lasso,my_results_for_lasso$metabolite!="valeric_acid")
 #
-cor_diet_bact=cor.test(tot[,64:316], method = "spearman")
+#cor_diet_bact=cor.test(tot[,64:316], method = "spearman")
 #
-highlyCorrelated <- findCorrelation(cor_diet_bact, cutoff=0.75)
+#highlyCorrelated <- findCorrelation(cor_diet_bact, cutoff=0.75)
 #
 q_mtb_names=q_mtb
 colnames(q_mtb_names)=make.names(colnames(q_mtb_names))
