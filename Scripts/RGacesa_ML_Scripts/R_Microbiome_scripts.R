@@ -1,8 +1,197 @@
 library(coin)
+library(vegan)
 
-# ML scripts
+# Microbiome scripts
 # by: Ranko Gacesa, UMCG
 # ==============================================
+
+doMicrobiomeAdonis <- function(inDF,
+                               idCol = "ID",
+                               permNR = 10000,
+                               adonisVarsTouse,
+                               adonisVarsToSkip = c("ID"),
+                               targetData = "Taxa", 
+                               pwyType = "MetaCyc",
+                               verbose = T,
+                               nrThreads = 4,
+                               measureTime = F) {
+  if (!(targetData %in% c("Taxa","PWYs"))) {
+    exit("ERROR: targetData must be 'Taxa' or 'PWYs' ")
+  }
+  adonisResults <- NULL
+  adonisVarsTouse <- adonisVarsTouse[!(adonisVarsTouse %in% adonisVarsToSkip)]
+  inPhenos <- inDF
+  if (verbose) {
+    if (targetData=="Taxa") {
+      spDF <- subsetMicrobiomeDF(inDF = inDF,verbose = verbose,getPWYs = F,getVFs = F,getTaxa = T,getCARDs = F,getPhenos = F,
+                                 getDivs = F,pwyType = pwyType,getID = T,idName = idCol,idToRowName = F)
+    } else if (targetData=="PWYs") {
+      spDF <- subsetMicrobiomeDF(inDF = inDF,verbose = verbose,getPWYs = T,getVFs = F,getTaxa = F,getCARDs = F,getPhenos = F,
+                                 getDivs = F,pwyType = pwyType,getID = T,idName = idCol,idToRowName = F)
+    }
+  }
+  for (i in adonisVarsTouse) {
+    if (verbose) {
+      print (paste(' >>> ANALYSING VARIABLE <',i,'>    <<<'))
+      print ('  >> collecting complete cases')
+    }
+    if (measureTime) {t1 <- Sys.time()}
+    inPhenosOneVarID <- inPhenos[,colnames(inPhenos) %in% c(i,idCol)]
+    allDF <- merge(x=inPhenosOneVarID,by.x=idCol,y=spDF,by.y=idCol)
+    rownames(allDF) <- allDF$DAG3_sampleID
+    allDF[[idCol]] <- NULL
+    allDF <- allDF[complete.cases(allDF),]
+    av <- allDF[[i]]
+    allDF[[i]] <- NULL
+    if (verbose) {print ('  >> calculating B/C distance')}
+    inBC <- vegdist(allDF,method = "bray")
+    if (verbose) {print ('  >> doing adonis')}
+    nrRows <- length(av)
+    if (length(av) < 3 | length(unique(av)) < 2) {
+      if (verbose) {print(paste0(' >> WARNING: ',i,' has no useful data!!'))}
+    } else {
+      #print(paste0(' NR NAs: ',sum(is.na(av))))
+      ad <- adonis(inBC ~ av,permutations=permNR,parallel = nrThreads)
+      aov_table <- ad$aov.tab
+      # accumulate results
+      oneRow <- data.frame(Var=i,
+                           NR_nonNA=nrRows,
+                           DF=aov_table[1,1],
+                           SumsOfSqs=aov_table[1,2],
+                           MeanSqs=aov_table[1,3],
+                           FModel=aov_table[1,4],
+                           R2=aov_table[1,5],
+                           pval=aov_table[1,6],
+                           FDR.BH=NA,
+                           Significant=NA)
+      print(oneRow)
+      adonisResults <- rbind.data.frame(adonisResults,oneRow)
+      if (verbose) {print (paste0('--- ',i,' DONE! ---'))}
+      if (measureTime) {t2 <- Sys.time()}
+      if (verbose & measureTime) {print(t2-t1)}
+    }
+  }
+  rownames(adonisResults) = adonisResults$Var
+  adonisResults$FDR.BH=p.adjust(adonisResults$pval, method = "BH")
+  adonisResults$Significant="No"
+  adonisResults$Significant[adonisResults$FDR.BH<0.05]="Yes"
+  adonisResults <- adonisResults[order(adonisResults$pval),]
+  adonisResults #write.table(adonisResults,'phenotypes_adonis_univar.csv',sep=',',row.names = F)
+  
+  # g <- ggplot(adonisResults, aes(reorder(row.names(adonisResults), R2), R2, fill=Significant)) + 
+  #   geom_bar(stat = "identity") + coord_flip() + theme_bw() + 
+  #   ylab ("Explained variance (R^2) ") + xlab ("Factor")  + theme(text = element_text(size=11))
+  # ggsave(plot = g,filename = 'phenotypes_adonis_univar.png')
+}
+
+
+# PREP DATA (CEDNN)
+# ===============================================================
+# > load CeDNN microbiome (metaphlan "raw" output / taxa)
+# ===============================================================
+prepCleanMetaphlan <- function(inPath,
+                               unclassifiedPercDrop=95,
+                               presenceFilter = -1,
+                               minRelativeAbundance = -1,
+                               rescaleTaxa = T,
+                               keepDomains = c("Archaea","Bacteria"),
+                               keepLevels=c("P","C","O","F","G","S"),
+                               novogeneIdsClean = T
+) {
+  inTaxa <- read.table(inPath,sep='\t',header=T)
+  # reshuffle id column, transpose, turn to data trame
+  rownames(inTaxa) <- inTaxa$ID
+  inTaxa$ID <- NULL
+  inTaxa <- as.data.frame(t.data.frame(inTaxa))
+  inTaxa$ID <- rownames(inTaxa)
+  print(paste('Loaded Metaphlan (',nrow(inTaxa),'samples)'))
+  # transform sample ID names to real-world ones
+  # (Novogene adds lots of stuff to names, we need to get rid of it)
+  if (novogeneIdsClean) {
+    print ('NOTE: doing cleaning of Novogene IDs (keeping format <AB>_<CD>_<EFG...>)')
+    for (i in c(1:nrow(inTaxa))) {
+      ss <- strsplit(inTaxa$ID[i],'_')[[1]]
+      sss <- paste0(ss[1],'_',ss[2],'_',ss[3])
+      inTaxa$ID[i] <- sss
+    }
+  }
+  # get rid of duplicates (Novogene randomly sequenced some samples mores then once)
+  if (sum(duplicated(inTaxa$ID) > 0)) {
+    print(paste('WARNING: found ',sum(duplicated(inTaxa$ID) > 0),'duplicates, dropping them!'))
+  }
+  inTaxa <- inTaxa[!duplicated(inTaxa$ID),]
+  rownames(inTaxa) <- NULL
+  # drop failed samples (ideally these would not exist)
+  if (sum(inTaxa$unclassified > unclassifiedPercDrop)) {
+    print(paste('WARNING: found ',sum(inTaxa$unclassified > unclassifiedPercDrop),'bad samples (with unclassified reads >',unclassifiedPercDrop,'%), dropping them!'))
+  }
+  inTaxa <- inTaxa[inTaxa$unclassified < unclassifiedPercDrop,]
+  # get rid of "nothing" taxon
+  inTaxa$unclassified <- NULL
+  # more fixing of ID column
+  rownames(inTaxa) <- inTaxa$ID
+  inTaxa$ID <- NULL
+  # filter metaphlan: keep Bacteria and Archaea, drop strains, rescale relative abundances to make sure each level sums to 1
+  inTaxaF <- filterMetaGenomeDF(inTaxa,presPerc = presenceFilter,minMRelAb=minRelativeAbundance,minMedRelAb = -1,rescaleTaxa = rescaleTaxa,verbose = T,keepDomains = keepDomains,
+                                keepLevels = keepLevels)
+  print(paste('Done, returning ',nrow(inTaxaF),'samples'))
+  inTaxaF$ID <- rownames(inTaxaF)
+  inTaxaF
+}
+
+# > load CeDNN microbiome (humann pathways, MetaCyc)
+#TODO: this should also be done for other humann data layers (GO, InfoGO, KEGG, Pfam, ...)
+# ===============================================================
+prepCleanHumann <- function(inPath,
+                            dropUnintegrated = T,
+                            dropUnmapped = T,
+                            dropTaxonSpecific = T,
+                            presenceFilter = -1,
+                            minRelativeAbundance = -1,
+                            rescaleTaxa = T,
+                            novogeneIdsClean = T
+) {
+  inDF <- read.table(inPath,sep='\t',header=T,quote ='',comment.char = '')
+  #fix pathway ID (these tend to be weird coming out of humann)
+  rownames(inDF) <- inDF$X..Pathway
+  inDF$X..Pathway <- NULL
+  #drop "junk" from humann (unintegrated/unmapped data & taxon-specific pathways)
+  if (dropTaxonSpecific) {
+    inDF <- inDF[grep('\\|',rownames(inDF),invert = T),]
+  }
+  if (dropUnintegrated) {
+    inDF <- inDF[grep('UNINTEGRATED',rownames(inDF),invert = T),]
+  }
+  if (dropUnmapped) {
+    inDF <- inDF[grep('UNMAPPED',rownames(inDF),invert = T),]
+  }
+  rownames(inDF)[grep('PWY',rownames(inDF),invert = T)] <- paste0('PWY_',rownames(inDF)[grep('PWY',rownames(inDF),invert = T)])
+  inDF <- as.data.frame(t.data.frame(inDF))
+  # fix sample IDs, remove duplicates
+  inDF$ID <- rownames(inDF)
+  if (novogeneIdsClean) {
+    print ('NOTE: doing cleaning of Novogene IDs (keeping format <AB>_<CD>_<EFG...>)')
+    for (i in c(1:nrow(inDF))) {
+      ss <- strsplit(inDF$ID[i],'_')[[1]]
+      sss <- paste0(ss[1],'_',ss[2],'_',ss[3])
+      inDF$ID[i] <- sss
+    }
+  }
+  if (sum(duplicated(inDF$ID) > 0)) {
+    print(paste('WARNING: found ',sum(duplicated(inDF$ID) > 0),'duplicates, dropping them!'))
+  }
+  inDF <- inDF[!duplicated(inDF$ID),]
+  rownames(inDF) <- inDF$ID
+  inDF$ID <- NULL
+  # make sure columns are actually numbers (otherwise filter dies; NOTE: this should not be necessary, but... )
+  for (c in colnames(inDF)) {inDF[[c]] <- as.numeric(inDF[[c]])}
+  # clean, rescale and save
+  inDFt2 <- filterHumannDF(inDF,presPerc = presenceFilter,minMRelAb = minRelativeAbundance,minMedRelAb = -1,rescale = T,minSum = 1,verbose = T)
+  inDFt2 <- inDFt2[,colSums(inDFt2)!=0]
+  inDFt2$ID <- row.names(inDFt2)
+  print(paste('Done, returning ',nrow(inDFt2),'samples'))
+  inDFt2
+}
 
 
 purgeMGNames <- function(dF) {
@@ -382,14 +571,18 @@ reorderMicrobiomeDF <- function(inDF,verbose=T) {
 # ====================================================
 # > Subsets stuff from merged microbiome dataframe
 # ====================================================
-subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCARDs=F,getPhenos=T,getDivs=F,pwyType="MetaCyc",getID=T,idName="ID") {
-  if (verbose) {print ("SUBSETTING Mergerd Microbiome Dataframe  ...")
+subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCARDs=F,getPhenos=T,getDivs=F,pwyType="MetaCyc",getID=T,idName="ID",idToRowName=F) {
+  if (!(pwyType %in% c('MetaCyc','EC','RXN','PFAM','GO','KEGG'))) {
+    exit("ERROR: pwyType must be one of 'MetaCyc','EC','RXN','PFAM','GO','KEGG' ")
+  }
+  if (verbose) {print ("SUBSETTING Microbiome Dataframe  ...")
     if (getPhenos) {print("  > getting phenotypes")}
     if (getTaxa) {print("  > getting taxa")}
     if (getPWYs) {print(paste0("  > getting pathways [",pwyType,"]"))}
     if (getCARDs) {print("  > getting CARDs")}
     if (getVFs) {print("  > getting VFs")}
     if (getDivs) {print("  > getting Diversities")}
+    if (getID) {print(paste0("  > getting ID column = ",idName))}
   }
   nonPhenoCols <- c()
   nonPhenoColsTaxa <- c(grep("^[dgtspcfko]__",colnames(inDF)))
@@ -401,6 +594,7 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
   nonPhenoColsPWYs <- c()
   if (pwyType=='MetaCyc' | pwyType=='All' | pwyType=='Metacyc') {
     nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("PWY",colnames(inDF)))
+    nonPhenoColsPWYs <- nonPhenoColsPWYs[!(nonPhenoColsPWYs %in% grep('^DIV\\.',colnames(inDF)))]
   }
   if (pwyType=='EC' | pwyType=='All') {
     nonPhenoColsPWYs <- c(nonPhenoColsPWYs,grep("^EC_",colnames(inDF)))
@@ -437,7 +631,7 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
     if (verbose) {print(paste0(' > FOUND ',length(divCols),' *Diversity metrics*'))}
     toGet <- c(toGet,divCols)
   }
-  idCols <- grep("^",idName,"$",colnames(inDF))
+  idCols <- grep(paste0("^",idName,"$"),colnames(inDF))
   if (getID) {
     toGet <- unique(c(toGet,idCols))
     if (verbose) {print(paste0(' > FOUND ',length(idCols),' *ID COLUMNS*'))}
@@ -449,6 +643,11 @@ subsetMicrobiomeDF <- function(inDF,verbose=T,getPWYs=F,getVFs=F,getTaxa=T,getCA
     if (verbose) {print(paste0(' > FOUND ',length(phenoCols),' *Phenotypes*'))}
   }
   inDF <- inDF[, unique(toGet)]
+  if (idToRowName) {
+    rownames(inDF) <- inDF[[idName]]
+    inDF[[idName]] <- NULL
+  }
+  inDF
 }
 
 # ================================================================================
@@ -1664,12 +1863,11 @@ testOneFeaturePrevalence <- function(dataIn,saveFolder,feature=NA,doSave=T,displ
 # ====================================================================================================
 testOneFeature <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onlyShowSig=T,yLab=NA, doViolin=T,title=NA,na.rem=T,
                            responseVar="Diagnosis",stTest="wilcox",doPlots = T,nrTests=-1,xLab=NA,retPlot=F,ylim=NA,alpha=0.25,
-                           discardZeros=F,cutoff=0.05,controlClass=NA)
+                           discardZeros=F,cutoff=0.05,controlClass=NA,doAnnotation=T,xRot=0)
 {
   ret = NULL
   if (is.na(feature)) {
-    print ('needs a feature as input!')
-    break
+    stop('needs a feature as input!')
   }
   if (is.na(xLab)) {
     xLab = responseVar
@@ -1680,8 +1878,7 @@ testOneFeature <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onl
   if (feature %in% colnames(dataIn)) {
     i <- grep(paste0("^",feature,"$"),colnames(dataIn))[1]
   } else {
-    print (paste("ERROR:",feature,"does not exist in input dataset!"))
-    return()
+    stop("ERROR:",feature,"does not exist in input dataset!")
   }
   ftr=feature
   ymax = 1000000
@@ -1708,8 +1905,7 @@ testOneFeature <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onl
   }
   # check if any response-var factors are all-0, if so, break
   if (length(classes) <= 1) {
-    print (paste0('ERROR: ',responseVar,' has < 2 classes for ',feature,'! quitting!'))
-    return (NA)
+    stop(paste0('ERROR: ',responseVar,' has < 2 classes for ',feature,'! quitting!'))
   }
   # extract classes
   pwC <- list()
@@ -1847,7 +2043,13 @@ testOneFeature <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onl
     combos$pCorr[is.na(combos$pCorr)] <- 1.0
     combos$pValue[is.na(combos$pValue)] <- 1.0
     
+    # add styling
+    if (xRot != 0) {
+      g <- g + theme(axis.text.x = element_text(angle = xRot,hjust = 1))
+    }
+    
     # first row:
+    if (doAnnotation) {
     if (nRows > 0) {
       for (f in seq(1,length(classes)-1)) {
         v1 <- as.character(classes[f])
@@ -1996,6 +2198,7 @@ testOneFeature <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onl
           annotate("segment", x = 4-0.01, y = yposLine, xend = 1.01,lineend = "round", 
                    yend = yposLine,size=lineSize,colour="black",arrow = arrow(length = unit(0.02, "npc")))
       }
+    }
     }
     # final adjustment for axis
     minY <- min(dataIn[[i]],na.rm = T)
