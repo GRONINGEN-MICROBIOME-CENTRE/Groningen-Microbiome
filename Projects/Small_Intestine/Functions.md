@@ -216,3 +216,11 @@ kruskal.test_function <- function(x) {
 }
 ```
 
+### 4. TopNTaxa 
+
+###### To select the top 'n' (most abundant) taxa 
+```{r}
+TopNTaxa <- function(x,n) {
+  names(x[1:n])
+} 
+```
