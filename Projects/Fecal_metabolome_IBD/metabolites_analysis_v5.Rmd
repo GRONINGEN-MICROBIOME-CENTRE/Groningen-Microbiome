@@ -1409,6 +1409,9 @@ head(sigfeatures[[1]])
 head(sigfeatures[[2]])
 head(sigfeatures[[3]])
 
+#capture.output(sigfeatures, file= "~/Documents/Project_Metabolome/6.Results/072020/features_icluster.txt")
+
+
 #Plot heatmap 
 library (gplots)
 bw.col = colorpanel(2,low="white",high="black")
@@ -1536,6 +1539,10 @@ bgc_fliter2[bgc_fliter2==0]=NA
 
 clus_stats_bgc=summary_stats(bgc_fliter2,clus_sel,missing_vals = "1")
 
+##################
+####METABOLITES###
+##################
+
 
 cm=merge(clus_sel,clus_mtb, by="row.names")
 
@@ -1558,6 +1565,11 @@ m_clus_res_mtb=dcast(m_clus_res_mtb, formula=Feature~variable, value.var="FDR")
 a_report_mtb=merge(clus_stats_mtb,m_clus_res_mtb, by.x="Metabolite", by.y="Feature")
 
 #write.table(a_report_mtb, "~/Documents/Project_Metabolome/6.Results/072020/iCluster_enriched_metabolites.txt", quote = F, sep = "\t")
+
+##################
+#### TAXA ########
+##################
+
 
 ct=merge(clus_sel,clus_taxa, by="row.names")
 
@@ -1583,6 +1595,11 @@ a_report_taxa=merge(clus_stats_taxa,m_clus_res_taxa, by.x="Metabolite", by.y="Fe
 
 #write.table(a_report_taxa, "~/Documents/Project_Metabolome/6.Results/072020/iCluster_enriched_taxa.txt", quote = F, sep = "\t")
 
+############################
+####Biosynthetic cluster####
+############################
+
+
 cb=merge(clus_sel,bcg_fil_trans, by="row.names")
 
 flag=1
@@ -1603,7 +1620,51 @@ m_clus_res_bgc$FDR=p.adjust(m_clus_res_bgc$value, method = "BH")
 m_clus_res_bgc=dcast(m_clus_res_bgc, formula=Feature~variable, value.var="FDR")
 a_report_bgc=merge(clus_stats_bgc,m_clus_res_bgc, by.x="Metabolite", by.y="Feature")
 
+##################
+####PHENOTYPES####
+##################
+library("lsmeans")
 
+phenos_ibdcc=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/phenos_IBD_cc.txt", sep = "\t", row.names = 1, header = T)
+
+colnames(clus_sel)="Clusters"
+cp=merge(clus_sel,phenos_ibdcc, by="row.names")
+
+flag=1
+for (a in 3:ncol(cp)){
+  my_name=colnames(cp)[a]
+  if (is.numeric(cp[,a])){
+    yy= pairwise.wilcox.test(cp[,a],cm$`K=4`, p.adjust.method = "none")$p.value
+    ccb=data.frame("Feature"=my_name,"C1_C2"=yy[1,1], "C1_C3"=yy[2,1],"C1_C4"=yy[3,1],"C2_C3"=yy[2,2], "C2_C4"=yy[3,2],"C3_C4"=yy[3,3] )
+    if(flag==1){
+      clus_res_phe=ccb
+      flag=5
+    }else{
+      clus_res_phe=rbind(clus_res_phe,ccb)
+    }
+  } else {
+    tmpdf=cp[,c(2,a)]
+    zzz=glm(tmpdf[,2] ~ Clusters, family = binomial(), data = tmpdf)
+    yyy=as.data.frame(pairs(regrid(lsmeans(zzz,"Clusters"), p.adjust.methods="none")))
+    ccb=data.frame("Feature"=my_name,"C1_C2"=yyy[1,6], "C1_C3"=yyy[2,6],"C1_C4"=yyy[3,6],"C2_C3"=yyy[4,6], "C2_C4"=yyy[5,6],"C3_C4"=yyy[6,6] )
+    if(flag==1){
+      clus_res_phe=ccb
+      flag=5
+    }else{
+      clus_res_phe=rbind(clus_res_phe,ccb)
+    }
+  }
+}
+
+m_clus_res_phe=melt(clus_res_phe)
+m_clus_res_phe$FDR=p.adjust(m_clus_res_phe$value, method = "BH")
+m_clus_res_phe=dcast(m_clus_res_phe, formula=Feature~variable, value.var="FDR")
+stats_phenos_clus=describe.by(cp, cp$Clusters)
+stats_phenos=data.frame("Phenotype"=colnames(cp), C1_N= stats_phenos_clus$`1`$n, C1_Min=stats_phenos_clus$`1`$min, C1_Max=stats_phenos_clus$`1`$max, C1_Mean=stats_phenos_clus$`1`$mean, C1_Median=stats_phenos_clus$`1`$median, C1_SD=stats_phenos_clus$`1`$sd,C2_N= stats_phenos_clus$`2`$n, C2_Min=stats_phenos_clus$`2`$min, C2_Max=stats_phenos_clus$`2`$max, C2_Mean=stats_phenos_clus$`2`$mean, C2_Median=stats_phenos_clus$`2`$median, C2_SD=stats_phenos_clus$`2`$sd , C3_N= stats_phenos_clus$`3`$n, C3_Min=stats_phenos_clus$`3`$min, C3_Max=stats_phenos_clus$`3`$max, C3_Mean=stats_phenos_clus$`3`$mean, C3_Median=stats_phenos_clus$`3`$median, C3_SD=stats_phenos_clus$`3`$sd, C4_N= stats_phenos_clus$`4`$n, C4_Min=stats_phenos_clus$`4`$min, C4_Max=stats_phenos_clus$`4`$max, C4_Mean=stats_phenos_clus$`4`$mean, C4_Median=stats_phenos_clus$`4`$median, C4_SD=stats_phenos_clus$`4`$sd)
+
+a_report_phe=merge(stats_phenos,m_clus_res_phe, by.x="Phenotype", by.y="Feature")
+
+write.table(a_report_phe,"~/Documents/Project_Metabolome/6.Results/072020/summary_stats_clusters_phe.txt", sep = "\t", quote = F)
 #write.table(a_report_bgc,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_BGC.txt", sep = "\t", quote = F)
 #write.table(a_report_mtb,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_MTB.txt", sep = "\t", quote = F)
 #write.table(a_report_taxa,"~/Documents/Project_Metabolome/6.Results/iClust/new/summary_stats_clusters_TAXA.txt", sep = "\t", quote = F)
@@ -1766,6 +1827,12 @@ mtb_quantitative_bugs=read.table("~/Documents/Project_Metabolome/6.Results/07202
 
 #corr_vars=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer")
 
+#Check Correlated dietary factor
+cor_diet=cor(mtb_quantitative_diet[,8:151], method = "spearman")
+#
+highlyCorrelated <- findCorrelation(cor_diet, cutoff=0.85, names = T)
+
+
 
 flag=1
 for ( i in 1:63) {
@@ -1882,17 +1949,20 @@ my_univariate_ibd2=my_univariate_ibd2[my_univariate_ibd2$phenotype!="ibd_ActiveD
 
 all_uni_quant=rbind(my_univariate_ibd2, my_univariate_diet)
 all_uni_quant=rbind(all_uni_quant, my_univariate_bugs2)
-all_uni_quant$FDR=p.adjust(all_uni_quant$`Pr(>|t|)`,method = "BH")
-all_uni_quant$Bonferroni=p.adjust(all_uni_quant$`Pr(>|t|)`,method = "bonferroni")
+all_uni_quant2=all_uni_quant
+all_uni_quant2=subset(all_uni_quant2, all_uni_quant2$phenotype %ni% highlyCorrelated)
+all_uni_quant2=subset(all_uni_quant2, all_uni_quant2$phenotype != "Simpson_Index")
+all_uni_quant2$FDR=p.adjust(all_uni_quant2$`Pr(>|t|)`,method = "BH")
+all_uni_quant2$Bonferroni=p.adjust(all_uni_quant2$`Pr(>|t|)`,method = "bonferroni")
 
 
 ##################
 ##SAVING RESULTS##
 ##################
-write.table(all_uni_quant,"~/Documents/Project_Metabolome/6.Results/052020_CLR/Results_quantitative_mtb_052020.txt",sep="\t", quote = F, row.names = T)
+write.table(all_uni_quant2,"~/Documents/Project_Metabolome/6.Results/072020/Results_quantitative_mtb.txt",sep="\t", quote = F, row.names = T)
 
-quant_significant=all_uni_quant[all_uni_quant$FDR<0.05,]
-quant_significant=all_uni_quant[all_uni_quant$Bonferroni<0.05,]
+quant_significant=all_uni_quant2[all_uni_quant2$FDR<0.05,]
+#quant_significant=all_uni_quant2[all_uni_quant2$Bonferroni<0.05,]
 #quant_significant=quant_significant[quant_significant$metabolite!="Veillonella_unclassified",]
 
 
@@ -1971,11 +2041,6 @@ test_mtb_presence$COMMENT=NULL
 mtb_prev_ibd=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/prev_cc_ibd.txt",sep="\t", header = T, row.names = 1)
 mtb_prev_diet=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/prev_cc_diet.txt",sep="\t", header = T, row.names = 1)
 mtb_prev_bugs=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/prev_cc_bugs.txt",sep="\t", header = T, row.names = 1)
-
-#Check Correlated dietary factor
-cor_diet=cor.test(tot[,64:316], method = "spearman")
-#
-#highlyCorrelated <- findCorrelation(cor_diet_bact, cutoff=0.75)
 
 
 flag=1
@@ -2095,13 +2160,21 @@ prev_univariate_ibd2=prev_univariate_ibd2[prev_univariate_ibd2$phenotype!="ibd_A
 
 all_uni_prev=rbind(prev_univariate_ibd2, prev_univariate_diet)
 all_uni_prev=rbind(all_uni_prev, prev_univariate_bugs2)
-all_uni_prev$FDR=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "BH")
-all_uni_prev$Bonferroni=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "bonferroni")
 
-write.table(all_uni_prev,"~/Documents/Project_Metabolome/6.Results/072020/Results_prevalence.txt",sep="\t", quote = F, row.names = T)
+all_uni_prev2=all_uni_prev
+all_uni_prev2=subset(all_uni_prev2, all_uni_prev2$phenotype %ni% highlyCorrelated)
+all_uni_prev2=subset(all_uni_prev2, all_uni_prev2$phenotype != "Simpson_Index")
+all_uni_prev2$FDR=p.adjust(all_uni_prev2$`Pr(>|z|)`,method = "BH")
+all_uni_prev2$Bonferroni=p.adjust(all_uni_prev2$`Pr(>|z|)`,method = "bonferroni")
 
-prev_significant=all_uni_prev[all_uni_prev$FDR<0.05,]
-prev_significant=all_uni_prev[all_uni_prev$Bonferroni<0.05,]
+
+#all_uni_prev$FDR=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "BH")
+#all_uni_prev$Bonferroni=p.adjust(all_uni_prev$`Pr(>|z|)`,method = "bonferroni")
+
+write.table(all_uni_prev2,"~/Documents/Project_Metabolome/6.Results/072020/Results_prevalence.txt",sep="\t", quote = F, row.names = T)
+
+#prev_significant=all_uni_prev2[all_uni_prev2$FDR<0.05,]
+prev_significant=all_uni_prev2[all_uni_prev2$Bonferroni<0.05,]
 
 diet=unlist(prev_significant$metabolite[grep("diet_", prev_significant$phenotype)])
 meds=unlist(prev_significant$metabolite[grep("med_", prev_significant$phenotype)])
@@ -2205,17 +2278,25 @@ ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="isobutyric_
 ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="propionic_acid",]
 ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="valeric_acid",]
 
-ibd_only_res_clean$FDR=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "BH")
-ibd_only_res_clean$Bonferroni=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "bonferroni")
-###
-###
-###
-###
-###
-write.table(ibd_only_res_clean,"~/Documents/Project_Metabolome/6.Results/072020/Results_lm_onlyIBD.txt",sep="\t", quote = F, row.names = T)
 
-ibd_only_sig=ibd_only_res_clean[ibd_only_res_clean$FDR<0.05,]
-ibd_only_sig=ibd_only_res_clean[ibd_only_res_clean$Bonferroni<0.05,]
+
+ibd_only_res_clean2=ibd_only_res_clean
+ibd_only_res_clean2=subset(ibd_only_res_clean2, ibd_only_res_clean2$phenotype %ni% highlyCorrelated)
+ibd_only_res_clean2=subset(ibd_only_res_clean2, ibd_only_res_clean2$phenotype != "Simpson_Index")
+ibd_only_res_clean2$FDR=p.adjust(ibd_only_res_clean2$`Pr(>|t|)`,method = "BH")
+ibd_only_res_clean2$Bonferroni=p.adjust(ibd_only_res_clean2$`Pr(>|t|)`,method = "bonferroni")
+
+#ibd_only_res_clean$FDR=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "BH")
+#ibd_only_res_clean$Bonferroni=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "bonferroni")
+###
+###
+###
+###
+###
+write.table(ibd_only_res_clean2,"~/Documents/Project_Metabolome/6.Results/072020/Results_lm_onlyIBD.txt",sep="\t", quote = F, row.names = T)
+
+ibd_only_sig=ibd_only_res_clean2[ibd_only_res_clean2$FDR<0.05,]
+ibd_only_sig=ibd_only_res_clean2[ibd_only_res_clean2$Bonferroni<0.05,]
 
 
 
@@ -2325,10 +2406,17 @@ ibd_only_results_prevalence=my_univariate_results
 #ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylcytidine",]
 #ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylguanosine.",]
 
-ibd_only_results_prevalence$FDR=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "BH")
-ibd_only_results_prevalence$Bonferroni=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "bonferroni")
+#ibd_only_results_prevalence$FDR=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "BH")
+#ibd_only_results_prevalence$Bonferroni=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "bonferroni")
 
-write.table(ibd_only_results_prevalence,"~/Documents/Project_Metabolome/6.Results/Results_onlyIBD_prev_052020.txt",sep="\t", quote = F, row.names = T)
+ibd_only_results_prevalence2=ibd_only_results_prevalence
+ibd_only_results_prevalence2=subset(ibd_only_results_prevalence2, ibd_only_results_prevalence2$phenotype %ni% highlyCorrelated)
+ibd_only_results_prevalence2=subset(ibd_only_results_prevalence2, ibd_only_results_prevalence2$phenotype != "Simpson_Index")
+ibd_only_results_prevalence2$FDR=p.adjust(ibd_only_results_prevalence2$`Pr(>|z|)`,method = "BH")
+ibd_only_results_prevalence2$Bonferroni=p.adjust(ibd_only_results_prevalence2$`Pr(>|z|)`,method = "bonferroni")
+
+
+write.table(ibd_only_results_prevalence2,"~/Documents/Project_Metabolome/6.Results/072020/Results_onlyIBD_prev.txt",sep="\t", quote = F, row.names = T)
 
 
 test_pv=as.data.frame(table(only_ibd_quant$host_SmokeCurrentSmoker, only_ibd_quant$cotinine))
@@ -2491,9 +2579,9 @@ library(pROC)
 
 #Select uncorrelated metabolites
 
-mtb_corr=cor(q_mtb, method = "spearman")
-corr_mtb <- findCorrelation(q_mtb, cutoff=0.75)
-remove_corr_mtb=colnames(q_mtb)[corr_mtb]
+#mtb_corr=cor(q_mtb, method = "spearman")
+corr_mtb <- findCorrelation(mtb_corr, cutoff=0.85, names = T)
+
 
 #Define what to test
 rf_IBD=mtb_quantitative_ibd
@@ -2503,7 +2591,7 @@ rf_IBD[rf_IBD$ibd_Diagnosis!="A_Control",]$ibd_Diagnosis="IBD"
 rf_IBD$ibd_Diagnosis=droplevels(rf_IBD$ibd_Diagnosis)
 
 #Remove high correlated metabolites, predictions based on 650 metabolites.  
-rf_IBD=rf_IBD[,colnames(rf_IBD) %ni% remove_corr_mtb]
+rf_IBD=rf_IBD[,colnames(rf_IBD) %ni% corr_mtb]
 rf_IBD$valeric_acid=NULL
 rf_IBD$propionic_acid=NULL
 rf_IBD$isovaleric_acid=NULL
@@ -2564,8 +2652,8 @@ CD vs Controls
 
 #Define what to test
 #rf_IBD=mtb_quantitative_ibd
-my_CD=rownames(mtb_quantitative_ibd)[mtb_quantitative_ibd$ibd_Diagnosis=="CD" | mtb_quantitative_ibd$ibd_Diagnosis=="A_Control" ]
-my_UC=rownames(mtb_quantitative_ibd)[mtb_quantitative_ibd$ibd_Diagnosis=="UC" | mtb_quantitative_ibd$ibd_Diagnosis=="A_Control"]
+my_CD=rownames(mtb_quantitative_ibd)[mtb_quantitative_ibd$ibd_CD=="CD" | mtb_quantitative_ibd$ibd_Diagnosis=="A_Control" ]
+my_UC=rownames(mtb_quantitative_ibd)[mtb_quantitative_ibd$ibd_UC=="UC" | mtb_quantitative_ibd$ibd_Diagnosis=="A_Control"]
 #rf_IBD=rf_IBD[,c(10,64:ncol(rf_IBD))]
 #rf_IBD=rf_IBD[,c(4,70:ncol(rf_IBD))]
 #levels(rf_IBD$ibd_Diagnosis) <- c(levels(rf_IBD$ibd_Diagnosis), "IBD", "a_nonCD", "a_nonUC") 
@@ -2762,7 +2850,9 @@ pROC::ggroc(my_roc, col="orange", size=1.5, ci=T) + theme_bw() + geom_abline(int
 ```{r}
 
 #Relation to bacteria
+
 rare_mtb=all_new_ID_raw [,colnames(all_new_ID_raw) %in% to_remove$Metabolite]
+annot_rare=annot[rownames(annot)%in%colnames(rare_mtb),]
 rare_mtb_coded=rare_mtb
 rare_mtb_coded[!is.na(rare_mtb_coded)]=1
 rare_mtb_coded[is.na(rare_mtb_coded)]=0
@@ -2773,9 +2863,9 @@ rare_mtb2=merge(cc_pheno3,rare_mtb,by="row.names")
 t_rare=t_rare[,c(1,207:ncol(t_rare))]
 
 
-t_res=matrix(nrow=34444,ncol = 4)
-v=1
-for (i in 2:110){
+#t_res=matrix(nrow=34444,ncol = 4)
+#v=1
+#for (i in 2:110){
   for (a in 111:ncol(t_rare)){
     t_res[v,1]=colnames(t_rare)[i]
     t_res[v,2]=colnames(t_rare)[a]
@@ -2790,8 +2880,8 @@ for (i in 2:110){
   }
 }
 
-t_res=as.data.frame(t_res)
-t_res$bnf=p.adjust(as.numeric(as.character(t_res[,4])), method = "bonferroni")
+#t_res=as.data.frame(t_res)
+#t_res$bnf=p.adjust(as.numeric(as.character(t_res[,4])), method = "bonferroni")
 
 #Relation to drugs
 
@@ -2820,13 +2910,13 @@ m_res$bnf=p.adjust(as.numeric(as.character(m_res[,4])), method = "bonferroni")
 
 #Only for drugs within IBD
 
-m_meds=only_ibd_quant[,c(47:95)]
+m_meds=only_ibd_quant[,c(45:92)]
 m_meds2=merge(m_meds,rare_mtb_coded, by="row.names")
 
 m_res_ibd=matrix(nrow=15484,ncol = 4)
 v=1
-for (i in 2:50){
-  for (a in 51:ncol(m_meds2)){
+for (i in 2:49){
+  for (a in 50:ncol(m_meds2)){
     m_res_ibd[v,1]=colnames(m_meds2)[i]
     m_res_ibd[v,2]=colnames(m_meds2)[a]
     m_res_ibd[v,3]=sum(m_meds2[,a] !=0)
@@ -2856,7 +2946,7 @@ cc_pheno4=merge(SCFA2,cc_pheno3, by="row.names")
 rownames(cc_pheno4)=cc_pheno4$Row.names
 cc_pheno4$Row.names=NULL
 cc_pheno5=merge(my_batch_id,cc_pheno4, by="row.names")
-my_regress_phenos=cc_pheno5[,c("Row.names","run_day_cat", "Amount_sample_gram", "LC.COLUMN" , "metabolon_Month_in_freezer" , "ibd_Diagnosis")]
+my_regress_phenos=cc_pheno5[,c("Row.names","run_day_cat", "Amount_sample_gram", "LC.COLUMN" , "metabolon_Month_in_freezer" , "host_Age_sampling", "host_BMI","host_Sex", "ibd_Diagnosis")]
 rownames(my_regress_phenos)=my_regress_phenos$Row.names
 my_regress_phenos$Row.names=NULL
 
@@ -2887,6 +2977,26 @@ for (i in 7:ncol(rgs_tx)){
 rgs_tx2=as.data.frame(rgs_tx2)
 rownames(rgs_tx2)=rgs_tx$Row.names
 colnames(rgs_tx2)=colnames(rgs_tx)[7:ncol(rgs_tx)]
+
+
+library ("Hmisc")
+test_corr2=rcorr(as.matrix(test_corr), type = "spearman")
+test_corr_coef=test_corr2$r
+test_corr_coef_sel=test_corr_coef[(ncol(rgs_mb4)+1):nrow(test_corr_coef), 1:ncol(rgs_mb4)]
+test_corr_pval=test_corr2$P
+test_corr_pval_sel=test_corr_pval[(ncol(rgs_mb4)+1):nrow(test_corr_pval), 1:ncol(rgs_mb4)]
+
+corr_coef=melt(test_corr_coef_sel)
+corr_pval=melt(test_corr_pval_sel)
+
+table(corr_coef$Var1 == corr_pval$Var1)
+table(corr_coef$Var2 == corr_pval$Var2)
+
+colnames(corr_coef)=c("BGC","Metabolites","Coeff")
+colnames(corr_pval)=c("BGC2","Metabolites2","P_val")
+bcg_metabolites=cbind(corr_coef, corr_pval)
+
+
 
 flag=1
 for (mtb in 1:ncol(rgs_mb2)){
