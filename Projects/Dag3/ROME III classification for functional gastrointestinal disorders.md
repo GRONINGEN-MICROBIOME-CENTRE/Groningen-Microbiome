@@ -17,6 +17,7 @@ If containing no sex information: Add a column sex to this data R0$sex and label
 #### Variable names questions: ROME1 to ROME26 
 #### Score questions
 
+---
 #### New variables created: ROME1s - ROME26s
 for(i in c("ROME1","ROME19","ROME21","ROME23","ROME25")){
   RO$j <- ifelse(RO[,i]=="never",0,
