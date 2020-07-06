@@ -4,18 +4,16 @@
 #### Version 2: 20th March 2020 Trishla Sinha 
 #### Update on 25th March 2020 by Trishla Sinha: translating, editing scripts as per new requirements 
 
-#### accompanying document: RomeIII_functional bowel disorders questionnaire.pdf
-#### execution of the code below will results in 29 additional variables:
+#### Based on the scoring document for the Rome foundation:  RomeIII_functional bowel disorders questionnaire.pdf
+#### Execution of the code below will results in 29 additional variables:
    - 26 scoring variables representing the 26 questions of the questionnaire
    - variable IBS stating yes or no for IBS
    - variable Subtype specifying the IBS subtype C/D/M/U
    - variable FGID listing all functional gastrointestinal disorders from this questionnaire: IBS, IBS strict, functional constipation, functional diarrhea, functional bloating
 
-#### name of dataframe: RO (@Dasha check if this one also has sex information)
+#### Name of dataframe: RO 
 If containing no sex information: Add a column sex to this data R0$sex and label it male and female
 #### Variable names questions: ROME1 to ROME26 
-
-
 #### score questions
 #### new variables created: ROME1s - ROME26s
 for(i in c("ROME1","ROME19","ROME21","ROME23","ROME25")){
