@@ -1,4 +1,4 @@
-# **Diagnosis RomeIII questionnaire**
+# **Diagnosis Rome III questionnaire**
 
 #### Version 1: 21st July 2016 Ettje Tigchelaar
 #### Version 2: 20th March 2020 Trishla Sinha 
