@@ -14,8 +14,8 @@
 #### Name of dataframe: RO 
 If containing no sex information: Add a column sex to this data R0$sex and label it male and female
 #### Variable names questions: ROME1 to ROME26 
-#### score questions
-#### new variables created: ROME1s - ROME26s
+#### Score questions
+#### New variables created: ROME1s - ROME26s
 for(i in c("ROME1","ROME19","ROME21","ROME23","ROME25")){
   RO$j <- ifelse(RO[,i]=="never",0,
          ifelse(RO[,i]=="less than 1 day a month",1,
@@ -87,5 +87,5 @@ RO$FGID <- ifelse(RO$IBS=="yes" & g==1, "IBS strict",
                                    ifelse(RO$IBS=="no" & l==1,"functional bloating",RO$IBS)))))
 
 
-##### Note that IBS strict criteria is not used for this pupose as its a stricter definition for clinical trials 
-##### In FGID, NA's to No's as all participants answere the questionaires 
+#### Note that IBS strict criteria is not used for this pupose as its a stricter definition for clinical trials 
+#### In FGID, NA's to No's as all participants answere the questionaires 
