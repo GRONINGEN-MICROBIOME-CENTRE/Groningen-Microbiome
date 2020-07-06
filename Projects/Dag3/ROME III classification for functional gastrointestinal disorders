@@ -1,9 +1,8 @@
-###################################
-# Diagnosis RomeIII questionnaire #
-###################################
-# Version 1: 21st July 2016 Ettje Tigchelaar
-# Version 2: 20th March 2020 Trishla Sinha 
-# Update on 25th March 2020 by Trishla Sinha: translating, editing scripts as per new requirements 
+# **Diagnosis RomeIII questionnaire**
+
+#### Version 1: 21st July 2016 Ettje Tigchelaar
+#### Version 2: 20th March 2020 Trishla Sinha 
+#### Update on 25th March 2020 by Trishla Sinha: translating, editing scripts as per new requirements 
 
 # accompanying document: RomeIII_functional bowel disorders questionnaire.pdf
 # execution of the code below will results in 29 additional variables:
