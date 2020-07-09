@@ -4,7 +4,6 @@ library(vegan)
 # Microbiome scripts
 # by: Ranko Gacesa, UMCG
 # ==============================================
-
 doMicrobiomeAdonis <- function(inDF,
                                idCol = "ID",
                                permNR = 10000,
@@ -1495,7 +1494,6 @@ testAbundances <- function(dataIn,saveFolder,pathway=T,doSave=T,display="P",only
 # - calculates p nominal, p adjusted (holm) and FDR (with input number of tests)
 # - plots and outputs to saveFolder
 # ====================================================================================
-
 testOneFeaturePrevalence <- function(dataIn,saveFolder,feature=NA,doSave=T,display="P",onlyShowSig=T,yLab=NA,title=NA,na.rem=T,
                              responseVar="Diagnosis",stTest="chisquared",doPlots = T,nrTests=-1,xLab=NA,retPlot=F,ylim=NA,addNRs=F,
                              cutoff=0.05)

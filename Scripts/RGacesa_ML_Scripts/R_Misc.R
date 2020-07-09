@@ -84,12 +84,10 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
     print(paste0('==================================================================================='))
   }
   if (!response %in% colnames(inDF)) {
-    print(paste0('ERROR: ',response,' not in inDF columns! STOPPING!'))
-    return()
+    stop(paste0('ERROR: ',response,' not in inDF columns! STOPPING!'))
   }
   if (!ftr %in% colnames(inDF)) {
-    print(paste0('ERROR: ',ftr,' not in inDF columns! STOPPING!'))
-    return()
+    stop(paste0('ERROR: ',ftr,' not in inDF columns! STOPPING!'))
   }
   inDF <- inDF[,c(ftr,response)]
   if (dropNAs) {
@@ -98,9 +96,8 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
     print('WARNING: NAs in data and dropNAs is FALSE, CODE MIGHT CRASH!!!')
   }
   if (doTestVsControl) {
-    if (!controlClass %in% inDF[[response]]) {
-      print(paste0('ERROR: ',controlClass,' not in ',response, ' STOPPING!'))
-      return()
+    if (!controlClass %in% inDF[[response]] & !controlClass == "OTHERS") {
+      stop(paste0('ERROR: ',controlClass,' not in ',response, ' STOPPING! Use control = existing class or "OTHERS" to test VS rest of data'))
     }
   }
   ret = data.frame()
@@ -116,6 +113,10 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
     if (class(inDF[[ftr]]) == "integer") {
       inDF[[ftr]] <- as.numeric(inDF[[ftr]])
     }
+    # if (class(inDF[[ftr]]) == "character") {
+    #   inDF[[ftr]] <- as.factor(inDF[[ftr]])
+    # }
+    # 
     # ==================================================
     # NUMERIC VARIABLE
     #  > use M/U/W test (wilcoxon implementation in R)
@@ -152,33 +153,45 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
       if (!doTestVsControl) {
         print(paste0(' > ',response,' = ',rv,'; mean(',ftr,') = ',mn,'; sd = ',sd,'| median = ',md,' Q1 = ',q1,' Q3 = ',q3))
         ret <- rbind.data.frame(ret,oneRow)
-      } else {
-        if (rv != controlClass) {
-          ctrData <- inDF[inDF[[response]] == controlClass,][[ftr]]
+      } else if (controlClass == "OTHERS") {
+        if (rv != "TOTAL") {
+          ctrData <- inDF[inDF[[response]] != rv,][[ftr]]
           tst <- wilcox.test(ctrData,ftrData)
           if (verbose) {
-            print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+            print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS all other classes'))
           }
           sigStr = ""
           pV <- tst$p.value
           if (verbose) {
             print(paste0(' > P-value = ',pV))
           }
-        } else {
-          pV = NA; sig = ""; FDR = NA
-        } 
-        oneRow$pV <- pV
-        ret <- rbind.data.frame(ret,oneRow)
-      }
+        }
+      } else if (rv != controlClass) {
+        ctrData <- inDF[inDF[[response]] == controlClass,][[ftr]]
+        tst <- wilcox.test(ctrData,ftrData)
+        if (verbose) {
+          print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+        }
+        sigStr = ""
+        pV <- tst$p.value
+        if (verbose) {
+          print(paste0(' > P-value = ',pV))
+        }
+      } else {
+        pV = NA; sig = ""; FDR = NA
+      } 
+      oneRow$pV <- pV
+      ret <- rbind.data.frame(ret,oneRow)
     } 
     # ===============================================
     # CATEGORICAL VARIABLE <BINARY>
     # > use chi/squared test
     # report: 
     #  > percent of group 1
+    # TODO: add "others"
     # ===============================================
     if (class(inDF[[ftr]]) == "factor") {
-      
+      # BINARY VARIABLE
       if (length(unique(inDF[[ftr]])) == 2) {
         if (verbose) {
           print(paste0('   -> ',ftr,' is factor with 2 classes!!'))
@@ -206,9 +219,13 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
                               Lvl2=g2,nrLvl2=nrg2,percLvl2=percg2)
         if (!doTestVsControl) {
           retB <- rbind.data.frame(retB,oneRowB)
-        } else {
-          if (rv != controlClass & rv != "TOTAL") {
-            toTestDF <- inDF[inDF[[response]] %in% c(rv,controlClass),]          
+        } else if (controlClass == "OTHERS") {
+          if (rv != "TOTAL") {
+            toTestDF <- inDF
+            toTestDF[[response]] <- as.character(toTestDF[[response]])
+            toTestDF[[response]][toTestDF[[response]] != rv] <- "OTHERS"
+            toTestDF[[response]] <- as.factor(toTestDF[[response]])
+            
             toTestDF[[ftr]] <- as.factor(as.character(toTestDF[[ftr]] ))
             toTestDF[[response]] <- as.factor(as.character(toTestDF[[response]] ))
             tblTest <- table(toTestDF[[ftr]],toTestDF[[response]])
@@ -218,20 +235,38 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
               print(tst)
             }
             if (verbose) {
-              print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+              print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS all other classes'))
             }
             sigStr = ""
             pV <- tst$p.value
             if (verbose) {
               print(paste0(' > P-value = ',pV))
             }
-          } else {
-            pV = NA; sig = ""; FDR = NA
-          } 
-          oneRowB$pV <- pV
-          retB <- rbind.data.frame(retB,oneRowB)
-          ret <- retB
-        }
+          }
+        } else if (rv != controlClass & rv != "TOTAL") {
+          toTestDF <- inDF[inDF[[response]] %in% c(rv,controlClass),]          
+          toTestDF[[ftr]] <- as.factor(as.character(toTestDF[[ftr]] ))
+          toTestDF[[response]] <- as.factor(as.character(toTestDF[[response]] ))
+          tblTest <- table(toTestDF[[ftr]],toTestDF[[response]])
+          tst <- chisq.test(tblTest)
+          if (verbose) {
+            print(tblTest)
+            print(tst)
+          }
+          if (verbose) {
+            print(paste0(" TESTING variable ",ftr,", Response variable(",response,") class " ,rv,' VS ',controlClass))
+          }
+          sigStr = ""
+          pV <- tst$p.value
+          if (verbose) {
+            print(paste0(' > P-value = ',pV))
+          }
+        } else {
+          pV = NA; sig = ""; FDR = NA
+        } 
+        oneRowB$pV <- pV
+        retB <- rbind.data.frame(retB,oneRowB)
+        ret <- retB
       }
     } else if (TRUE) {
       # ========================================
@@ -249,8 +284,8 @@ makeOneSummaryByResponse <- function(inDF,ftr,response,doTestVsControl=T,control
 # makeOneSummaryByResponse, but ftrs is vector of variable names
 # =====================================================================
 makeMultiSummaryByResponse <- function(inDF,ftrs,response,doTestVsControl=T,controlClass="HC",
-                                       formatSci=F,formatDig=2,formatRoundDig=3,doFDR=T,verbose=F,
-                                       includeTotals=T,doSort=T)
+                                       formatSci=F,formatDig=3,formatRoundDig=3,doFDR=T,verbose=F,
+                                       includeTotals=T,doSort=T,addResponseVarCol=T)
 {
   ret <- data.frame()
   # debug / reality check
@@ -281,6 +316,9 @@ makeMultiSummaryByResponse <- function(inDF,ftrs,response,doTestVsControl=T,cont
   ret$niceOut <- paste0(ret$niceOut," ",ret$FDRsig)
   if (doSort) {
     ret <- ret[order(ret$pV,decreasing = F),]
+  }
+  if (addResponseVarCol) {
+    ret$ResponseVar <- response
   }
   ret
 }
@@ -1475,11 +1513,14 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
                                             cellWidth=15, 
                                             cellHeight=15,
                                             nrColors = 13,
-                                            flipCoords = T
+                                            flipCoords = T,
+                                            shortenTaxNames = T,
+                                            returnWideDFs = T
 )
 {
   # other variables
   featuresToPlotGrep = ""
+  directionValue = "coef"
   # ================================================
   # ERROR CHECK:
   # =================================================
@@ -1498,6 +1539,13 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
   }
   if (!plotTextSig %in% c("all","nomSig","padjSig")) {
     stop(paste0("ERROR: plotTextSig parameter MUST BE one of ['all', 'nomSig', 'padjSig']"))
+  }
+  
+  if (shortenTaxNames) {
+    inData$feature <- as.character(inData$feature)
+    for (cc in seq(1,nrow(inData))) {
+      inData$feature[cc] <- purgeMGNameOne(inData$feature[cc])
+    }
   }
   
   if (featuresToPlot == "Taxa" | featuresToPlot == "All") {
@@ -1539,15 +1587,15 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
   }
   # test for non-existing models (nominal significance)
   if (!nominalSigParameter %in% colnames(inDFf)) {
-    stop(paste0('ERROR: stat "',nominalSigParameter,'" + model "',modelToUse,'" does not exist in data, try different modelToUse or nominalSigParameter!'))
+    stop(paste0('ERROR: stat ',nominalSigParameter,' does not exist in data, try different nominalSigParameter!'))
   }
   # test for non-existing direction values
   if (!directionValue %in% colnames(inDFf)) {
-    stop(paste0('ERROR: directionStat "',directionStat,'" + model "',modelToUse,'" does not exist in data, try directionStat = R2'))
+    stop(paste0('ERROR: directionStat ',directionValue,' does not exist in data, try directionStat = R2'))
   }
   # test for non-existing direction values
   if (!sigParameter %in% colnames(inDFf)) {
-    stop(paste0('ERROR: sigStat "',directionStat,'" + model "',modelToUse,'" does not exist in data, try different modelToUse or sigStat!'))
+    stop(paste0('ERROR: sigStat "',sigParameter,' does not exist in data, try different sigStat!'))
   }
   
   # collect data from results file
@@ -1560,10 +1608,10 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
     stop('WARNING: No significant results found, stopping!')
   }
   # shorten names
-  for (r in c(1:nrow(inDFfs))) {
-    #print(inDFfs$Taxon[r])
-    inDFfs$Feature[r] <- (purgeMGNameOne(inDFfs$Feature[r]))
-  }
+  # for (r in c(1:nrow(inDFfs))) {
+  #   #print(inDFfs$Taxon[r])
+  #   inDFfs$Feature[r] <- (purgeMGNameOne(inDFfs$Feature[r]))
+  # }
   # make wide dataframe for heatmap plotting
   # ======================================
   inDFwide <- reshape(inDFfs, idvar = "Phenotype", timevar = "Feature", direction = "wide")
@@ -1654,6 +1702,7 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
   }
   rownames(inTextWide) <- inTextWide$Phenotype
   inTextWide$Phenotype <- NULL
+  inValueWideOrg <- inValueWide
   # >>> filter dataframes by significance if needed
   #  > heatmap values
   #    > filter by nominal significance
@@ -1722,7 +1771,11 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
                 treeheight_row = 0, treeheight_col = 0,legend_labels = "log(p-value)",color = myColor,
                 fontsize_col = colTextSize,fontsize_row = rowTextSize,display_numbers = plotDFText,breaks = myBreaks,
                 cellwidth = cellWidth,cellheight = cellHeight)
-  p
+  if (!returnWideDFs) {
+    p
+  } else {
+    list(Values.pv=inValueWideOrg,Values.qv=inSigAdjWide,Dir=inDirWide,Plot=p)
+  }
 }
 
 # =================================================================
@@ -1775,7 +1828,8 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
                                           nrColors = 13,
                                           flipCoords = T,
                                           doRefactor=F,
-                                          refactorIncludeAllClasses=F
+                                          refactorIncludeAllClasses=F,
+                                          trimNames = F
 )
 
 {
@@ -1946,6 +2000,7 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   }
   # shorten names
   if (dataType=="taxon") {
+    inDFfs$Feature <- as.character(inDFfs$Feature)
     for (r in c(1:nrow(inDFfs))) {
       #print(inDFfs$Taxon[r])
       inDFfs$Feature[r] <- (purgeMGNameOne(inDFfs$Feature[r]))
@@ -1955,6 +2010,11 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   # make wide dataframe for heatmap plotting
   # ======================================
   inDFwide <- reshape(inDFfs, idvar = "Phenotype", timevar = "Feature", direction = "wide")
+  # kill class bug
+  for (cc in colnames(inDFwide)) {
+    inDFwide[[cc]] <- as.character(inDFwide[[cc]])
+  }
+  
   # subset taxa
   rownames(inDFwide) <- inDFwide$Phenotype
   inDFwide <- inDFwide[,grep(featuresToPlotGrep,colnames(inDFwide))]
@@ -2001,6 +2061,7 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
   for (cn in colnames(inSigAdjWide)[colnames(inSigAdjWide)!="Phenotype"]) {
     inSigAdjWide[[cn]][is.na(inSigAdjWide[[cn]])] <- 1.0
+    inSigAdjWide[[cn]] <- as.numeric(as.character(inSigAdjWide[[cn]]))
   }
   # rownames(inSigAdjWide) <- inSigAdjWide$Phenotype
   # inSigAdjWide$Phenotype <- NULL
@@ -2013,6 +2074,7 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   #  otherwise values are 0 for purposes of plotting (effect size, chi-squared statistic, correlation)
   for (cn in colnames(inSigNomWide)[colnames(inSigNomWide)!="Phenotype"]) {
     inSigNomWide[[cn]][is.na(inSigNomWide[[cn]])] <- 1.0
+    inSigNomWide[[cn]] <- as.numeric(as.character(inSigNomWide[[cn]]))
   }
   # rownames(inSigNomWide) <- inSigNomWide$Phenotype
   # inSigNomWide$Phenotype <- NULL
