@@ -1,4 +1,4 @@
-##version 1.0.1 from 7 May 2020.
+##version 1.0.0 from 7  July 2020.
 ##Written by Alex Kur
 
 # Instruction manual (simple)
@@ -8,177 +8,111 @@
 # 3. open R  
 #   $ R
 # 4. Load script as a source 
-#   > source("PhenoMicrobeReEvaluation_v.1.0.0.R")
-# 5. two main functions:
-#   > run.association.pathway(pathway_name,phenotypes,model.type = "complete")
-#   > run.association.taxa(taxon_name,phenotypes,model.type = "complete")
-# Pathway_name and taxon_name should be single element characters of your taxon/pathway of interest.
-#
+#   > source("run_multiple_phenos.R")
+#   > run.associations(phenotypes, trait, trait_group = "taxa")
+# In this function, 'phenotypes' is a vector with phenotypes of your interest, 'trait' is microbial trait of corresponding type,
+# and trait_group is a group of microbiome data, should be 'taxa','pathways','KOterms','CARD' , 'VFDB' or 'alpha'
+# for "trait_group = alpha", trait should be: trait='shannon'  
 # Phenotypes could be vector of one or few phenotype names, 
 # for example:
 #   > c("MED.BLOOD.Lymphocytes_10E9perL","MED.BLOOD.Bpressure.systolic.mm.Hg")
-#
-# model.type should be "complete", "mu", "nu" and "sigma". Mainly, complete and mu should be in frequent use. 
+# OUTPUT:
+# result = run_associations(parameters)
+# result$anova - overall significance of all phenotypes (similar to anova() output)
+# result$summary - conditional significance of each phenotypes (similar to summary(lm) output)
 
 
 
+# load R libraries --------------------------------------------------------
+library(data.table)
+library(vegan)
 
-#loading data for analysis
-message("Start loading data")
-library(gamlss)
 
-covar_path = read.table("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/covariates_path.txt")
-pathways = read.table("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/pathways_metacyc.txt")
-pathways = pathways[,colSums(pathways>0)>nrow(pathways) * 0.05]
 
-covar_tax = read.table("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/covariates.txt")
+# load and prepare all input data -----------------------------------------------------
+
+do_clr_externalWeighting = function(interest_matrix, core_matrix){
+  if(any(interest_matrix==0)) interest_matrix = interest_matrix + min(interest_matrix[interest_matrix>0])/2
+  if(any(core_matrix==0)) core_matrix = core_matrix + min(core_matrix[core_matrix>0])/2
+  
+  #estimate weighting parameter
+  gm_mean = function(x, na.rm=TRUE){
+    exp(sum(log(x), na.rm=na.rm) / length(x))
+  }
+  Gmean_core = apply(core_matrix, 1, gm_mean)
+  
+  #do transformation
+  data_prepared = cbind(Gmean_core,interest_matrix)
+  data_transformed = t(apply(data_prepared,1,function(x){
+    log(x / x[1])[-1]
+  }))
+  colnames(data_transformed) = colnames(data_transformed)
+  rownames(data_transformed) = rownames(data_transformed)
+  data_transformed
+}
+load("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/pheno_release26.RData")
+covar = read.table("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/covariates.txt")[,-8]
+
 taxa = read.table("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/taxa.txt")
-taxa = taxa[,colSums(taxa>0)>nrow(taxa) * 0.05]
 
-load("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/phenos.RData")
+alpha = data.frame(shannon=diversity(taxa[,grep("s__",colnames(taxa))],index = "shannon"))
 
-if(all(unlist(lapply(c("taxa","pathways","pheno","covar_path","covar_tax"),exists)))) message("All data succesfully loaded")
+pathways = read.table("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov/Association.analysis.input/pathways_metacyc.txt")
 
-#functions for public use
-show.pathways = function() print(colnames(pathways))
-show.taxa = function() print(colnames(taxa))
-show.phenotypes = function() print(colnames(pheno))
+taxa_transformed = do_clr_externalWeighting(taxa,taxa[,grep("[.]s__",colnames(taxa))])
+taxa_transformed = taxa_transformed[,colSums(taxa>0)>nrow(taxa) * 0.05]
 
-#main function for phenotypes
-run.association.pathway = function(pathway_name,phenotypes,model.type = "complete"){
-  if(!(pathway_name %in% colnames(pathways))) stop ("check your pathway names. Stopped")
-  if(!all(phenotypes %in% colnames(pheno))) stop ("check your phenotype names. Stopped")
+pathways_transformed = do_clr_externalWeighting(pathways,pathways)
+pathways_transformed = pathways_transformed[,colSums(pathways>0)>nrow(pathways)*0.05]
+
+KOterms = fread("/groups/umcg-lifelines/tmp01/projects/dag3_fecal_mgs/DAG3_data_ready/microbiome/processed/dag3_kegg_unfiltered_lvl3.csv",header=T,sep=",")
+KOterms = as.data.frame(KOterms)
+rownames(KOterms) = KOterms[,ncol(KOterms)]
+KOterms = KOterms[,-ncol(KOterms)]
+KOterms = KOterms[intersect(rownames(KOterms),rownames(taxa)),]
+KOterms_transformed = do_clr_externalWeighting(KOterms,KOterms)
+KOterms_transformed = KOterms_transformed[,colSums(KOterms>0)>0.05 * nrow(KOterms)]
+CARD = fread("/groups/umcg-lifelines/tmp01/projects/dag3_fecal_mgs/DAG3_data_ready/microbiome/processed/DAG3_CARD_nofiltering.txt",header=T)
+CARD = as.data.frame(CARD,stringsAsFactors=F)
+rownames(CARD) = CARD[,1]
+CARD = CARD[,-1]
+CARD = CARD[intersect(rownames(CARD),rownames(taxa)),]
+CARD_transformed = do_clr_externalWeighting(CARD,CARD)
+CARD_transformed = CARD_transformed[,colSums(CARD>0)>0.05 * nrow(CARD)]
+
+VFDB = fread("/groups/umcg-lifelines/tmp01/projects/dag3_fecal_mgs/DAG3_data_ready/microbiome/processed/DAG3_VFDB_VFs_nofiltering.txt",header=T)
+VFDB = as.data.frame(VFDB,stringsAsFactors=F)
+rownames(VFDB) = VFDB[,1]
+VFDB = VFDB[,-1]
+VFDB = VFDB[intersect(rownames(taxa),rownames(VFDB)),]
+VFDB_transformed = do_clr_externalWeighting(VFDB,VFDB)
+VFDB_transformed = VFDB_transformed[,colSums(VFDB>0)>0.05 * nrow(VFDB)]
+
+
+
+# function for associations -----------------------------------------------
+
+run_associations = function(phenotypes, trait, trait_group = "taxa"){
+  if (trait_group == "taxa") {trait_interest = taxa_transformed[,trait,drop = F]
+  } else if ((trait_group == "pathways")) {trait_interest = pathways_transformed[,trait,drop = F]
+  } else if ((trait_group == "KOterms")) {trait_interest = KOterms_transformed[,trait,drop = F]
+  } else if ((trait_group == "CARD")) {trait_interest = CARD_transformed[,trait,drop = F]
+  } else if ((trait_group == "alpha")) {trait_interest = alpha[,trait,drop = F]
+  } else if ((trait_group == "VFDB")) {trait_interest = VFDB_transformed[,trait,drop = F]
+  }else stop("trait_group or trait name is wrong! trait_group should be one of 'taxa','pathways','KOterms','CARD' or 'VFDB'. Check trait names by using traitnames() function)")  
   
-  #preparing data for analysis
-  predictors = data.frame(covar_path,pheno[,phenotypes,drop = F])
-  good.samples = complete.cases(predictors)
-  pathway = pathways[good.samples,pathway_name]
-  cleaned_data = predictors[good.samples,]
-  formula.str = as.formula(paste("pathway ~ ",
-                      paste(collapse="+",c("Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7",phenotypes))))
-  formula.shrinked = as.formula(paste(collapse="+",c("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7",phenotypes)))
+  covar_local = covar[rownames(trait_interest),]
+  pheno_local = pheno26[rownames(trait_interest),,drop = F]
+  predictors = try(data.frame(covar_local,pheno_local[,phenotypes,drop = F]))
+  if (class(predictors) == "try-error") stop ("wrong phenotype names!")
+  lm_null = lm(trait_interest[complete.cases(predictors),1] ~ .,data = covar_local[complete.cases(predictors),])
+  lm_alter = lm(trait_interest[complete.cases(predictors),1] ~ .,data = predictors[complete.cases(predictors),])
+  anova.overall = anova(lm_alter,lm_null)
+  summary_object = summary(lm_alter)$coef[-c(1:(1+ncol(covar_local))),,drop =F]
   
-  if(model.type == "complete"){
-    bezi.model = gamlss(formula.str,
-                        sigma.formula = formula.shrinked,
-                        nu.formula = formula.shrinked,
-                        data = cleaned_data,
-                        family = "BEZI",
-                        method = RS(50))
-    summary.object = summary(bezi.model)
-    output = data.frame(parameter = c(rep("mu",length(phenotypes)),rep("sigma",length(phenotypes)),rep("nu",length(phenotypes))),
-                                      summary.object[rownames(summary.object) %in% phenotypes,])
-    output = data.frame(phenotype = sub("[.][0-9]$","",rownames(output)),pathway = pathway_name,output,row.names=NULL)
-  } else if (model.type == "mu"){
-    bezi.model = gamlss(formula.str,
-                        sigma.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        nu.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        data = cleaned_data,
-                        family = "BEZI",
-                        method = RS(50))
-    summary.object = summary(bezi.model)
-    output = data.frame(parameter = "mu",summary.object[rownames(summary.object) %in% phenotypes,])
-    output = data.frame(phenotype = rownames(output),pathway = pathway_name,output, row.names=NULL)
-  } else if (model.type == "nu"){
-    bezi.model = gamlss(as.formula("pathway ~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                                     DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        sigma.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        nu.formula = formula.shrinked,
-                        data = cleaned_data,
-                        family = "BEZI",
-                        method = RS(50))
-    summary.object = summary(bezi.model)
-    output = data.frame(parameter = "nu",summary.object[rownames(summary.object) %in% phenotypes,])
-    output = data.frame(phenotype = rownames(output),pathway = pathway_name,output, row.names=NULL)
-  }
-    else if (model.type == "sigma"){
-      bezi.model = gamlss(as.formula("pathway ~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                                     DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                          sigma.formula = formula.shrinked,
-                          nu.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                          data = cleaned_data,
-                          family = "BEZI",
-                          method = RS(50))
-      summary.object = summary(bezi.model)
-      output = data.frame(parameter = "sigma",summary.object[rownames(summary.object) %in% phenotypes,])
-      output = data.frame(phenotype = rownames(output),pathway = pathway_name,output, row.names=NULL)
-    } else {stop("incorrect parameter selected. Should be mu,nu or sigma")}
-  output
+  result = list()
+  result$anova = anova.overall
+  result$summary = summary_object
+  rownames(result$summary) = names(lm_alter$coef[-c(1:(ncol(covar_local)+1))])
+  result
 }
-  
-  
-run.association.taxa = function(taxon_name,phenotypes,model.type = "complete"){
-  if(!(taxon_name %in% colnames(taxa))) stop ("check your taxon name. Stopped")
-  if(!all(phenotypes %in% colnames(pheno))) stop ("check your phenotype names. Stopped")
-  
-  #preparing data for analysis
-  predictors = data.frame(covar_tax,pheno[,phenotypes,drop = FALSE])
-
-  good.samples = complete.cases(predictors)
-  taxon = taxa[good.samples,taxon_name]
-  cleaned_data = predictors[good.samples,]
-  formula.str = as.formula(paste("taxon ~ ",
-                                 paste(collapse="+",c("Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7",phenotypes))))
-  formula.shrinked = as.formula(paste(collapse="+",c("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7",phenotypes)))
-  
-  if(model.type == "complete"){
-    bezi.model = gamlss(formula.str,
-                        sigma.formula = formula.shrinked,
-                        nu.formula = formula.shrinked,
-                        data = cleaned_data,
-                        family = "BEZI",
-                        method = RS(50))
-    summary.object = summary(bezi.model)
-    output = data.frame(parameter = c(rep("mu",length(phenotypes)),rep("sigma",length(phenotypes)),rep("nu",length(phenotypes))),
-                        summary.object[rownames(summary.object) %in% phenotypes,])
-    output = data.frame(phenotype = sub("[.][0-9]$","",rownames(output)),taxon = taxon_name,output,row.names=NULL)
-  } else if (model.type == "mu"){
-    bezi.model = gamlss(formula.str,
-                        sigma.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        nu.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        data = cleaned_data,
-                        family = "BEZI",
-                        method = RS(50))
-    summary.object = summary(bezi.model)
-    output = data.frame(parameter = "mu",summary.object[rownames(summary.object) %in% phenotypes,])
-    output = data.frame(phenotype = rownames(output),taxon = taxon_name,output, row.names=NULL)
-  } else if (model.type == "nu"){
-    bezi.model = gamlss(as.formula("taxon ~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                                     DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        sigma.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        nu.formula = formula.shrinked,
-                        data = cleaned_data,
-                        family = "BEZI",
-                        method = RS(50))
-    summary.object = summary(bezi.model)
-    output = data.frame(parameter = "nu",summary.object[rownames(summary.object) %in% phenotypes,])
-    output = data.frame(phenotype = rownames(output),taxon = taxon_name,output, row.names=NULL)
-  }
-  else if (model.type == "sigma"){
-    bezi.model = gamlss(as.formula("taxon ~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                                     DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        sigma.formula = formula.shrinked,
-                        nu.formula = as.formula("~ Age+Sex+Season.spring+Season.summer+Season.unknown+Season.winter+
-                              DNA.con+GeoMean+batch.2+batch.3+batch.4+batch.5+batch.6+batch.7"),
-                        data = cleaned_data,
-                        family = "BEZI",
-                        method = RS(50))
-    summary.object = summary(bezi.model)
-    output = data.frame(parameter = "sigma",summary.object[rownames(summary.object) %in% phenotypes,])
-    output = data.frame(phenotype = rownames(output),taxon = taxon_name,output, row.names=NULL)
-  } else {stop("incorrect parameter selected. Should be mu,nu or sigma")}
-  output
-}
-
-
