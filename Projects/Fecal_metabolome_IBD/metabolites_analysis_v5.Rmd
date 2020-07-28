@@ -2098,7 +2098,7 @@ associations_controls=my_univariate_results
 associations_controls$FDR=p.adjust(associations_controls$`Pr(>|t|)`,method = "BH")
 associations_controls$Bonferroni=p.adjust(associations_controls$`Pr(>|t|)`,method = "bonferroni")
 
-write.table(associations_ibd, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/Controls_associations_quantitative.txt", sep = "\t", quote = F)
+write.table(associations_controls, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/Controls_associations_quantitative.txt", sep = "\t", quote = F)
 
 
 ##TEST PREVALENCE ###
@@ -2281,234 +2281,6 @@ write.table(prev_univariate_control, "~/Desktop/Metabolomics_for_cluster/3.Preli
 
 
 
-
-
-
-10. Associations only in the IBD cohort
-===
-
-```{r}
-
-
-only_ibd_quant=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/ibd_quant.txt",sep="\t", header = T, row.names = 1)
-only_ibd_quant$ibd_CurrentStomaOrPouch=NULL
-only_ibd_quant$host_Sex.1=NULL
-only_ibd_quant$med_parasympathicolytic_inhaler=NULL
-only_ibd_quant$med_ranitidine=NULL
-#346 347
-flag=1
-for ( i in 1:237) {
-  my_pheno=colnames(only_ibd_quant)[i]
-  if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling") {
-    print (paste("Skipping phenotype:",my_pheno))
-    
-  } 
-  else if ( my_pheno=="ibd_Diagnosis"){
-    print (paste("Testing:",my_pheno))
-    for (a in 238:ncol(only_ibd_quant)){
-      my_trait=colnames(only_ibd_quant)[a]
-      my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno,my_trait)]
-      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno)
-      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
-      #my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
-      my_samples=nrow(my_uni_test)
-      my_lm=summary(lm(my_f,data = my_uni_test ))
-      my_lm_coef=as.data.frame(my_lm$coefficients)
-      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
-      my_lm_pheno$metabolite=my_trait
-      my_lm_pheno$phenotype=my_pheno
-      my_lm_pheno$factor=rownames(my_lm_pheno)
-      if (flag!=1){
-          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
-      }else{
-          my_univariate_results=my_lm_pheno
-          flag=5
-      }
-    }
-  }else {
-    print (paste("Testing:",my_pheno))
-    for (a in 238:ncol(only_ibd_quant)){
-      my_trait=colnames(only_ibd_quant)[a]
-      my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
-      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
-      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
-      #my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
-      my_samples=nrow(my_uni_test)
-      my_lm=summary(lm(my_f,data = my_uni_test ))
-      my_lm_coef=as.data.frame(my_lm$coefficients)
-      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
-      my_lm_pheno$metabolite=my_trait
-      my_lm_pheno$phenotype=my_pheno
-      my_lm_pheno$factor=rownames(my_lm_pheno)
-      if (flag!=1){
-          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
-      }else{
-          my_univariate_results=my_lm_pheno
-          flag=5
-      }
-    }
-  }
-}
-
-ibd_only_results=my_univariate_results
-ibd_only_results[ibd_only_results$phenotype=="Shannon_Index",]$factor="sp_richness"
-ibd_only_results[ibd_only_results$phenotype=="Simpson_Index",]$factor="sp_richness"
-ibd_only_res_clean=ibd_only_results
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="Methylbutyric_acid",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="acetic_acid",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="butyric_acid",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="hexanoic_acid",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="isovaleric_acid",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="isobutyric_acid",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="propionic_acid",]
-ibd_only_res_clean=ibd_only_res_clean[ibd_only_res_clean$phenotype!="valeric_acid",]
-
-
-
-ibd_only_res_clean2=ibd_only_res_clean
-ibd_only_res_clean2=subset(ibd_only_res_clean2, ibd_only_res_clean2$phenotype %ni% highlyCorrelated)
-ibd_only_res_clean2=subset(ibd_only_res_clean2, ibd_only_res_clean2$phenotype != "Simpson_Index")
-ibd_only_res_clean2$FDR=p.adjust(ibd_only_res_clean2$`Pr(>|t|)`,method = "BH")
-ibd_only_res_clean2$Bonferroni=p.adjust(ibd_only_res_clean2$`Pr(>|t|)`,method = "bonferroni")
-
-#ibd_only_res_clean$FDR=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "BH")
-#ibd_only_res_clean$Bonferroni=p.adjust(ibd_only_res_clean$`Pr(>|t|)`,method = "bonferroni")
-###
-###
-###
-###
-###
-write.table(ibd_only_res_clean2,"~/Documents/Project_Metabolome/6.Results/072020/Results_lm_onlyIBD.txt",sep="\t", quote = F, row.names = T)
-
-ibd_only_sig=ibd_only_res_clean2[ibd_only_res_clean2$FDR<0.05,]
-ibd_only_sig=ibd_only_res_clean2[ibd_only_res_clean2$Bonferroni<0.05,]
-
-
-
-diet=unlist(ibd_only_sig$metabolite[grep("diet_", ibd_only_sig$phenotype)])
-meds=unlist(ibd_only_sig$metabolite[grep("med_", ibd_only_sig$phenotype)])
-CD_vs_UC=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_DiagnosisUC"])
-Richness=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="sp_richness"])
-Bowel_move=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="host_BowelMovementADay"])
-
-Resection=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_ResectionAnyyes"])
-Ileocecal_valve=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_IleocecalValveInSituyes"])
-
-Num_resections=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_NumberOfResectionsAny"])
-Active_disease=unlist(ibd_only_sig$metabolite[ibd_only_sig$factor=="ibd_ActiveDiseaseNotActive"])
-#bugs=unlist(ibd_only_sig$metabolite[645:nrow(ibd_only_sig)])
-
-
-my_test_list=list(CD_vs_UC =CD_vs_UC, Bowel_move=Bowel_move, Resection = Resection, Diet = diet ,Meds=meds, Richness=Richness,Ileocecal_valve=Ileocecal_valve,Num_resections=Num_resections,Active_disease=Active_disease)
-upset(fromList(my_test_list), order.by = "freq", nsets = 10)
-
-
-
-ggplot(only_ibd_quant, aes( Veillonella_atypica, X___23438)) + geom_point() + theme_bw() + geom_smooth(method='lm') 
-ggplot(only_ibd_quant, aes( Ruminococcus._gnavus, tryptamine)) + geom_point() + theme_bw() + geom_smooth(method='lm')
-
-my_plot=only_ibd_quant[,c("ibd_IleocecalValveInSitu","X7_ketodeoxycholate")]
-my_plot=my_plot[complete.cases(my_plot$ibd_IleocecalValveInSitu),]
-my_plot$my_ord="Without valve"
-my_plot$my_ord[my_plot$ibd_IleocecalValveInSitu=="yes"]="in situ"
-ggplot(my_plot, aes( my_ord, X7_ketodeoxycholate, fill=my_ord)) + geom_boxplot(outlier.color = "white") + theme_bw() + geom_jitter(alpha=0.2) + xlab("") + scale_fill_manual(values=c("lightblue","firebrick2"))
-
-
-
-#####################################
-
-#Prevalence
-
-####################################
-
-
-
-
-only_ibd_quant=read.table("~/Documents/Project_Metabolome/6.Results/072020/input/ibd_prev.txt",sep="\t", header = T, row.names = 1)
-only_ibd_quant$ibd_CurrentStomaOrPouch=NULL
-only_ibd_quant$host_Sex.1=NULL
-only_ibd_quant$med_parasympathicolytic_inhaler=NULL
-only_ibd_quant$med_ranitidine=NULL
-
-flag=1
-for ( i in 1:237) {
-  my_pheno=colnames(only_ibd_quant)[i]
-  if (my_pheno=="run_day_cat" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age_sampling") {
-    print (paste("Skipping phenotype:",my_pheno))
-    
-  } 
-  else if ( my_pheno=="ibd_Diagnosis"){
-    print (paste("Testing:",my_pheno))
-    for (a in 238:ncol(only_ibd_quant)){
-      my_trait=colnames(only_ibd_quant)[a]
-      my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno,my_trait)]
-      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer",my_pheno)
-      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
-      #my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
-      my_samples=nrow(my_uni_test)
-      my_lm=summary(glm(my_f, family = binomial(link="logit"), data =my_uni_test))
-      my_lm_coef=as.data.frame(my_lm$coefficients)
-      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
-      my_lm_pheno$metabolite=my_trait
-      my_lm_pheno$phenotype=my_pheno
-      my_lm_pheno$factor=rownames(my_lm_pheno)
-      if (flag!=1){
-          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
-      }else{
-          my_univariate_results=my_lm_pheno
-          flag=5
-      }
-    }
-  }else {
-    print (paste("Testing:",my_pheno))
-    for (a in 238:ncol(only_ibd_quant)){
-      my_trait=colnames(only_ibd_quant)[a]
-      my_uni_test=only_ibd_quant[,c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno,my_trait)]
-      my_preds=c("host_Sex","host_Age_sampling","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","ibd_Diagnosis",my_pheno)
-      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
-      #my_uni_test[,8]=as.numeric(as.character(my_uni_test[,8]))
-      my_samples=nrow(my_uni_test)
-      my_lm=summary(glm(my_f, family = binomial(link="logit"), data =my_uni_test))
-      my_lm_coef=as.data.frame(my_lm$coefficients)
-      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
-      my_lm_pheno$metabolite=my_trait
-      my_lm_pheno$phenotype=my_pheno
-      my_lm_pheno$factor=rownames(my_lm_pheno)
-      if (flag!=1){
-          my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
-      }else{
-          my_univariate_results=my_lm_pheno
-          flag=5
-      }
-    }
-  }
-}
-
-ibd_only_results_prevalence=my_univariate_results
-
-#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_2_anacardic_acid",]
-#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X15_3_anacardic_acid",]
-#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylcytidine",]
-#ibd_only_results_prevalence=ibd_only_results_prevalence[ibd_only_results_prevalence$phenotype!="X3_5_adenylylguanosine.",]
-
-#ibd_only_results_prevalence$FDR=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "BH")
-#ibd_only_results_prevalence$Bonferroni=p.adjust(ibd_only_results_prevalence$`Pr(>|z|)`,method = "bonferroni")
-
-ibd_only_results_prevalence2=ibd_only_results_prevalence
-ibd_only_results_prevalence2=subset(ibd_only_results_prevalence2, ibd_only_results_prevalence2$phenotype %ni% highlyCorrelated)
-ibd_only_results_prevalence2=subset(ibd_only_results_prevalence2, ibd_only_results_prevalence2$phenotype != "Simpson_Index")
-ibd_only_results_prevalence2$FDR=p.adjust(ibd_only_results_prevalence2$`Pr(>|z|)`,method = "BH")
-ibd_only_results_prevalence2$Bonferroni=p.adjust(ibd_only_results_prevalence2$`Pr(>|z|)`,method = "bonferroni")
-
-
-write.table(ibd_only_results_prevalence2,"~/Documents/Project_Metabolome/6.Results/072020/Results_onlyIBD_prev.txt",sep="\t", quote = F, row.names = T)
-
-
-test_pv=as.data.frame(table(only_ibd_quant$host_SmokeCurrentSmoker, only_ibd_quant$cotinine))
-setDT(test_pv)[,prop:=Freq/sum(Freq),by=Var1]
-ggplot(test_pv, aes(Var1,prop, fill=Var2)) + geom_bar(stat = "identity") + theme_bw() + ylab ("Cotinine") + xlab ("Current smoking")
-
-```
 
 
 11. Calculate ratios
@@ -2991,11 +2763,13 @@ for (i in 2:46){
 
 m_res=as.data.frame(m_res)
 m_res$bnf=p.adjust(as.numeric(as.character(m_res[,4])), method = "bonferroni")
-
+m_res$FDR=p.adjust(as.numeric(as.character(m_res[,4])), method = "BH")
+colnames(m_res)=c("Drug", "Metabolite", "Number_samples_metabolite_detected","BNF","FDR")
+write.table(m_res, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/rare_metabolites_medication.txt", sep = "\t", quote = F)
 
 #Only for drugs within IBD
 
-m_meds=only_ibd_quant[,c(45:92)]
+m_meds=ibd_test_phenos[,c(44:92)]
 m_meds2=merge(m_meds,rare_mtb_coded, by="row.names")
 
 m_res_ibd=matrix(nrow=15484,ncol = 4)
@@ -3017,7 +2791,8 @@ for (i in 2:49){
 
 m_res_ibd=as.data.frame(m_res_ibd)
 m_res_ibd$bnf=p.adjust(as.numeric(as.character(m_res_ibd[,4])), method = "bonferroni")
-
+m_res_ibd$FDR=p.adjust(as.numeric(as.character(m_res_ibd[,4])), method = "BH")
+write.table(m_res_ibd, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/rare_metabolites_medication_IBD.txt", sep = "\t", quote = F)
 ```
 
 
@@ -3030,13 +2805,13 @@ m_res_ibd$bnf=p.adjust(as.numeric(as.character(m_res_ibd[,4])), method = "bonfer
 #1: Regress age, sex, BMI, etc.  => Test correlation IBD / non-IBD
 #2: Regress age,sex, BMI etc. + IBD => test correlation all samples 
 
-cc_pheno4=merge(SCFA2,cc_pheno3, by="row.names")
-rownames(cc_pheno4)=cc_pheno4$Row.names
-cc_pheno4$Row.names=NULL
-cc_pheno5=merge(my_batch_id,cc_pheno4, by="row.names")
-cc_rd=read.table("~/Documents/Project_Metabolome/1.Input_files/IDs_read_depth.txt", header = T, row.names = "V5")
+#cc_pheno4=merge(SCFA2,cc_pheno3, by="row.names")
+#rownames(cc_pheno4)=cc_pheno4$Row.names
+#cc_pheno4$Row.names=NULL
+#cc_pheno5=merge(my_batch_id,cc_pheno4, by="row.names")
+cc_rd=read.table("~/Documents/Project_Metabolome/1.Input_files/IDs_read_depth.txt", header = T, row.names = "PID")
 cc_rd$row.names=NULL
-cc_rd2=merge(cc_rd,cc_pheno5,by="row.names")
+cc_rd2=merge(cc_rd,cc_pheno5,by="row.names", all.y = T)
 
 
 my_regress_phenos=cc_rd2[,c("Row.names","run_day_cat", "Amount_sample_gram", "LC.COLUMN" , "metabolon_Month_in_freezer" , "host_Age_sampling", "host_BMI","host_Sex", "PF_RD", "clinical_BowelMovementADayDef", "ibd_Diagnosis")]
@@ -3058,18 +2833,18 @@ rgs_mb3=matrix(nrow=nrow(my_regress_phenos), ncol = ncol(clus_mtb))
 n=1
 for (i in 12:ncol(rgs_mb)){
   
-  my_lm=lm(rgs_mb[,i] ~ run_day_cat+Amount_sample_gram+LC.COLUMN+metabolon_Month_in_freezer+host_Age_sampling+ host_BMI+ host_Sex +clinical_BowelMovementADayDef+ ibd_Diagnosis,data = rgs_mb)
+  #my_lm=lm(rgs_mb[,i] ~ Amount_sample_gram+LC.COLUMN+metabolon_Month_in_freezer+host_Age_sampling+ host_BMI+ host_Sex +clinical_BowelMovementADayDef+ ibd_Diagnosis,data = rgs_mb)
   
-  rgs_mb2[,n] = my_lm$residuals
+  #rgs_mb2[,n] = my_lm$residuals
   
-  my_lm2=lm(rgs_mb[,i] ~ run_day_cat+Amount_sample_gram+LC.COLUMN+metabolon_Month_in_freezer+host_Age_sampling+ host_BMI+ host_Sex+ clinical_BowelMovementADayDef,data = rgs_mb)
+  my_lm2=lm(rgs_mb[,i] ~ Amount_sample_gram+LC.COLUMN+metabolon_Month_in_freezer+host_Age_sampling+ host_BMI+ host_Sex+ clinical_BowelMovementADayDef,data = rgs_mb)
   
   rgs_mb3[,n] = my_lm2$residuals
   n=n+1
 }
-rgs_mb2=as.data.frame(rgs_mb2)
-rownames(rgs_mb2)=rgs_mb$Row.names
-colnames(rgs_mb2)=colnames(rgs_mb)[12:ncol(rgs_mb)]
+#rgs_mb2=as.data.frame(rgs_mb2)
+#rownames(rgs_mb2)=rgs_mb$Row.names
+#colnames(rgs_mb2)=colnames(rgs_mb)[12:ncol(rgs_mb)]
 
 rgs_mb3=as.data.frame(rgs_mb3)
 rownames(rgs_mb3)=rgs_mb$Row.names
@@ -3077,24 +2852,25 @@ colnames(rgs_mb3)=colnames(rgs_mb)[12:ncol(rgs_mb)]
 
 
 #clus_taxa
+my_regress_phenos$PF_RD[is.na(my_regress_phenos$PF_RD)]=median(my_regress_phenos$PF_RD,na.rm = T)
 rgs_tx=merge(my_regress_phenos,clus_taxa, by="row.names")
 rgs_tx2=matrix(nrow=nrow(my_regress_phenos), ncol = ncol(clus_taxa))
 rgs_tx3=matrix(nrow=nrow(my_regress_phenos), ncol = ncol(clus_taxa))
 n=1
 for (i in 12:ncol(rgs_tx)){
 
-  my_lm=lm(rgs_tx[,i] ~ host_Age_sampling+ host_BMI+ host_Sex +PF_RD+clinical_BowelMovementADayDef+ ibd_Diagnosis,data = rgs_mb)
+  #my_lm=lm(rgs_tx[,i] ~ host_Age_sampling+ host_BMI+ host_Sex +PF_RD+clinical_BowelMovementADayDef+ ibd_Diagnosis,data = rgs_tx)
   
-  rgs_tx2[,n] = my_lm$residuals
+  #rgs_tx2[,n] = my_lm$residuals
   
-  my_lm2=lm(rgs_tx[,i] ~host_Age_sampling+ host_BMI+ host_Sex+clinical_BowelMovementADayDef+ PF_RD,data = rgs_mb)
+  my_lm2=lm(rgs_tx[,i] ~host_Age_sampling+ host_BMI+ host_Sex+clinical_BowelMovementADayDef+ PF_RD,data = rgs_tx)
   
   rgs_tx3[,n] = my_lm2$residuals
   n=n+1
 }
-rgs_tx2=as.data.frame(rgs_tx2)
-rownames(rgs_tx2)=rgs_tx$Row.names
-colnames(rgs_tx2)=colnames(rgs_tx)[12:ncol(rgs_tx)]
+#rgs_tx2=as.data.frame(rgs_tx2)
+#rownames(rgs_tx2)=rgs_tx$Row.names
+#colnames(rgs_tx2)=colnames(rgs_tx)[12:ncol(rgs_tx)]
 
 rgs_tx3=as.data.frame(rgs_tx3)
 rownames(rgs_tx3)=rgs_tx$Row.names
@@ -3107,26 +2883,27 @@ colnames(rgs_tx3)=colnames(rgs_tx)[12:ncol(rgs_tx)]
 corr_mtb_taxa=merge(rgs_mb2,rgs_tx2, by="row.names")
 row.names(corr_mtb_taxa)=corr_mtb_taxa$Row.names
 corr_mtb_taxa$Row.names=NULL
-corr_mtb_taxa_vals=rcorr(as.matrix(corr_mtb_taxa), type = "spearman")
+#corr_mtb_taxa_vals=rcorr(as.matrix(corr_mtb_taxa), type = "spearman")
 
-test_corr_coef=corr_mtb_taxa_vals$r
-test_corr_coef_sel=test_corr_coef[(ncol(rgs_mb2)+1):nrow(test_corr_coef), 1:ncol(rgs_mb2)]
-test_corr_pval=corr_mtb_taxa_vals$P
-test_corr_pval_sel=test_corr_pval[(ncol(rgs_mb2)+1):nrow(test_corr_pval), 1:ncol(rgs_mb2)]
-corr_coef=melt(test_corr_coef_sel)
-corr_pval=melt(test_corr_pval_sel)
+#test_corr_coef=corr_mtb_taxa_vals$r
+#test_corr_coef_sel=test_corr_coef[(ncol(rgs_mb2)+1):nrow(test_corr_coef), 1:ncol(rgs_mb2)]
+#test_corr_pval=corr_mtb_taxa_vals$P
+#test_corr_pval_sel=test_corr_pval[(ncol(rgs_mb2)+1):nrow(test_corr_pval), 1:ncol(rgs_mb2)]
+#corr_coef=melt(test_corr_coef_sel)
+#corr_pval=melt(test_corr_pval_sel)
 
-table(corr_coef$Var1 == corr_pval$Var1)
-table(corr_coef$Var2 == corr_pval$Var2)
+#table(corr_coef$Var1 == corr_pval$Var1)
+#table(corr_coef$Var2 == corr_pval$Var2)
 
-colnames(corr_coef)=c("Taxa","Metabolites","Coeff")
-colnames(corr_pval)=c("Taxa","Metabolites2","P_val")
-corr_taxa_metabolites_IBD=cbind(corr_coef, corr_pval)
-corr_taxa_metabolites_IBD$Metabolites2=NULL
-corr_taxa_metabolites_IBD[,4]=NULL
+#colnames(corr_coef)=c("Taxa","Metabolites","Coeff")
+#colnames(corr_pval)=c("Taxa","Metabolites2","P_val")
+#corr_taxa_metabolites_IBD=cbind(corr_coef, corr_pval)
+#corr_taxa_metabolites_IBD$Metabolites2=NULL
+#corr_taxa_metabolites_IBD[,4]=NULL
 
-
+########################
 ##Split IBD / Controls##
+########################
 
 corr_mtb_taxa_IBD=subset(corr_mtb_taxa,row.names(corr_mtb_taxa) %in% my_IBD)
 corr_mtb_taxa_CNT=subset(corr_mtb_taxa,row.names(corr_mtb_taxa) %in% my_CNT)
@@ -3172,8 +2949,20 @@ corr_taxa_metabolites_CNT[,4]=NULL
 
 corr_taxa_metabolites_oIBD$Bonferroni=p.adjust(corr_taxa_metabolites_oIBD$P_val, method = "bonferroni")
 corr_taxa_metabolites_CNT$Bonferroni=p.adjust(corr_taxa_metabolites_CNT$P_val, method = "bonferroni")
+corr_taxa_metabolites_oIBD$FDR=p.adjust(corr_taxa_metabolites_oIBD$P_val, method = "BH")
+corr_taxa_metabolites_CNT$FDR=p.adjust(corr_taxa_metabolites_CNT$P_val, method = "BH")
+
 corr_taxa_metabolites_f=cbind(corr_taxa_metabolites_oIBD, corr_taxa_metabolites_CNT)
-colnames(corr_taxa_metabolites_f)=c("Taxa", "Metabolite", "Coef_IBD", "P-val_IBD","BFN_IBD", "Taxa", "Metabolites","Coeff_Controls", "P-val_Controls", "BFN_Controls")
+colnames(corr_taxa_metabolites_f)=c("Taxa", "Metabolite", "Coef_IBD", "P-val_IBD","BFN_IBD","FDR_IBD", "Taxa", "Metabolites","Coeff_Controls", "P-val_Controls", "BFN_Controls", "FDR_Controls")
+
+write.table(corr_taxa_metabolites_f, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/correlation_metabolites_taxa_spearman.txt", sep = "\t", quote = F)
+
+sig_corr=subset(corr_taxa_metabolites_f, corr_taxa_metabolites_f$FDR_IBD<0.05 | corr_taxa_metabolites_f$FDR_Controls<0.05 )
+sig_corr$replicated="No"
+sig_corr$replicated[sig_corr$FDR_IBD<0.05 & sig_corr$FDR_Controls<0.05 ]="Yes"
+write.table(sig_corr, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/correlation_metabolites_taxa_spearman_significant.txt", sep = "\t", quote = F)
+
+
 
 res_mtb_tx=corr_taxa_metabolites_f[,c(1,2,3,4,5)]
 res_mtb_tx$Coef2=res_mtb_tx$Coef_IBD
@@ -3225,30 +3014,12 @@ pheatmap(t(my_test3), cluster_cols = T, cluster_rows = T,show_rownames = T, show
 
 #Hannah database: gutSMASH on a combined collection of 4.083 genomes from the Culturable Genome Reference (CGR), Human Microbiome Project (HMP) and complete genomes belonging to Clostridiales species. This resulted in 11.509 predicted metabolic gene clusters which we used as input for BiG-MAP.family
 
-#ml conda activate /home/umcg-avich/miniconda3/envs/BiG-MAP_process
+#conda activate /home/umcg-avich/miniconda3/envs/BiG-MAP_process
 #ml Bowtie2
 #python3 /groups/umcg-gastrocol/tmp01/Arnau/BiG-MAP/src/BiG-MAP.map.py -th 10 -I1 /groups/umcg-gastrocol/tmp01/Arnau/BiG-MAP/batch8/*_1.fastq -I2 /groups/umcg-gastrocol/tmp01/Arnau/BiG-MAP/batch8/*_2.fastq -O /groups/umcg-gastrocol/tmp01/Arnau/BiG-MAP/result_b8/ -P ./BiG-MAP.GCF_HGF.pickle 
 
-#bgc=read.table("~/Documents/Project_Metabolome/7.Bacterial_genes_and_pathways/all/b1_core_rpkm_filt_renamed.txt", sep = "\t", row.names = 1, stringsAsFactors = F, header = T, check.names = F )
 
-#awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_LLD.txt b1_core_rpkm_filt.txt | tr " " "\t" > b1_core_rpkm_filt_renamed.txt
-
-#awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_LLD.txt b2_core_rpkm_filt.txt | tr " " "\t" > b2_core_rpkm_filt_renamed.txt
-
-#awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_LLD.txt b3_core_rpkm_filt.txt | tr " " "\t" > b3_core_rpkm_filt_renamed.txt
-
-#awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_LLD.txt b4_core_rpkm_filt.txt | tr " " "\t" > b4_core_rpkm_filt_renamed.txt
-
-#awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_IBD.txt b5_core_rpkm_filt.txt | tr " " "\t" > b5_core_rpkm_filt_renamed.txt 
-
-# awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_IBD.txt b6_core_rpkm_filt.txt | tr " " "\t" > b6_core_rpkm_filt_renamed.txt
-
-# awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_IBD.txt b7_core_rpkm_filt.txt | tr " " "\t" > b7_core_rpkm_filt_renamed.txt
-
-# awk 'NR==FNR{d[$1]=$2;next}FNR==1{for(i=1;i<=NF;i++)$i=d[$i]?d[$i]:$i}7' ./rename_IBD.txt b8_core_rpkm_filt.txt | tr " " "\t" > b8_core_rpkm_filt_renamed.txt
-
-
-setwd("~/Documents/Project_Metabolome/7.Bacterial_genes_and_pathways/all/")
+setwd("~/Documents/Project_Metabolome/7.Bacterial_genes_and_pathways/all2/")
  
 file_list <- list.files()
 flag=1
@@ -3256,13 +3027,13 @@ for (file in file_list){
        
   # if the merged dataset doesn't exist, create it
   if (flag==1){
-    bgc <- read.table(file, header=TRUE,  check.names = F, sep="\t", row.names = 1, stringsAsFactors = F)
+    bgc <- read.table(file, header=TRUE,  check.names = F, sep=",", row.names = 1, stringsAsFactors = F)
     flag=5
   }
    
   # if the merged dataset does exist, append to it
   else {
-    temp_bgc <-read.table(file, header=TRUE,  check.names = F, sep="\t", row.names = 1, stringsAsFactors = F)
+    temp_bgc <-read.table(file, header=TRUE,  check.names = F, sep=",", row.names = 1, stringsAsFactors = F)
     bgc<-merge(bgc, temp_bgc, by="row.names", all.x=T)
     row.names(bgc)=bgc$Row.names
     bgc$Row.names=NULL
@@ -3271,14 +3042,41 @@ for (file in file_list){
  
 }
 
-h_genes=read.table("~/Documents/Project_Metabolome/7.Bacterial_genes_and_pathways/test_data_Hannah/RPKM_BiG-MAP_names.tsv", header = T)
+bgc_rpkm=select(bgc, contains(".RPKM"))
+colnames(bgc_rpkm)=gsub(".RPKM","",colnames(bgc_rpkm))
+cc_rd$id2=rownames(cc_rd)
+row.names(cc_rd)=cc_rd$IDs_MGS
+cc_rd$row.names=NULL
 
+bgc_rpkm2=merge(cc_rd,t(bgc_rpkm), by="row.names")
+rownames(bgc_rpkm2)=bgc_rpkm2$id2
+bgc_rpkm2$id2=NULL
+bgc_rpkm2$Row.names=NULL
+bgc_rpkm2$IDs_MGS=NULL
+bgc_rpkm2$PF_RD=NULL
+bgc_rpkm3=subset(bgc_rpkm2, row.names(bgc_rpkm2) %in% row.names(cc_pheno2))
+bgc_rpkm3.1=bgc_rpkm3[,colnames(bgc_rpkm3) %in% colnames(bcg_fil_trans)]
+select2=subset(select,select$ibd_Diagnosis!="IBDU")
+summary_bgc=summary_stats(bgc_rpkm3.1,select2, missing_vals = 0)
+
+
+bgc_coverage=select(bgc, contains(".cov"))
+colnames(bgc_coverage)=gsub(".cov","",colnames(bgc_coverage))
+
+bgc_coverage2=merge(cc_rd,t(bgc_coverage), by="row.names")
+rownames(bgc_coverage2)=bgc_coverage2$id2
+bgc_coverage2$id2=NULL
+bgc_coverage2$Row.names=NULL
+bgc_coverage2$IDs_MGS=NULL
+bgc_coverage2$PF_RD=NULL
+bgc_coverage3=subset(bgc_coverage2, row.names(bgc_coverage2) %in% row.names(cc_pheno2))
+
+#h_genes=read.table("~/Documents/Project_Metabolome/7.Bacterial_genes_and_pathways/test_data_Hannah/RPKM_BiG-MAP_names.tsv", header = T)
 
 #Select samples in our study
-bgc2=bgc[,colnames(bgc) %in% row.names(cc_pheno2)]
 
-features_per_samples=data.frame(Sample=colnames(bgc2), Counts=colSums(bgc2!=0))
-samples_per_feature=data.frame(BCG=rownames(bgc2), Counts=rowSums(bgc2!=0))
+features_per_samples=data.frame(Sample=rownames(bgc_rpkm3), Counts=rowSums(bgc_rpkm3!=0))
+samples_per_feature=data.frame(BCG=colnames(bgc_rpkm3), Counts=colSums(bgc_rpkm3!=0))
 
 
 ggplot(features_per_samples, aes(reorder(Sample,-Counts), Counts )) + geom_bar(stat = "identity", fill="lightblue3") + theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + ylab ("Number of Biosynthetic genes clusters")  + xlab ("Samples")
@@ -3289,17 +3087,253 @@ ggplot(boxss, aes (ibd_Diagnosis, Counts, fill=ibd_Diagnosis)) + geom_violin() +
 
 ggplot(samples_per_feature, aes(reorder(BCG,-Counts), Counts )) + geom_bar(stat = "identity", fill="gray50") + theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + ylab ("Number of samples")  + xlab ("Biosynthetic genes clusters")
 
-#Remove samples with less 100 BioSynthetic Gene Clusters (n=9)
-remove_samples=row.names(features_per_samples)[features_per_samples$Counts <99]
-bgc_filter=bgc2[, colnames(bgc2) %ni%  remove_samples]
-
 #Filtering prevalence in 20% => 568 metabolites
-bcg_fil_trans=transform_and_filter_taxa(bgc_filter, samples_row = F, method = "clr",missing_filter = 20)
+bcg_fil_trans=transform_and_filter_taxa(bgc_rpkm3, samples_row = T, method = "clr",missing_filter = 20)
+
+bgc_coverage4=bgc_coverage3 [,colnames(bgc_coverage3) %in% colnames(bcg_fil_trans)]
+bgc_mean_coverage=data.frame(BCG=colnames(bgc_coverage4), Mean=colMeans(bgc_coverage4))
+ggplot(bgc_mean_coverage, aes(reorder(BCG,-Mean), Mean )) + geom_bar(stat = "identity", fill="red4") + theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + ylab ("Mean coverage")  + xlab ("Biosynthetic genes clusters")
+
+#Filtering based on the region coverage (10%)
+
+select_coverage=droplevels(bgc_mean_coverage$BCG[bgc_mean_coverage$Mean>0.1])
+
+bcg_fil_trans2=bcg_fil_trans[,colnames(bcg_fil_trans) %in% select_coverage]
+
+cc_ibd=cc_pheno6[,"ibd_Diagnosis", drop=F]
+bgc_ibd=merge(cc_ibd,bcg_fil_trans2, by="row.names")
+
+flag=1
+for (a in 3:ncol(bgc_ibd)){
+  my_name=colnames(bgc_ibd)[a]
+  yy= pairwise.wilcox.test(bgc_ibd[,a],bgc_ibd$ibd_Diagnosis, p.adjust.method = "none")$p.value
+  ccb=data.frame("Feature"=my_name,"CD_Control"=yy[1,1], "CD_IBDU"=yy[2,1],"CD_UC"=yy[3,1],"Control_IBDU"=yy[2,2], "Control_UC"=yy[3,2],"IBDU_UC"=yy[3,3] )
+  if(flag==1){
+    bgc_res=ccb
+    flag=5
+  }else{
+    bgc_res=rbind(bgc_res,ccb)
+  }
+}
+bgc_res$CD_IBDU=NULL
+bgc_res$Control_IBDU=NULL
+bgc_res$IBDU_UC=NULL
+bgc_res_2=melt(bgc_res)
+bgc_res_2$FDR=p.adjust(bgc_res_2$value, method = "BH")
+bgc_res_2=dcast(bgc_res_2, formula=Feature~variable, value.var="FDR")
+a_report_bgc=merge(summary_bgc,bgc_res_2, by.x="Metabolite", by.y="Feature")
+
+
+write.table(bgc_ibd, "~/Desktop/Metabolomics_for_cluster/1.Raw_data_Metabolon/BGC_with_IBD", sep = "\t", quote = F)
+write.table(summary_bgc, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/BGC_summary_stats.txt", sep = "\t", quote = F)
+write.table(a_report_bgc, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/BGC_summary_stats_significant.txt", sep = "\t", quote = F)
+
+
+
+###################################
+## correlation BGC & Taxa        ##
+###################################
+
+
+#Regress covariates to BGC
+
+#clus_taxa
+
+rgs_bgc=merge(my_regress_phenos,bcg_fil_trans2, by="row.names")
+
+rgs_bgc3=matrix(nrow=nrow(my_regress_phenos), ncol = ncol(bcg_fil_trans2))
+n=1
+for (i in 12:ncol(rgs_bgc)){
+
+  #my_lm=lm(rgs_tx[,i] ~ host_Age_sampling+ host_BMI+ host_Sex +PF_RD+clinical_BowelMovementADayDef+ ibd_Diagnosis,data = rgs_tx)
+  
+  #rgs_tx2[,n] = my_lm$residuals
+  
+  my_lm2=lm(rgs_bgc[,i] ~host_Age_sampling+ host_BMI+ host_Sex+clinical_BowelMovementADayDef+ PF_RD,data = rgs_bgc)
+  
+  rgs_bgc3[,n] = my_lm2$residuals
+  n=n+1
+}
+rgs_bgc3=as.data.frame(rgs_bgc3)
+rownames(rgs_bgc3)=rgs_bgc$Row.names
+colnames(rgs_bgc3)=colnames(rgs_bgc)[12:ncol(rgs_bgc)]
+
+rgs_bgc_tx=merge(rgs_bgc3,rgs_tx3, by="row.names")
+rownames(rgs_bgc_tx)=rgs_bgc_tx$Row.names
+rgs_bgc_tx$Row.names=NULL
+
+corr_bgc_tx_IBD=subset(rgs_bgc_tx,row.names(rgs_bgc_tx) %in% my_IBD)
+corr_bgc_tx_CNT=subset(rgs_bgc_tx,row.names(rgs_bgc_tx) %in% my_CNT)
+
+
+corr_bgc_tx_IBD_val=rcorr(as.matrix(corr_bgc_tx_IBD), type = "spearman")
+
+test_corr_coef=corr_bgc_tx_IBD_val$r
+test_corr_coef_sel=test_corr_coef[(ncol(rgs_bgc3)+1):nrow(test_corr_coef), 1:ncol(rgs_bgc3)]
+test_corr_pval=corr_bgc_tx_IBD_val$P
+test_corr_pval_sel=test_corr_pval[(ncol(rgs_bgc3)+1):nrow(test_corr_pval), 1:ncol(rgs_bgc3)]
+corr_coef=melt(test_corr_coef_sel)
+corr_pval=melt(test_corr_pval_sel)
+
+table(corr_coef$Var1 == corr_pval$Var1)
+table(corr_coef$Var2 == corr_pval$Var2)
+
+colnames(corr_coef)=c("Taxa","BGC","Coeff")
+colnames(corr_pval)=c("Taxa","BGC","P_val")
+corr_taxa_bgc_oIBD=cbind(corr_coef, corr_pval)
+
+
+corr_bgc_tx_vals=rcorr(as.matrix(corr_bgc_tx_CNT), type = "spearman")
+
+test_corr_coef=corr_bgc_tx_vals$r
+test_corr_coef_sel=test_corr_coef[(ncol(rgs_bgc3)+1):nrow(test_corr_coef), 1:ncol(rgs_bgc3)]
+test_corr_pval=corr_bgc_tx_vals$P
+test_corr_pval_sel=test_corr_pval[(ncol(rgs_bgc3)+1):nrow(test_corr_pval), 1:ncol(rgs_bgc3)]
+corr_coef=melt(test_corr_coef_sel)
+corr_pval=melt(test_corr_pval_sel)
+
+table(corr_coef$Var1 == corr_pval$Var1)
+table(corr_coef$Var2 == corr_pval$Var2)
+
+colnames(corr_coef)=c("Taxa","BGC","Coeff")
+colnames(corr_pval)=c("Taxa","BGC","P_val")
+corr_bgc_tx_CNT=cbind(corr_coef, corr_pval)
+
+corr_taxa_bgc_oIBD$Metabolites2=NULL
+corr_taxa_bgc_oIBD[,4]=NULL
+corr_bgc_tx_CNT$Metabolites2=NULL
+corr_bgc_tx_CNT[,4]=NULL
+
+corr_taxa_bgc_oIBD$Bonferroni=p.adjust(corr_taxa_bgc_oIBD$P_val, method = "bonferroni")
+corr_bgc_tx_CNT$Bonferroni=p.adjust(corr_bgc_tx_CNT$P_val, method = "bonferroni")
+corr_taxa_bgc_oIBD$FDR=p.adjust(corr_taxa_bgc_oIBD$P_val, method = "BH")
+corr_bgc_tx_CNT$FDR=p.adjust(corr_bgc_tx_CNT$P_val, method = "BH")
+
+corr_taxa_bgc_f=cbind(corr_taxa_bgc_oIBD, corr_bgc_tx_CNT)
+colnames(corr_taxa_bgc_f)=c("Taxa", "BGC", "Coef_IBD", "BGC","P-val_IBD","BFN_IBD","FDR_IBD", "Taxa", "BGC","Coeff_Controls","BGC", "P-val_Controls", "BFN_Controls", "FDR_Controls")
+
+
+write.table(corr_taxa_bgc_f, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/correlation_BGC_taxa_spearman.txt", sep = "\t", quote = F)
+
+sig_corr=subset(corr_taxa_bgc_f, corr_taxa_bgc_f$FDR_IBD<0.05 | corr_taxa_bgc_f$FDR_Controls<0.05 )
+sig_corr$replicated="No"
+sig_corr$replicated[sig_corr$FDR_IBD<0.05 & sig_corr$FDR_Controls<0.05 ]="Yes"
+write.table(sig_corr, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/correlation_BGC_taxa_spearman_significant.txt", sep = "\t", quote = F)
+
 
 
 ###################################
 ## correlation BGC & Metabolites ##
 ###################################
+
+rgs_bgc_mtb=merge(rgs_bgc3,rgs_mb3, by="row.names")
+rownames(rgs_bgc_mtb)=rgs_bgc_mtb$Row.names
+rgs_bgc_mtb$Row.names=NULL
+
+rgs_bgc_mtb_IBD=subset(rgs_bgc_mtb,row.names(rgs_bgc_mtb) %in% my_IBD)
+rgs_bgc_mtb_CNT=subset(rgs_bgc_mtb,row.names(rgs_bgc_mtb) %in% my_CNT)
+
+
+rgs_bgc_mtb_IBD_val=rcorr(as.matrix(rgs_bgc_mtb_IBD), type = "spearman")
+
+test_corr_coef=rgs_bgc_mtb_IBD_val$r
+test_corr_coef_sel=test_corr_coef[(ncol(rgs_bgc3)+1):nrow(test_corr_coef), 1:ncol(rgs_bgc3)]
+test_corr_pval=rgs_bgc_mtb_IBD_val$P
+test_corr_pval_sel=test_corr_pval[(ncol(rgs_bgc3)+1):nrow(test_corr_pval), 1:ncol(rgs_bgc3)]
+corr_coef=melt(test_corr_coef_sel)
+corr_pval=melt(test_corr_pval_sel)
+
+table(corr_coef$Var1 == corr_pval$Var1)
+table(corr_coef$Var2 == corr_pval$Var2)
+
+colnames(corr_coef)=c("Metabolite","BGC","Coeff")
+colnames(corr_pval)=c("Metabolite","BGC","P_val")
+corr_mtb_bgc_oIBD=cbind(corr_coef, corr_pval)
+
+
+
+
+
+corr_bgc_mtb_vals=rcorr(as.matrix(rgs_bgc_mtb_CNT), type = "spearman")
+#here:
+test_corr_coef=corr_bgc_tx_vals$r
+test_corr_coef_sel=test_corr_coef[(ncol(rgs_bgc3)+1):nrow(test_corr_coef), 1:ncol(rgs_bgc3)]
+test_corr_pval=corr_bgc_tx_vals$P
+test_corr_pval_sel=test_corr_pval[(ncol(rgs_bgc3)+1):nrow(test_corr_pval), 1:ncol(rgs_bgc3)]
+corr_coef=melt(test_corr_coef_sel)
+corr_pval=melt(test_corr_pval_sel)
+
+table(corr_coef$Var1 == corr_pval$Var1)
+table(corr_coef$Var2 == corr_pval$Var2)
+
+colnames(corr_coef)=c("Taxa","BGC","Coeff")
+colnames(corr_pval)=c("Taxa","BGC","P_val")
+corr_bgc_tx_CNT=cbind(corr_coef, corr_pval)
+
+corr_taxa_bgc_oIBD$Metabolites2=NULL
+corr_taxa_bgc_oIBD[,4]=NULL
+corr_bgc_tx_CNT$Metabolites2=NULL
+corr_bgc_tx_CNT[,4]=NULL
+
+corr_taxa_bgc_oIBD$Bonferroni=p.adjust(corr_taxa_bgc_oIBD$P_val, method = "bonferroni")
+corr_bgc_tx_CNT$Bonferroni=p.adjust(corr_bgc_tx_CNT$P_val, method = "bonferroni")
+corr_taxa_bgc_oIBD$FDR=p.adjust(corr_taxa_bgc_oIBD$P_val, method = "BH")
+corr_bgc_tx_CNT$FDR=p.adjust(corr_bgc_tx_CNT$P_val, method = "BH")
+
+corr_taxa_bgc_f=cbind(corr_taxa_bgc_oIBD, corr_bgc_tx_CNT)
+colnames(corr_taxa_bgc_f)=c("Taxa", "BGC", "Coef_IBD", "BGC","P-val_IBD","BFN_IBD","FDR_IBD", "Taxa", "BGC","Coeff_Controls","BGC", "P-val_Controls", "BFN_Controls", "FDR_Controls")
+
+
+write.table(corr_taxa_bgc_f, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/correlation_BGC_taxa_spearman.txt", sep = "\t", quote = F)
+
+sig_corr=subset(corr_taxa_bgc_f, corr_taxa_bgc_f$FDR_IBD<0.05 | corr_taxa_bgc_f$FDR_Controls<0.05 )
+sig_corr$replicated="No"
+sig_corr$replicated[sig_corr$FDR_IBD<0.05 & sig_corr$FDR_Controls<0.05 ]="Yes"
+write.table(sig_corr, "~/Desktop/Metabolomics_for_cluster/3.Preliminary_results_v2/correlation_BGC_taxa_spearman_significant.txt", sep = "\t", quote = F)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3386,18 +3420,6 @@ res_mtb_tx$Coef2[res_mtb_tx$`P-val_IBD`>0.05]=0
 my_test2=dcast(res_mtb_tx, formula=Metabolite~Taxa, value.var="Coef2")
 rownames(my_test2)=my_test2$Metabolite
 my_test2$Metabolite=NULL
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
