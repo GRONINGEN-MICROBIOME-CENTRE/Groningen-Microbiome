@@ -1162,7 +1162,7 @@ testFeaturesPrev <- function(inDFf,featureType='taxa',response='Diagnosis',plots
 # > makes summary statistics for dataframe
 # > returns list[numeric summaries, categorical summaries]
 # ===========================================================
-makeMultiSummary <- function(inDF,ftrs,nrClassesToList=2) {
+makeMultiSummary <- function(inDF,ftrsToTest,nrClassesToList=2) {
   # > initialize variables
   summNum <- NULL
   summCat <- NULL
@@ -2175,3 +2175,66 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   p
 }
 
+# =========================================================
+# do rarefaction
+# =========================================================
+#rarify (min abundance = 0.001)
+doRarefaction <- function(inDF,replacements=F,doAll=F,
+                          steps = c(10,20,30,40,50,75,100,150,200,300,400,500,750,1000,1500,2000,2500,3000,3500,4000,4500,5000,5500,6000,6500,7000,7500,8000,8229),
+                          bootstraps=10,extrapolate=F,
+                          doTaxa = T)
+{
+  if (doTaxa) {
+    allCohTaxFt <- inDF[,grep('__',colnames(inDF))]
+    allCohTaxFt$Cohort <- inDF$Cohort
+  } else {
+    isNum <- c()
+    for (cc in colnames(inDF)) {
+      isNum <- c(isNum,is.numeric(inDF[[cc]]))
+    }
+    allCohTaxFt <- inDF[,isNum]
+    allCohTaxFt$Cohort <- inDF$Cohort
+  }
+  boots <- bootstraps
+  rareDf2 <- data.frame()
+  cohorts = unique(inDF$Cohort)
+  if (doAll) {cohorts <- c("All",cohorts)}
+  #for (n in seq(10,nrow(allCohTaxF),100)) {
+  for (coh in cohorts) {
+    print (paste(" >> Rarefying",coh))
+    for (n in steps) {
+      if (coh != "All" & n > sum(allCohTaxFt$Cohort==coh) & !extrapolate) {
+        break()
+      } else if (!extrapolate & n > length(allCohTaxFt$Cohort)) {
+        break()
+      }
+      print(n)
+      mns <- c()
+      for (b in c(1:boots)) {
+        if (coh != "All") {
+          t <- allCohTaxFt[allCohTaxFt$Cohort==coh,]
+          if (extrapolate & n > length(t$Cohort)) {
+            smp <- t[sample(nrow(t), n,replace = T), ]
+          } else {
+            smp <- t[sample(nrow(t), n,replace = replacements), ]
+          }
+        } else {
+          if (extrapolate & n > length(t$Cohort)) {
+            smp <- t[sample(nrow(t), n,replace = T), ]
+          }
+          else {
+            smp <- t[sample(nrow(t), n,replace = replacements), ]
+          }
+        }
+        smp$Cohort <- NULL
+        csums <- colSums(smp)
+        nrSpec <- sum(csums>0)
+        mns <- c(mns,nrSpec)
+      }
+      mn <- mean(mns)
+      sdev <- sd(mns)
+      rareDf2 <- rbind.data.frame(rareDf2,data.frame(nr=n,spec.nr.mn=mn,spec.nr.sd=sdev,cohort=coh))
+    }
+  }
+  rareDf2
+}
