@@ -1,0 +1,6 @@
+[submodule "Projects/GFD_virome/GFD_RNA_viruses_analysis"]
+	path = Projects/GFD_virome/GFD_RNA_viruses_analysis
+	url = https://github.com/aag1/GFD_RNA_viruses_analysis
+[submodule "Projects/GFD_virome/GFD_vConTACT_based_analysis"]
+	path = Projects/GFD_virome/GFD_vConTACT_based_analysis
+	url = https://github.com/aag1/GFD_vConTACT_based_analysis

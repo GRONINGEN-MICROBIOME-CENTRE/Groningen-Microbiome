@@ -1,6 +1,6 @@
 # **Dutch Microbiome Project**
 
-Creators: R. Gacesa, A. Kurilshikov 
+Creators: R. Gacesa, A. Kurilshikov , L.Chen, S. Hu, A. Vich Vila, T.Sinha 
 
 Year: 2019
 
