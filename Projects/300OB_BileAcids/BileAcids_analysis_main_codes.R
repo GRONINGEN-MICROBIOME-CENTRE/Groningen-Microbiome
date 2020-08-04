@@ -2,19 +2,18 @@
 #1.QTL mapping (GWAS)
 #2.microbiome wide association (MWAS)
 #3.LD clumping
-#4.cross validation based variance estimation
 
 
-###QTL mapping (Genome wide association, GWAS)
+###1.QTL mapping (Genome wide association, GWAS)
 #QTL mapping is performed by calculating Spearman correlation between SNP dosage and bile acid entities.
 #detailed describtion of the JAVA based QTL mapping tool is here: https://github.com/molgenis/systemsgenetics/blob/master/eqtl-mapping-pipeline
 
 
-###micorbiome bile acid entities associations (MWAS)
+###2.micorbiome bile acid entities associations (MWAS)
 #pairwise Spearman correlation is used to check association between micorbial features and bile acid entities
 
 
-###select independent QTLs (LD clumping (PLINK clumping method),500kb,r2=0.05) for variance prediction by using 5-fold CV
+###3.select independent QTLs (LD clumping (PLINK clumping method),500kb,r2=0.05) for variance prediction by using 5-fold CV
 library(devtools)
 library(TwoSampleMR)
 trait=colnames(ba) #names of 39 bile acid entities
