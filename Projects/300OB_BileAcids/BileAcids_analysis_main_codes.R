@@ -75,7 +75,7 @@ cor_spearman_permutation=function(microbiome, metabolites,n){
   return(association)
 }
 
-###3.select independent QTLs (LD clumping (PLINK clumping method),500kb,r2=0.05) for variance prediction by using 5-fold CV
+###3.select independent QTLs (LD clumping (PLINK clumping method),500kb,r2=0.05)
 library(devtools)
 library(TwoSampleMR)
 trait=colnames(ba) #names of 39 bile acid entities
