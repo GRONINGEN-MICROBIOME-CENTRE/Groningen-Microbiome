@@ -21,11 +21,17 @@ for i in *bam; do
 	#echo "mkdir ./$sid/clean_reads/"  >> "$sid".sh
 	#echo "mkdir ./$sid/test_05/"  >> "$sid".sh
 	#echo "mkdir ./$sid/test_08/"  >> "$sid".sh
+	#echo "mkdir ./$sid/Bracken_reports/" >> "$sid".sh
+	#echo "mkdir ./$sid/test_old/"  >> "$sid".sh
+	#echo "mkdir ./$sid/test_new/"  >> "$sid".sh
+	#echo "mkdir ./$sid/mOTUs/" >> "$sid".sh
 
 	
 	echo "export PATH=\$PATH:/groups/umcg-gastrocol/tmp03/metagenomic_tools/kraken2" >> "$sid".sh
 	echo "export PATH=\$PATH:/groups/umcg-gastrocol/tmp03/metagenomic_tools/kraken2/Bracken" >> "$sid".sh
 	echo "export PATH=\$PATH:/groups/umcg-gastrocol/tmp03/metagenomic_tools/kraken2/Bracken/src/" >> "$sid".sh
+	echo "export PATH=\$PATH:/groups/umcg-gastrocol/tmp03/metagenomic_tools/metaphlan_3/MetaPhlAn-3.0/metaphlan" >> "$sid".sh
+	echo "export PATH=\$PATH:/groups/umcg-gastrocol/tmp03/metagenomic_tools/mOTUS/mOTUs_v2.5/mOTUs_v2" >> "$sid".sh
 
 	#BAM to FASTQ
 	echo "java -jar \${EBROOTPICARD}/picard.jar SamToFastq I=$sid.bam F=./$sid/clean_reads/"$sid".fastq1 F2=./$sid/clean_reads/"$sid".fastq2" >> "$sid".sh
@@ -44,6 +50,11 @@ for i in *bam; do
 	echo "bracken -d /groups/umcg-gastrocol/tmp03/metagenomic_tools/kraken2/standard_DB/ -i ./$sid/test_08/"$sid"_0.8_kraken.txt -o ./Bracken_reports/"$i"_bracken.txt -w ./Bracken_reports/"$sid"_sp -l S " >> "$sid".sh
 	#echo "rm -r ./$sid/clean_reads/" >> "$sid".sh
 
+	# MOTUs
+	#echo ""
+	echo "ml Biopython"  >> "$sid".sh
+	echo "ml BWA"  >> "$sid".sh
+
 	#echo ""
 	echo "motus profile -f ./$sid/clean_reads/clean_1.fq -r ./$sid/clean_reads/clean_2.fq -o ./$sid/mOTUs/"$sid"_motus_profile.txt -t 8 -C parenthesis -not_renormalise_cami -g 3" >> "$sid".sh
 	echo "motus profile -f ./$sid/clean_reads/clean_1.fq -r ./$sid/clean_reads/clean_2.fq -o ./$sid/mOTUs/"$sid"_motus_strict_profile.txt -t 8 -C parenthesis -not_renormalise_cami -g 6 -l 90" >> "$sid".sh
@@ -58,6 +69,10 @@ for i in *bam; do
 	echo "metaphlan.py ./"$sid"/metagenome.bowtie2.bz2 --input_type bowtie2out --legacy-output  --nproc 6 -o ./"$sid"/test_old/"$sid"_old.txt --tmp_dir ./"$sid"/clean_reads/" >> "$sid".sh
 	echo "metaphlan.py ./"$sid"/metagenome.bowtie2.bz2 --input_type bowtie2out --add_viruses --unknown_estimation --nproc 6 -o ./"$sid"/test_viruses/"$sid"_virus.txt --tmp_dir ./"$sid"/clean_reads/" >> "$sid".sh
 	echo "metaphlan.py ./"$sid"/metagenome.bowtie2.bz2 --input_type bowtie2out --CAMI_format_output --unknown_estimation --nproc 6 -o ./"$sid"/test_CAMI/"$sid"_CAMI.txt --tmp_dir ./"$sid"/clean_reads/" >> "$sid".sh
-	echo "rm -r ./$sid/clean_reads/" >> "$sid".sh
+	#echo "rm -r ./$sid/clean_reads/" >> "$sid".sh
+	
+	# To keep kneaddata logfiles: 
+	#echo "rm -r ./$sid/clean_reads/*.fastq" >> "$sid".sh
+	#echo "rm -r ./$sid/clean_reads/*.fq" >> "$sid".sh
 done
 
