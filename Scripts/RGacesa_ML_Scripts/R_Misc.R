@@ -1945,9 +1945,11 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
         splitSS <- unlist(strsplit(oneRow$levels_SampleSize,':'))   # sample size split
         splitES <- unlist(strsplit(oneRow$effect.size,':'))  # effect size split
         if (refactorIncludeAllClasses) {startC = 1} else {startC = 2}
+        if (dataType=="taxon") {dataTyp="taxon"
+        } else if (dataType=="pathway") {dataTyp="pathway"}
         for (ln in c(startC:length(splitLvls))) {
           newRow <- data.frame(phenotype=paste0(oneRow$phenotype,'.C',ln-1,'_',splitLvls[ln]),
-                               taxon=oneRow$taxon,
+                               taxon=oneRow[[dataTyp]],
                                Nsamples=oneRow$Nsamples,
                                levels=splitLvls[ln],
                                levels_SampleSize=splitSS[ln],
@@ -1968,6 +1970,9 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
     print ('  > sorting dataframe')
     newDF <- newDF[order(newDF$phenotype),]
     print ('  > merging with original')
+    if (dataType=="taxon") {colnames(newDF)[2] <- "taxon"} 
+    else if (dataType=="pathway") {colnames(newDF)[2] <- "pathway"}
+    
     inDFf <- rbind.data.frame(inDFf,newDF)
     print ('reshaping done!')
   } else {
@@ -1990,6 +1995,9 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   }
   
   # collect data from results file
+  if (!(dataType %in% colnames(inDFf))) {
+    stop(paste0(' ERROR: ',dataType,' column not in input data, note: double-check the input data!'))
+  }
   inDFfs <- inDFf[,c("phenotype",dataType,statToPlot,sigParameter,nominalSigParameter,directionValue)]
   # collect only values within nominal significance (as defined by parameters)
   inDFfs <- inDFfs[inDFfs[[nominalSigParameter]] < sigAll,]
@@ -2018,6 +2026,9 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   # subset taxa
   rownames(inDFwide) <- inDFwide$Phenotype
   inDFwide <- inDFwide[,grep(featuresToPlotGrep,colnames(inDFwide))]
+  if ("Phenotype" %in% colnames(inDFwide)) {
+    inDFwide$Phenotype <- NULL
+  }
   
   # extract individual dataframes
   # >>> DIRECTION DF
