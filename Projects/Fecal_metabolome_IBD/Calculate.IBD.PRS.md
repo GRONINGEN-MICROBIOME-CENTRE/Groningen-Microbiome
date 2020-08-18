@@ -1,4 +1,4 @@
-A simple calculation of IBD poly genetic risk scores used in metabolics ananlysis
+#A simple calculation of IBD poly genetic risk scores used in metabolics ananlysis
 
 *extracted IBD GWAS from public database*
 
