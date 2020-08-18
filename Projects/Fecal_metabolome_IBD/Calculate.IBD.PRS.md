@@ -1,6 +1,6 @@
 ### A simple calculation of IBD poly genetic risk scores used in metabolics ananlysis
 
-* extracted IBD GWAS from public database *
+* extracted IBD GWAS from public database*
 
 database is https://www.ebi.ac.uk/gwas/ (reference:https://www.nature.com/articles/ng.3760#Sec12)
 
