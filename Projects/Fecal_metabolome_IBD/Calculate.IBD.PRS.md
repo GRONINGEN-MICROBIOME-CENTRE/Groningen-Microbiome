@@ -12,6 +12,33 @@ ebi-a-GCST004133 is UC
 
 ebi-a-GCST004131 is IBD
 
+```
+library(TwoSampleMR)
+library(MRInstruments)
+
+gwas.hits=read.table("PRS/snps.Wehave.txt",sep = "\t",header = T,stringsAsFactors = F)
+
+IBD.data <- extract_outcome_data(
+  snps = gwas.hits$OurVariants[gwas.hits$Disease=="IBD" | gwas.hits$Disease=="IBD,UC" | gwas.hits$Disease=="UC,IBD"],
+  outcomes = 'ebi-a-GCST004131'
+)
+CD.data <- extract_outcome_data(
+  snps = gwas.hits$OurVariants[gwas.hits$Disease=="CD" | gwas.hits$Disease=="CD,UC"],
+  outcomes = 'ebi-a-GCST004132'
+)
+UC.data <- extract_outcome_data(
+  snps = gwas.hits$OurVariants[gwas.hits$Disease=="UC" | gwas.hits$Disease=="CD,UC" | gwas.hits$Disease=="IBD,UC" | gwas.hits$Disease=="UC,IBD"],
+  outcomes = 'ebi-a-GCST004133'
+)
+
+IBD.data=IBD.data[,c("SNP","chr","pos","effect_allele.outcome","other_allele.outcome","beta.outcome","se.outcome","pval.outcome","outcome")]
+CD.data=CD.data[,c("SNP","chr","pos","effect_allele.outcome","other_allele.outcome","beta.outcome","se.outcome","pval.outcome","outcome")]
+UC.data=UC.data[,c("SNP","chr","pos","effect_allele.outcome","other_allele.outcome","beta.outcome","se.outcome","pval.outcome","outcome")]
+
+write.table(IBD.data,file = "IBD.summary.txt",sep = "\t",quote = F,row.names = F)
+write.table(UC.data,file = "UC.summary.txt",sep = "\t",quote = F,row.names = F)
+write.table(CD.data,file = "CD.summary.txt",sep = "\t",quote = F,row.names = F)
+```
 
 *step.2 Check GWAS SNPs/SNP-proxy in our genetics dataset*
 ---
