@@ -51,3 +51,18 @@ Variants are replaced with proxy based on LD (r=1): rs3180018, rs144344067, rs25
 
 The final variants number to be used in PRS calculation is 234.
 
+
+*step.3 calculate PRS based on GWAS summary in our datasets*
+---
+
+Formular of PRS: sum(beta * effect allele) / total number of effect alleles
+
+reference(https://www.prsice.info/step_by_step/; Choi,et,al.(2020).NatureProtocols)
+
+```
+Rscript ~/PRSice.R  --dir . --prsice ~/PRSice_linux --base CD.summary.txt --target /groups/umcg-gastrocol/tmp04/Metabolic_Project/Genetics/Combined/All.merged.1_22chr.biallic --stat beta.outcome --binary-target F --out CD.PRS --no-regress T --no-full T --snp SNP --chr chr --bp pos --A1 effect_allele.outcome --A2 other_allele.outcome --pvalue pval.outcome
+
+script ~/PRSice.R  --dir . --prsice ~/PRSice_linux --base UC.summary.txt --target /groups/umcg-gastrocol/tmp04/Metabolic_Project/Genetics/Combined/All.merged.1_22chr.biallic --stat beta.outcome --binary-target F --out UC.PRS --no-regress T --no-full T --snp SNP --chr chr --bp pos --A1 effect_allele.outcome --A2 other_allele.outcome --pvalue pval.outcome
+
+Rscript ~/PRSice.R  --dir . --prsice ~/PRSice_linux --base IBD.summary.txt --target /groups/umcg-gastrocol/tmp04/Metabolic_Project/Genetics/Combined/All.merged.1_22chr.biallic --stat beta.outcome --binary-target F --out IBD.PRS --no-regress T --no-full T --snp SNP --chr chr --bp pos --A1 effect_allele.outcome --A2 other_allele.outcome --pvalue pval.outcome
+```
