@@ -1,3 +1,6 @@
+Author: Arnau Vich Vila 
+
+
 #!/bin/bash
 
 for i in *_1.fq.gz; do 
