@@ -10,9 +10,9 @@ Year: 2020
 # Functions Required:
 
 library(forcats)
-summary_statistics_metadata   #see 'Functions' file, 1.
-Remove_FactCols #see 'Functions' file, 2.
-kruskal.test_function. #see 'Functions' file, 3.
+summary_statistics_metadata   #see 'Functions' file, point 1.
+Remove_FactCols #see 'Functions' file, point 2.
+kruskal.test_function. #see 'Functions' file, point 3.
 
 
 # Data Import & Processing
@@ -112,7 +112,7 @@ write.table(Test2, "Pval_DescrpStats_SIvsLLD.txt", sep = "\t",col.names = T)
 ### 2. Genus Composition  
 
 ```{r}
-# Functions Required:
+# Packages & Functions Required:
 
 library(dplyr)
 library(ggplot2)
@@ -120,7 +120,7 @@ library(reshape2)
 library(plotly)
 library(RColorBrewer)
 library(forcats)
-TopNTaxa  #see 'Functions' file, 4.
+TopNTaxa  #see 'Functions' file, point 4.
 
 
 
@@ -415,5 +415,133 @@ my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
 write.table(my_matrix, file = "Top10_SI_Genera.txt", sep = "\t", col.names = T)
 
 ```
+
+### 4. Alpha & Beta Diversity 
+
+```{r}
+
+# Packages & Functions Required:
+library(vegan)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(plotly)
+library(RColorBrewer)
+library(ggpubr)
+library(forcats)
+PCoA #see 'Functions' file, point 5.
+
+# Data Import & Process
+
+#_Metadata
+#metadata (LLD and IBD faecal ID's combined in one column to allow for merge (see following steps))
+LLD.IBD_Meta <- read.table(file = "../Data/SI_project/Metadata27022019_new.txt", header = TRUE, sep = "\t", quote = "\\") #Metadata 
+
+LLD.IBD_Meta <- LLD.IBD_Meta[-c(1783,1793,2000,1349,1839),]
+
+LLD.IBD_Meta <- subset(LLD.IBD_Meta, DiagnosisCurrent != "MicroscopicColitis" & DiagnosisCurrent != "IBDI")
+
+LLD.IBD_Meta$DiagnosisCurrent <- fct_drop(LLD.IBD_Meta$DiagnosisCurrent)
+
+#To distinguish patients with no stoma and no resections from patients with resections 
+LLD.IBD_Meta <- LLD.IBD_Meta %>%
+  mutate(CurrentStomaOrPouchType = ifelse(ResectionAny=="yes", gsub('none', 'Resections', CurrentStomaOrPouchType), as.character(CurrentStomaOrPouchType)))
+
+LLD.IBD_Meta <- LLD.IBD_Meta %>%
+  mutate(CurrentStomaOrPouchType = ifelse(ResectionAny=="no", gsub('none', 'No Resections', CurrentStomaOrPouchType), as.character(CurrentStomaOrPouchType)))
+
+LLD.IBD_Meta$CurrentStomaOrPouchType <- as.factor(LLD.IBD_Meta$CurrentStomaOrPouchType)
+
+#Add additional level to 'CurrentStomaOrPouchType' column to represent LLD individuals 
+levels <- levels(LLD.IBD_Meta$CurrentStomaOrPouchType)
+levels[length(levels) + 1] <- "HealthyControl"
+
+# refactor CurrentStomaOrPouchType to include "HealthyControl" as a level
+# and replace NAs with "HealthyControl"
+LLD.IBD_Meta$CurrentStomaOrPouchType <- factor(LLD.IBD_Meta$CurrentStomaOrPouchType, levels = levels)
+LLD.IBD_Meta$CurrentStomaOrPouchType[is.na(LLD.IBD_Meta$CurrentStomaOrPouchType)] <- "HealthyControl"
+
+#Final data with ileostoma and pouch individuals as one group
+LLD.IBD_Meta$CurrentStomaOrPouchType <- as.factor(gsub("ileostoma", "IleostomaPouch", LLD.IBD_Meta$CurrentStomaOrPouchType))
+LLD.IBD_Meta$CurrentStomaOrPouchType <- as.factor(gsub("pouch", "IleostomaPouch", LLD.IBD_Meta$CurrentStomaOrPouchType))
+
+#Final data with colotoma and resection individuals as one group
+LLD.IBD_Meta$CurrentStomaOrPouchType <- as.factor(gsub("colostoma", "Resections", LLD.IBD_Meta$CurrentStomaOrPouchType))
+
+#Change order of the levels for variable CurrentStomaOrPouchType
+LLD.IBD_Meta$CurrentStomaOrPouchType <- factor(LLD.IBD_Meta$CurrentStomaOrPouchType, levels = c('HealthyControl', 'No Resections', 'Resections', 'IleostomaPouch'))
+
+
+#_IBD_Taxonomy
+IBD_Taxa <- read.table(file = "../Data/SI_project/IBD_taxonomy_unstrat_clean.txt", header = TRUE, sep = "\t", quote = "\\") #IBD Taxonomy 
+rownames(IBD_Taxa) <- IBD_Taxa$ID
+IBD_Taxa$ID <- NULL
+IBD_Taxa <- as.data.frame(t(IBD_Taxa)) #transform
+
+
+#_LLD_Taxonomy
+LLD_Taxa <- read.table(file = "../Data/SI_project/LLD_taxonomy_unstrat_clean.txt", header = TRUE, sep = "\t", quote = "\\") #LLD Taxonomy 
+rownames(LLD_Taxa) <- LLD_Taxa$ID
+LLD_Taxa$ID <- NULL
+
+LLD <- gsub("^X", "", colnames(LLD_Taxa)) #Remove 'X' at the beginning of ID numbers
+colnames(LLD_Taxa) <- LLD
+
+#Merge the cohort taxa's
+IBD_Taxa1 <- as.data.frame(t(IBD_Taxa))
+LLD_IBD_Taxa <- merge(LLD_Taxa, IBD_Taxa1, by = 'row.names', all = T)
+rownames(LLD_IBD_Taxa) <- LLD_IBD_Taxa$Row.names
+LLD_IBD_Taxa$Row.names <- NULL
+LLD_IBD_Taxa <- as.data.frame(t(LLD_IBD_Taxa))
+
+#Species Taxa
+LLD_IBD_TaxaS <- LLD_IBD_Taxa[,grepl('s__',colnames(LLD_IBD_Taxa),ignore.case = T)]
+LLD_IBD_TaxaS<- LLD_IBD_TaxaS[,!grepl('t__',colnames(LLD_IBD_TaxaS),ignore.case = T)]
+
+#Merge metadata with taxa
+LLD_IBD_MetTax <- merge(LLD.IBD_Meta,LLD_IBD_TaxaS, by.x = 'CombinedIDs', by.y = 'row.names')
+
+# Remove bacteria from dataframe with a prevalence < 15%
+remove_cols <- vector()
+for (i in 748:ncol(LLD_IBD_MetTax)) {
+  cname <- colnames(LLD_IBD_MetTax)[i]
+  if(colSums(LLD_IBD_MetTax[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTax) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD_IBD_MetTax15 <- LLD_IBD_MetTax %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+rownames(LLD_IBD_MetTax15) <- LLD_IBD_MetTax15$CombinedIDs
+LLD_IBD_MetTax15$CombinedIDs <- NULL
+
+#Category table
+Stoma1 <- LLD_IBD_MetTax15[c(169)]
+
+
+# Alpha diversity (Shannon Index)
+
+
+Alpha1 <- as.data.frame(diversity(LLD_IBD_MetTax15[,c(747:880)], index="shannon"))
+colnames(Alpha1)[1] <- 'AlphaDiversity' 
+  
+Alpha_Stoma1 <- merge(Stoma1, Alpha1, by = 'row.names')
+rownames(Alpha_Stoma1) <- Alpha_Stoma1$Row.names
+Alpha_Stoma1$Row.names <- NULL
+
+ my_comparisions=list(c("HealthyControl","IleostomaPouch"),c("Resections","IleostomaPouch"),c("No Resections","IleostomaPouch"))
+
+m <- ggplot(Alpha_Stoma1, aes (x=CurrentStomaOrPouchType, y=AlphaDiversity, fill=CurrentStomaOrPouchType)) + geom_violin() + geom_boxplot(width = 0.1, fill = "white") + theme_minimal() + theme(legend.position="none") + theme(axis.text.x = element_text(hjust = 0.5,vjust = 1, size=8,color="black")) + scale_fill_manual(values=c('grey54','slateblue2','gold1','red2')) + stat_compare_means(comparisons = my_comparisions, method = "wilcox.test") + ylab ("Shannon Index") + xlab ("Bowel Phenotype") + scale_x_discrete(labels=c('HealthyControl' = 'general population\n N = 1178', 'No Resections' = 'IBD non-resected bowel\n N = 309', 'Resections' = 'IBD resected bowel\n N = 169', 'IleostomaPouch' = 'IBD small intestine\n N = 57'))
+
+
+ggplotly(m)
+
+table(Alpha_Stoma1$CurrentStomaOrPouchType)
+
+write.table(Alpha_Stoma1, file = "LLD_IBD_ShannonDiversity_ileopouch.txt", sep = "\t", col.names = T)
+
+Alpha_Stoma1x<- melt(Alpha_Stoma1, 'CurrentStomaOrPouchType')
+Alpha_Stoma1x <- aggregate(Alpha_Stoma1[, 2], list(Alpha_Stoma1$CurrentStomaOrPouchType), mean)
+colnames(Alpha_Stoma1x) <- c("CurrentStomaOrPouchType", "MeanShannonIndex")
 
 
