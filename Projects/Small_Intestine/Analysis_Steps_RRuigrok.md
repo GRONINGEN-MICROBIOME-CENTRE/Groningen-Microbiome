@@ -1054,4 +1054,123 @@ ggplotly(b)
 ```
 
 
+### 7. Maaslin Multivariate analyses
 
+```{r}
+
+#Packages required:
+#install.packages(c('agricolae','gam','gamlss','gbm','glmnet','inlinedocs','logging','MASS','nlme','optparse','outliers','penalized','pscl','robustbase'))
+install.packages('agricolae')
+install.packages('gam')
+install.packages('gamlss')
+install.packages('gbm')
+install.packages('glmnet')
+install.packages('inlinedocs')
+install.packages('logging')
+install.packages('MASS')
+install.packages('nlme')
+install.packages('optparse')
+install.packages('outliers')
+install.packages('penalized')
+install.packages('pscl')
+install.packages('robustbase')
+
+install.packages("https://bitbucket.org/biobakery/maaslin/downloads/Maaslin_0.0.5.tar.gz", repo=NULL, type="source")
+
+library(Maaslin)
+library(forcats)
+
+
+#***IleostomaPouch vs Healthy Controls***
+
+#Prepare input data for Maaslin 
+
+# 1. Metadata & Taxa
+# Dataframe needed: LLD.IBD_MetaSp15 (i.e. non-transformed) (see rscript 'UnivariateAnalysis260320' for dataframe)
+
+Maaslin_MetaTaxa1 <- subset(LLD.IBD_MetaSp15, CurrentStomaOrPouchType == 'IleostomaPouch' | CurrentStomaOrPouchType == 'HealthyControl')
+Maaslin_MetaTaxa1 <- Maaslin_MetaTaxa1[c(1,2,3,9,14,74,76,96,98,99,102,113,115,119,120,121,128,133,135,138,147,148,163,165:298)]
+Maaslin_MetaTaxa1$CurrentStomaOrPouchType <- fct_drop(Maaslin_MetaTaxa1$CurrentStomaOrPouchType)
+
+#Set sample IDs as column 1
+#Maaslin_MetaTaxa1$SampleID <- rownames(Maaslin_MetaTaxa1) 
+#Maaslin_MetaTaxa1 <- Maaslin_MetaTaxa1[c(159,1:158)]
+
+for (i in 24:157) {
+  Maaslin_MetaTaxa1[,i] <- Maaslin_MetaTaxa1[,i]/100
+}     # Relative abundance should be between 0 - 1
+
+
+write.table(Maaslin_MetaTaxa1, file = "MaaslinMetaTaxa_HealthControl_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+Maaslin(strInputTSV = "MaaslinMetaTaxa_HealthControl_vs_IleostomaPouch.tsv", strOutputDIR = "Maaslin_HC_vs_Ileostoma_Output", strInputConfig = "MaasLinConfig_HC_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0)
+
+#MaaslinTest <- read.table(file = "../Maaslin/MaaslinMetaTaxa_HealthControl_vs_IleostomaPouch.tsv", header = TRUE, sep = "\t", quote = "\\") #Metadata
+
+
+
+#***Within IBD __ IleostomaPouch vs No Resection***
+
+# 1. Metadata & Taxa
+Maaslin_MetaTaxa2 <- subset(LLD.IBD_MetaSp15, CurrentStomaOrPouchType == 'IleostomaPouch' | CurrentStomaOrPouchType == 'No Resections')
+Maaslin_MetaTaxa2 <- Maaslin_MetaTaxa2[c(1,2,3,9,14,15,74,76,96,98,99,102,113,115,119,120,121,127,128,133,135,138,147,148,163,165:298)]
+Maaslin_MetaTaxa2$CurrentStomaOrPouchType <- fct_drop(Maaslin_MetaTaxa2$CurrentStomaOrPouchType)
+
+Maaslin_MetaTaxa2$CurrentStomaOrPouchType <- relevel(Maaslin_MetaTaxa2$CurrentStomaOrPouchType, ref = 'No Resections') #Change Reference (Baseline) Category
+
+Maaslin_MetaTaxa2$DiagnosisCurrent <- fct_drop(Maaslin_MetaTaxa2$DiagnosisCurrent)
+
+for (i in 26:159) {
+  Maaslin_MetaTaxa2[,i] <- Maaslin_MetaTaxa2[,i]/100
+} 
+
+write.table(Maaslin_MetaTaxa2, file = "MaaslinMetaTaxa_WithinIBD_NoResections_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+
+#2. Config file
+# Using R, name: MaaslinConfig_NoResection_vs_IleostomaPouch.read.config.R
+
+Maaslin(strInputTSV = "MaaslinMetaTaxa_WithinIBD_NoResections_vs_IleostomaPouch.tsv", strOutputDIR = "Maaslin_NoResection_vs_Ileostoma_Output", strInputConfig = "MaaslinConfig_NoResection_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0)
+
+
+#***Within IBD __ IleostomaPouch vs Resections***
+
+# 1. Metadata & Taxa
+Maaslin_MetaTaxa3 <- subset(LLD.IBD_MetaSp15, CurrentStomaOrPouchType == 'IleostomaPouch' | CurrentStomaOrPouchType == 'Resections')
+Maaslin_MetaTaxa3 <- Maaslin_MetaTaxa3[c(1,2,3,9,14,15,74,76,79,82,96,98,99,102,113,115,119,120,121,127,128,133,135,138,147,148,163,165:298)]
+Maaslin_MetaTaxa3$CurrentStomaOrPouchType <- fct_drop(Maaslin_MetaTaxa3$CurrentStomaOrPouchType)
+
+Maaslin_MetaTaxa3$CurrentStomaOrPouchType <- relevel(Maaslin_MetaTaxa3$CurrentStomaOrPouchType, ref = 'Resection NoStoma') #Change Reference (Baseline) Category
+
+#Remove levels with 0 samples
+Maaslin_MetaTaxa3$DiagnosisCurrent <- fct_drop(Maaslin_MetaTaxa3$DiagnosisCurrent)
+
+for (i in 28:161) {
+  Maaslin_MetaTaxa3[,i] <- Maaslin_MetaTaxa3[,i]/100
+} 
+
+write.table(Maaslin_MetaTaxa3, file = "MaaslinMetaTaxa_WithinIBD_Resections_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+
+#2. Config file
+# Using R, name: MaaslinConfig_ResectionNoStoma_IleostomaPouch.read.config.R
+
+Maaslin(strInputTSV = "MaaslinMetaTaxa_WithinIBD_Resections_vs_IleostomaPouch.tsv", strOutputDIR = "Maaslin_Resections_vs_Ileostoma_Output", strInputConfig = "MaaslinConfig_ResectionNoStoma_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0)
+
+
+
+#***Within IBD __ IleostomaPouch vs Resections IleoCecalValveInSitu***
+
+# 1. Metadata & Taxa
+Maaslin_MetaTaxa3a <- subset(Maaslin_MetaTaxa3, CurrentStomaOrPouchType == 'Resections' & IleocecalValveInSitu == 'yes')
+Maaslin_MetaTaxa3b <- rbind(subset(Maaslin_MetaTaxa3, CurrentStomaOrPouchType == 'IleostomaPouch'), Maaslin_MetaTaxa3a)
+Maaslin_MetaTaxa3b$IleocecalValveInSitu <- NULL
+
+write.table(Maaslin_MetaTaxa3b, file = "MaaslinMetaTaxa_WithinIBD_ResectionsWithIleoCecalValveInSitu_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+
+#2. Config file
+# Using R, name: MaasLinConfig_HC_vs_IleostomaPouch.read.config.R
+
+
+Maaslin(strInputTSV = "MaaslinMetaTaxa_WithinIBD_ResectionsWithIleoCecalValveInSitu_vs_IleostomaPouch.tsv", strOutputDIR = "Maaslin_ResectionsCecalValveInSitu_vs_Ileostoma_Output", strInputConfig = "MaasLinConfig_HC_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0)
+
+```
+
+### 8.
