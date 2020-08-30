@@ -1841,4 +1841,130 @@ Maaslin(strInputTSV = "MaaslinMetaPwy_WithinIBD_ResectionsWithIleoCecalValveInSi
 ```
 
 
-###
+### 12. Logistic Regression
+
+```{r}
+
+#Packages required:
+library(forcats)
+Remove_FactCols #see 'Functions' file, point 2.
+LogisticRegression.function #see 'Functions' file, point 12.
+LgRgr.DescriptiveStats #see 'Functions' file, point 13.
+
+
+#See 'pathways' R script for origin 
+LLD_IBD_MetTaxS <- read.table(file = "../RScripts/LLD_IBD_MetaSpecies150420.txt", header = TRUE, sep = "\t", quote = "\\", row.names = 1) # 
+LLD_IBD_MetTaxS <- LLD_IBD_MetTaxS[-c(212,218,379,1554,1671),]
+LLD_IBD_MetTaxS <- subset(LLD_IBD_MetTaxS, DiagnosisCurrent != "MicroscopicColitis" & DiagnosisCurrent != "IBDI")
+LLD_IBD_MetTaxS$DiagnosisCurrent <- fct_drop(LLD_IBD_MetTaxS$DiagnosisCurrent)
+
+LLD_IBD_MetTaxS$CurrentStomaOrPouchType <- as.factor(gsub("Resection NoStoma", "Resections", LLD_IBD_MetTaxS$CurrentStomaOrPouchType))
+LLD_IBD_MetTaxS$CurrentStomaOrPouchType <- as.factor(gsub("colostoma", "Resections", LLD_IBD_MetTaxS$CurrentStomaOrPouchType))
+
+#Final subsetting .. 
+#LLD.IBD_MetTaxS.F <- LLD_IBD_MetTaxS[c(2,4:6,8,9,14:17,20,22,24:28,30:37,42:48,50:69,71:86,88:181,183:197,414:422,424:431,433:684,687:1338)]
+LLD.IBD_MetTaxS.F <- LLD_IBD_MetTaxS[c(2,4:6,8,9,14:17,20,22,24:28,30:37,42:48,50:69,71:86,88:181,183:197,202,203,408:416,418:425,427:678,681:1332)]
+
+x <- gsub('CU','UC', LLD.IBD_MetTaxS.F$DiagnosisFirst) 
+LLD.IBD_MetTaxS.F$DiagnosisFirst <- as.factor(x)
+
+LLD.IBD_MetTaxS.F$DiagnosisCurrent <- as.factor(gsub("ReconsideringDiagnosis", "IBDU", LLD.IBD_MetTaxS.F$DiagnosisCurrent))
+
+LLD.IBD_MetTaxS.F$TimeEndPreviousExacerbation <- as.numeric(as.character(LLD.IBD_MetTaxS.F$TimeEndPreviousExacerbation))
+
+y <- lapply(LLD.IBD_MetTaxS.F[,1:448], class) #check class of each phenotype variable
+
+#check how many levels per group, remove variables with too many levels i.e. too few samples per group for statistical testing
+w <- lapply(LLD.IBD_MetTaxS.F[,1:448], nlevels) 
+LLD.IBD_MetTaxS.F$ReasonUnclearSurgeryResectionProcedures <- NULL
+#LLD.IBD_MetTaxS.F$NumberIndicationabcessOrfistula <- NULL #this group contains an NA level 
+
+#write.table(LLD.IBD_MetTaxS.F, file = "LLD.IBD_MetTaxS.F.txt", sep = "\t", col.names = TRUE)
+
+LLD.IBD_Final <- Remove_FactCols(LLD.IBD_MetTaxS.F) 
+y <- lapply(LLD.IBD_Final[,1:428], class)
+
+LLD.IBD_Final <- LLD.IBD_Final[c(1:114,142:1080)] #remove logical variables, not informative and cannot be applied to the 'univariate.analysis' function
+y <- lapply(LLD.IBD_Final[,1:401], class)      
+
+
+LLD.IBD_Final[408,128] <- NA #change 'NA' to NA 
+LLD.IBD_Final$NumberIndicationabcessOrfistula <- fct_drop(LLD.IBD_Final$NumberIndicationabcessOrfistula) #remove level 'NA'
+
+LLD.IBD_Final$IncludedSamples <- NULL
+
+#include BinaryBSS and bowel movement variable to LLD.IBD_Final dataframe
+BinaryBSS <- read.table(file = "../Data/SI_project/intestinal_info.txt", header = TRUE, sep = "\t", quote = "\\")
+LLD.IBD_Final <- merge(BinaryBSS, LLD.IBD_Final, by.x = 'UMCGIBDResearchIDorLLDeepID', by.y = 'row.names')
+rownames(LLD.IBD_Final) <-LLD.IBD_Final$UMCGIBDResearchIDorLLDeepID
+LLD.IBD_Final$UMCGIBDResearchIDorLLDeepID <- NULL
+LLD.IBD_Final <- LLD.IBD_Final[c(3:388,1,2,389:1054)] #change order
+
+#include updated PFReads variable to LLD.IBD_Final dataframe 
+PFReads <- read.table(file = "../Data/SI_project/PFReads31.03.20.txt", header = TRUE, sep = "\t", quote = "\\")
+LLD.IBD_Final$PFReads <- NULL
+LLD.IBD_Final <- merge(PFReads, LLD.IBD_Final, by.x = 'SampleID', by.y = 'row.names')
+rownames(LLD.IBD_Final) <-LLD.IBD_Final$SampleID
+LLD.IBD_Final$SampleID <- NULL
+LLD.IBD_Final <- LLD.IBD_Final[c(2,1,3:1054)] #change order
+colnames(LLD.IBD_Final)[2] <- "PFReads"
+
+#remove individuals with <10 million PFReads
+#LLD.IBD_Final1 <- subset(LLD.IBD_Final, PFReads >= 10000000) #pouch = 8 (instead of 9), ileostoma = 45 (instead of 49)
+
+#Final data with ileostoma and pouch individuals as one group
+LLD.IBD_Finalx <-  LLD.IBD_Final
+LLD.IBD_Finalx$CurrentStomaOrPouchType <- as.factor(gsub("ileostoma", "IleostomaPouch", LLD.IBD_Finalx$CurrentStomaOrPouchType))
+LLD.IBD_Finalx$CurrentStomaOrPouchType <- as.factor(gsub("pouch", "IleostomaPouch", LLD.IBD_Finalx$CurrentStomaOrPouchType))
+
+#Remove 'correlated/releted' variables
+LLD.IBD_Finalxx <- LLD.IBD_Finalx[c(1,2,5:13,15,18,21:31,33,36:43,45,47,49,52:108,110,111,114:134,302,310:317,319,321,323:370,373,377,379,381:385,387,389,403:1054)]
+LLD.IBD_Finalxx <- LLD.IBD_Finalxx[-c(74,76:78,80:93,96,98,113)]
+
+# Remove bacteria from dataframe with a prevalence < 15%
+remove_cols <- vector()
+for (i in 165:ncol(LLD.IBD_Finalxx)) {
+  cname <- colnames(LLD.IBD_Finalxx)[i]
+  if(colSums(LLD.IBD_Finalxx[i] != 0) / nrow(LLD.IBD_Finalxx) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+
+LLD.IBD_Species_Below15 <- LLD.IBD_Finalxx %>% select(remove_cols)
+LLD.IBD_Species_Below15 <- as.data.frame(ifelse(LLD.IBD_Species_Below15 > 0, 1, 0))
+
+LLD.IBD_MetSp_Below15 <- cbind(LLD.IBD_Finalxx[,c(1:164)], LLD.IBD_Species_Below15)
+
+#LLD.IBD_MetSp_Below15$CurrentStomaOrPouchType <- relevel(LLD.IBD_MetSp_Below15$CurrentStomaOrPouchType, ref = 'IleostomaPouch') #Change Reference (Baseline) Category
+
+
+
+#Logistic regression with Ileostomy/Pouch vs Rest (i.e. SI vs Colon)
+SIvsColon <- LLD.IBD_MetSp_Below15[c(76,1,3,165:ncol(LLD.IBD_MetSp_Below15))]
+SIvsColon$CurrentStomaOrPouchType <- fct_collapse(SIvsColon$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
+
+my_preds=c("CurrentStomaOrPouchType","Sex","AgeAtFecalSampling")
+
+LgR <- LogisticRegression.function(SIvsColon,3,4,my_preds)
+LgR.decrp <- LgRgr.DescriptiveStats(SIvsColon, 3, 4)
+
+LogisticRegrSIvsColon <- cbind(LgR.decrp, LgR[c(3:8)])
+
+write.table(LogisticRegrSIvsColon, "LogisticRegression_SIvsColon1.txt", sep = "\t", col.names = T)
+
+
+#Bowel Phenotype only
+SIvsColon_only <- LLD.IBD_MetSp_Below15[c(76,165:ncol(LLD.IBD_MetSp_Below15))]
+SIvsColon_only$CurrentStomaOrPouchType <- fct_collapse(SIvsColon$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
+
+my_preds=c("CurrentStomaOrPouchType")
+
+LgR <- LogisticRegression.function(SIvsColon_only,1,2,my_preds)
+LgR.decrp <- LgRgr.DescriptiveStats(SIvsColon_only, 1, 2)
+
+LogisticRegrSIvsColon_only <- cbind(LgR.decrp, LgR[c(3:8)])
+
+write.table(LogisticRegrSIvsColon_only, "LogisticRegression_SIvsColon2.txt", sep = "\t", col.names = T)
+
+```
+
