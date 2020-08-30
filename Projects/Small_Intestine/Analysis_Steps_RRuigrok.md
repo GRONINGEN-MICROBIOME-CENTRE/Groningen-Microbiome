@@ -1079,6 +1079,12 @@ install.packages("https://bitbucket.org/biobakery/maaslin/downloads/Maaslin_0.0.
 
 library(Maaslin)
 library(forcats)
+library(ggplot2)
+library(plotly)
+library(wesanderson)
+library(RColorBrewer)
+library(reshape2)
+FactorVariableHeatmapMaaslin #see 'Functions' file, point 11.
 
 
 #***IleostomaPouch vs Healthy Controls***
@@ -1171,6 +1177,668 @@ write.table(Maaslin_MetaTaxa3b, file = "MaaslinMetaTaxa_WithinIBD_ResectionsWith
 
 Maaslin(strInputTSV = "MaaslinMetaTaxa_WithinIBD_ResectionsWithIleoCecalValveInSitu_vs_IleostomaPouch.tsv", strOutputDIR = "Maaslin_ResectionsCecalValveInSitu_vs_Ileostoma_Output", strInputConfig = "MaasLinConfig_HC_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0)
 
+
+
+#Display results
+#Heatmap
+
+Healthy_IBD.SI.Maaslin <- read.table(file = "../Maaslin/Maaslin_HC_vs_Ileostoma_Output/MaaslinMetaTaxa_HealthControl_vs_IleostomaPouch-CurrentStomaOrPouchType.txt", header = TRUE, sep = "\t") 
+
+IBD.NoResec_SI.Maaslin <- read.table(file = "../Maaslin/Maaslin_NoResection_vs_Ileostoma_Output/MaaslinMetaTaxa_WithinIBD_NoResections_vs_IleostomaPouch-CurrentStomaOrPouchType.txt", header = TRUE, sep = "\t")
+
+IBD.Resec_SI.Maaslin <- read.table(file = "../Maaslin/Maaslin_Resections_vs_Ileostoma_Output/MaaslinMetaTaxa_WithinIBD_Resections_vs_IleostomaPouch-CurrentStomaOrPouchType.txt", header = TRUE, sep = "\t") 
+
+IBD.IleoValve_SI.Maaslin <- read.table(file = "../Maaslin/Maaslin_ResectionsCecalValveInSitu_vs_Ileostoma_Output/MaaslinMetaTaxa_WithinIBD_ResectionsWithIleoCecalValveInSitu_vs_IleostomaPouch-CurrentStomaOrPouchType.txt", header = TRUE, sep = "\t") 
+
+Healthy_IBD.SI.Maaslin$Value <- as.factor(gsub("CurrentStomaOrPouchTypeIleostomaPouch", "IleostomaPouch01", Healthy_IBD.SI.Maaslin$Value ))
+IBD.NoResec_SI.Maaslin$Value <- as.factor(gsub("CurrentStomaOrPouchTypeNo Resections", "IleostomaPouch02", IBD.NoResec_SI.Maaslin$Value))
+IBD.Resec_SI.Maaslin$Value <- as.factor(gsub("CurrentStomaOrPouchTypeResections", "IleostomaPouch03", IBD.Resec_SI.Maaslin$Value))
+IBD.IleoValve_SI.Maaslin$Value <- as.factor(gsub("CurrentStomaOrPouchTypeResections", "IleostomaPouch04", IBD.IleoValve_SI.Maaslin$Value))
+
+Healthy_IBD.SI.Maaslin <- FactorVariableHeatmapMaaslin(Healthy_IBD.SI.Maaslin)
+IBD.NoResec_SI.Maaslin <- FactorVariableHeatmapMaaslin(IBD.NoResec_SI.Maaslin)
+IBD.Resec_SI.Maaslin <- FactorVariableHeatmapMaaslin(IBD.Resec_SI.Maaslin)
+IBD.IleoValve_SI.Maaslin <- FactorVariableHeatmapMaaslin(IBD.IleoValve_SI.Maaslin)
+
+colnames(Healthy_IBD.SI.Maaslin)[9] <- 'Maaslin_01'
+colnames(IBD.NoResec_SI.Maaslin)[9] <- 'Maaslin_02'
+colnames(IBD.Resec_SI.Maaslin)[9] <- 'Maaslin_03'
+colnames(IBD.IleoValve_SI.Maaslin)[9] <- 'Maaslin_04'
+
+# the direction for the last 4 Maaslin test values refer to the non IleostomaPouch group - multiply logFDR column by -1 
+IBD.NoResec_SI.Maaslin$Maaslin_02 <- IBD.NoResec_SI.Maaslin$Maaslin_02 * -1
+IBD.Resec_SI.Maaslin$Maaslin_03 <- IBD.Resec_SI.Maaslin$Maaslin_03 * -1
+IBD.IleoValve_SI.Maaslin$Maaslin_04 <- IBD.IleoValve_SI.Maaslin$Maaslin_04 * -1
+
+Merge10 <- merge(Healthy_IBD.SI.Maaslin, IBD.NoResec_SI.Maaslin, by = 'Feature', all = T)
+Merge10 <- Merge10[c(1,9,17)]
+
+Merge11 <- merge(Merge10, IBD.Resec_SI.Maaslin, by = 'Feature', all = T)
+Merge11<- Merge11[c(1,2,3,11)]
+
+#Merge12 <- merge(Merge11, IBD.IleoValve_SI.Maaslin, by = 'Feature', all = T)
+#Merge12<- Merge12[c(1,2,3,4,12)]
+
+#plot heatmap
+Merge11$Feature <- as.character(gsub("_", " ", Merge11$Feature))
+
+Heatmap_Maaslin <- melt(Merge11)
+Heatmap_Maaslin$value <- as.factor(Heatmap_Maaslin$value)
+Heatmap_Maaslin[is.na(Heatmap_Maaslin)] <- 0
+
+cols <- c("-3" = "#2171B5", "-2" = "#6BAED6", "-1" = "#C6DBEF", "0" = "white",  "1" = "#FCBBA1", "2" = "#FB6A4A", "3" = "#CB181D")
+
+w <- ggplot(Heatmap_Maaslin, aes(x = variable, y = Feature, fill= value)) + geom_tile(color="gray80") + scale_fill_manual(values = cols) + theme_classic() + theme(axis.text.x = element_text(angle = 55, hjust = 1, size=5))
+
+ggplotly(w)
+
 ```
 
-### 8.
+### 8. ADONIS analysis
+
+```{r}
+
+#Packages & functions required:
+library(vegan)
+library (dplyr)
+RemoveColumnsNA #see 'Functions' file, point 10.
+
+Final_phenotypes1 <- read.table(file = "../UnivariateAssociations_asin.txt",header = TRUE, sep = "\t", row.names = 1)
+Final_phenotypes1 <- as.character(unique(Final_phenotypes1$Phenotype))
+
+HealthyControls_meta <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "HealthyControl", select = c(Final_phenotypes1))
+IBD_meta <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections" , select = c(Final_phenotypes1))
+SmallIntestine_meta <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "IleostomaPouch" , select = c(Final_phenotypes1))
+
+HealthyControls_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "HealthyControl", c(165:ncol(LLD.IBD_MetaSp15.asin)))
+IBD_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections" , select = c(165:ncol(LLD.IBD_MetaSp15.asin)))
+SmallIntestine_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "IleostomaPouch" , select = c(165:ncol(LLD.IBD_MetaSp15.asin)))
+
+
+write.table(HealthyControls_meta, file = "HealthyControls_meta.txt", sep = "\t", col.names = TRUE)
+write.table(IBD_meta, file = "IBD_meta.txt", sep = "\t", col.names = TRUE)
+write.table(SmallIntestine_meta, file = "SmallIntestine_meta.txt", sep = "\t", col.names = TRUE)
+
+write.table(HealthyControls_taxa, file = "HealthyControls_taxa.txt", sep = "\t", col.names = TRUE)
+write.table(IBD_taxa, file = "IBD_taxa.txt", sep = "\t", col.names = TRUE)
+write.table(SmallIntestine_taxa, file = "SmallIntestine_taxa.txt", sep = "\t", col.names = TRUE)
+
+
+
+
+#Run Adonis
+
+#LLD
+adonis_HC <- matrix(ncol = 4, nrow=ncol(HealthyControls_meta)) 
+#HealthyControls_meta2 <- HealthyControls_meta[rownames(si_taxa),]
+for ( i in 1:ncol(HealthyControls_meta)){
+  HealthyControls_meta2=HealthyControls_meta[complete.cases(HealthyControls_meta[,i]),]
+  adonis_HC[i,4]=nrow(HealthyControls_meta2)
+  HealthyControls_taxa2=subset(HealthyControls_taxa, row.names(HealthyControls_taxa) %in% row.names(HealthyControls_meta2))
+  if (length(unique(HealthyControls_meta2[,i]))!=1 & nrow(HealthyControls_meta2)>1){
+    ad <- adonis(formula = HealthyControls_taxa2 ~ HealthyControls_meta2[,i] , data = HealthyControls_meta2, permutations = 1000, method = "bray")
+    aov_table <- ad$aov.tab
+    adonis_HC[i,1]=aov_table[1,1]
+    adonis_HC[i,2]=aov_table[1,5]
+    adonis_HC[i,3]=aov_table[1,6]
+  } else{
+    adonis_HC[i,1]="Only one level"
+    adonis_HC[i,2]="Only one level"
+    adonis_HC[i,3]="Only one level"
+  }
+}
+colnames(adonis_HC) <- c("Df", "R2", "Pr(>F)", "Num.samples")
+rownames(adonis_HC)=colnames(HealthyControls_meta)
+
+adonis_HC <- as.data.frame(adonis_HC)
+adonis_HC[,3] <- as.numeric(as.character(adonis_HC[,3]))
+
+adonis_HC$BonferroniAdjust <- p.adjust(c(adonis_HC[,3]), method = 'bonferroni')
+adonis_HC$FDRadjust <- p.adjust(c(adonis_HC[,3]), method = 'fdr')
+
+write.table(adonis_HC, file = 'Adonis_HealthyControls1.txt', sep = "\t", col.names = T)
+
+
+
+
+#IBD excl. ileostoma/ileoanal pouch
+#IBD_meta1 <- IBD_meta #[c(1:335,337:483),] #exclude sample IBDFEC1024
+
+adonis_IBD <- matrix(ncol = 4, nrow=ncol(IBD_meta)) 
+#IBD_meta2 <- IBD_meta[rownames(si_taxa),]
+for ( i in 1:ncol(IBD_meta)){
+  IBD_meta2=IBD_meta[complete.cases(IBD_meta[,i]),]
+  adonis_IBD[i,4]=nrow(IBD_meta2)
+  IBD_taxa2=subset(IBD_taxa, row.names(IBD_taxa) %in% row.names(IBD_meta2))
+  if (length(unique(IBD_meta2[,i]))!=1 & nrow(IBD_meta2)>1){
+    ad <- adonis(formula = IBD_taxa2 ~ IBD_meta2[,i] , data = IBD_meta2, permutations = 1000, method = "bray")
+    aov_table <- ad$aov.tab
+    adonis_IBD[i,1]=aov_table[1,1]
+    adonis_IBD[i,2]=aov_table[1,5]
+    adonis_IBD[i,3]=aov_table[1,6]
+  } else{
+    adonis_IBD[i,1]="Only one level"
+    adonis_IBD[i,2]="Only one level"
+    adonis_IBD[i,3]="Only one level"
+  }
+}
+colnames(adonis_IBD) <- c("Df", "R2", "Pr(>F)", "Num.samples")
+rownames(adonis_IBD)=colnames(IBD_meta)
+
+adonis_IBD <- as.data.frame(adonis_IBD)
+adonis_IBD[,3] <- as.numeric(as.character(adonis_IBD[,3]))
+
+adonis_IBD$BonferroniAdjust <- p.adjust(c(adonis_IBD[,3]), method = 'bonferroni')
+adonis_IBD$FDRadjust <- p.adjust(c(adonis_IBD[,3]), method = 'fdr')
+
+write.table(adonis_IBD, file = 'Adonis_IBD_excl.ileostoma&pouch1.txt', sep = "\t", col.names = T)
+
+
+
+#__Small Intestine (leostoma/ileoanal pouch)
+
+adonis_SI <- matrix(ncol = 4, nrow=ncol(SmallIntestine_meta)) 
+#SmallIntestine_meta2 <- SmallIntestine_meta[rownames(si_taxa),]
+for ( i in 1:ncol(SmallIntestine_meta)){
+  SmallIntestine_meta2=SmallIntestine_meta[complete.cases(SmallIntestine_meta[,i]),]
+  adonis_SI[i,4]=nrow(SmallIntestine_meta2)
+  SmallIntestine_taxa2=subset(SmallIntestine_taxa, row.names(SmallIntestine_taxa) %in% row.names(SmallIntestine_meta2))
+  if (length(unique(SmallIntestine_meta2[,i]))!=1 & nrow(SmallIntestine_meta2)>1){
+    ad <- adonis(formula = SmallIntestine_taxa2 ~ SmallIntestine_meta2[,i] , data = SmallIntestine_meta2, permutations = 1000, method = "bray")
+    aov_table <- ad$aov.tab
+    adonis_SI[i,1]=aov_table[1,1]
+    adonis_SI[i,2]=aov_table[1,5]
+    adonis_SI[i,3]=aov_table[1,6]
+  } else{
+    adonis_SI[i,1]="Only one level"
+    adonis_SI[i,2]="Only one level"
+    adonis_SI[i,3]="Only one level"
+  }
+}
+colnames(adonis_SI) <- c("Df", "R2", "Pr(>F)", "Num.samples")
+rownames(adonis_SI)=colnames(SmallIntestine_meta)
+
+adonis_SI <- as.data.frame(adonis_SI)
+adonis_SI[,3] <- as.numeric(as.character(adonis_SI[,3]))
+
+adonis_SI$BonferroniAdjust <- p.adjust(c(adonis_SI[,3]), method = 'bonferroni')
+adonis_SI$FDRadjust <- p.adjust(c(adonis_SI[,3]), method = 'fdr')
+
+write.table(adonis_SI, file = 'Adonis_SmallIntestine1.txt', sep = "\t", col.names = T)
+
+
+
+#Display results
+
+#variables not applicable to/not differing in SI removed
+Outcome_function = RemoveColumnsNA(SmallIntestine_meta, Threshold = 0.92) 
+Features_removed = Outcome_function[[2]]
+
+adonis_HC_sub <- adonis_HC[-c(22,23,45,46,47,49,50,51,54,55,108:113),]
+adonis_IBD_sub <- adonis_IBD[-c(22,23,45,46,47,49,50,51,54,55,108:113),]
+adonis_SI_sub <- adonis_SI[-c(22,23,45,46,47,49,50,51,54,55,108:113),]
+
+adonis_HC_sub$FDRadjust <- p.adjust(c(adonis_HC_sub[,3]), method = 'fdr')
+adonis_IBD_sub$FDRadjust <- p.adjust(c(adonis_IBD_sub[,3]), method = 'fdr')
+adonis_SI_sub$FDRadjust <- p.adjust(c(adonis_SI_sub[,3]), method = 'fdr')
+
+adonis_HC_sub$BonferroniAdjust <- p.adjust(c(adonis_HC_sub[,3]), method = 'bonferroni')
+adonis_IBD_sub$BonferroniAdjust <- p.adjust(c(adonis_IBD_sub[,3]), method = 'bonferroni')
+adonis_SI_sub$BonferroniAdjust <- p.adjust(c(adonis_SI_sub[,3]), method = 'bonferroni')
+
+adonis_HC_sig <- subset(adonis_HC_sub, `Pr(>F)` < 0.05)
+adonis_IBD_sig <- subset(adonis_IBD_sub, `Pr(>F)` < 0.05)
+adonis_SI_sig <- subset(adonis_SI_sub, `Pr(>F)` < 0.05)
+
+R2_HC <- sort(adonis_HC_sig$R2, decreasing = T) #order
+R2_IBD <- sort(adonis_IBD_sig$R2,decreasing = T)
+R2_SI <- sort(adonis_SI_sig$R2,decreasing = T)
+
+adonis_HC_Top_pval <- adonis_HC_sub[unique(c(TopNTaxa(R2_HC,10),TopNTaxa(R2_IBD,10),TopNTaxa(R2_SI,length(R2_SI)))),]
+adonis_IBD_Top_pval <- adonis_IBD_sub[unique(c(TopNTaxa(R2_HC,10),TopNTaxa(R2_IBD,10),TopNTaxa(R2_SI,length(R2_SI)))),]
+adonis_SI_Top_pval <- adonis_SI_sub[unique(c(TopNTaxa(R2_HC,10),TopNTaxa(R2_IBD,10),TopNTaxa(R2_SI,length(R2_SI)))),]
+
+adonis_HC_Top_pval$R2 <- as.numeric(as.character(adonis_HC_Top_pval$R2))*100
+adonis_IBD_Top_pval$R2 <- as.numeric(as.character(adonis_IBD_Top_pval$R2))*100
+adonis_SI_Top_pval$R2 <- as.numeric(as.character(adonis_SI_Top_pval$R2))*100
+
+adonis_HC_Top_pval$ID <- rownames(adonis_HC_Top_pval)
+adonis_IBD_Top_pval$ID <- rownames(adonis_IBD_Top_pval)
+adonis_SI_Top_pval$ID <- rownames(adonis_SI_Top_pval)
+
+adonis_HC_Top_pval <- adonis_HC_Top_pval[complete.cases(adonis_HC_Top_pval),] 
+adonis_IBD_Top_pval <- adonis_IBD_Top_pval[complete.cases(adonis_IBD_Top_pval),]
+adonis_SI_Top_pval <- adonis_SI_Top_pval[complete.cases(adonis_SI_Top_pval),]
+
+
+ggplot(adonis_HC_Top_pval, aes(x=reorder(ID, -R2), y=R2, fill = FDRadjust < 0.05)) + labs(x = "Phenotype", y= "Variance Explained") + geom_bar(stat="identity",color = "black")+scale_fill_manual(values=c("white","grey24")) + theme_classic()+theme(legend.position="none",axis.text.x = element_text(angle = 55, hjust = 1, size=5))+ylim(0,8)
+ggplot(adonis_IBD_Top_pval, aes(x=reorder(ID, -R2), y=R2, fill = FDRadjust < 0.05)) + labs(x = "Phenotype", y= "Variance Explained") + geom_bar(stat="identity",color = "black") +scale_fill_manual(values=c("white","grey24")) + theme_classic()+theme(legend.position="none",axis.text.x = element_text(angle = 55, hjust = 1, size=5))+ylim(0,8)
+ggplot(adonis_SI_Top_pval, aes(x=reorder(ID, -R2), y=R2, fill = FDRadjust < 0.05)) + labs(x = "Phenotype", y= "Variance Explained") + geom_bar(stat="identity",color = "black") +scale_fill_manual(values=c("white","grey24")) + theme_classic()+theme(legend.position="none",axis.text.x = element_text(angle = 55, hjust = 1, size=5))+ylim(0,8)
+
+ggplot(adonis_HC_Top_pval, aes(x=reorder(ID, -R2), y=R2,label = ifelse(FDRadjust < 0.05, "*", ""))) + labs(x = "Phenotype", y= "Variance Explained") + geom_bar(stat="identity", colour = "black", fill = "grey50") + geom_text(vjust = 0) + theme_classic()+theme(legend.position="none",axis.text.x = element_text(angle = 55, hjust = 1, size=5))+ylim(0,8)
+
+
+write.table(adonis_HC_sub, file = 'Adonis_HC_1.txt', sep = "\t", col.names = T)
+write.table(adonis_IBD_sub, file = 'Adonis_IBD_1.txt', sep = "\t", col.names = T)
+write.table(adonis_SI_sub, file = 'Adonis_SI_1.txt', sep = "\t", col.names = T)
+
+write.table(adonis_HC_Top_pval, file = 'Adonis_HC_TopPheno1.txt', sep = "\t", col.names = T)
+write.table(adonis_IBD_Top_pval, file = 'Adonis_IBD_TopPheno1.txt', sep = "\t", col.names = T)
+write.table(adonis_SI_Top_pval, file = 'Adonis_SI_TopPheno1.txt', sep = "\t", col.names = T)
+
+
+
+#____ SI versus Rest (regular faecal)
+
+SIvsColon <- LLD.IBD_MetSp_Below15[c(76,1,3,165:ncol(LLD.IBD_MetSp_Below15))]
+SIvsColon$CurrentStomaOrPouchType <- fct_collapse(SIvsColon$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
+
+SI_NonSI <- SIvsColon[c(1)]
+SI_NonSI_taxa <- LLD.IBD_MetaSp15.asin[c(165:ncol(LLD.IBD_MetaSp15.asin))]
+
+adonis_All <- matrix(ncol = 4, nrow=ncol(SI_NonSI)) 
+  adonis_All[1,4]=nrow(SI_NonSI)
+    ad <- adonis(formula = SI_NonSI_taxa ~ SI_NonSI[,1] , data = SI_NonSI, permutations = 1000, method = "bray")
+    aov_table <- ad$aov.tab
+    adonis_All[1,1]=aov_table[1,1]
+    adonis_All[1,2]=aov_table[1,5]
+    adonis_All[1,3]=aov_table[1,6]
+
+colnames(adonis_All) <- c("Df", "R2", "Pr(>F)", "Num.samples")
+rownames(adonis_All)=colnames(SI_NonSI)
+
+write.table(adonis_All, file = 'Adonis_SI_NonSI.txt', sep = "\t", col.names = T)
+
+
+#__ Resection vs Non-Resec
+NoResec_Resec <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections", select = "CurrentStomaOrPouchType")
+NoResec_Resec_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections" , select = c(165:ncol(LLD.IBD_MetaSp15.asin)))
+
+adonis_Resec <- matrix(ncol = 4, nrow=ncol(NoResec_Resec)) 
+adonis_Resec[1,4]=nrow(NoResec_Resec)
+ad <- adonis(formula = NoResec_Resec_taxa ~ NoResec_Resec[,1] , data = NoResec_Resec, permutations = 1000, method = "bray")
+aov_table <- ad$aov.tab
+adonis_Resec[1,1]=aov_table[1,1]
+adonis_Resec[1,2]=aov_table[1,5]
+adonis_Resec[1,3]=aov_table[1,6]
+
+colnames(adonis_Resec) <- c("Df", "R2", "Pr(>F)", "Num.samples")
+rownames(adonis_Resec)=colnames(NoResec_Resec)
+
+write.table(adonis_Resec, file = 'Adonis_Resec_NoResections.txt', sep = "\t", col.names = T)
+
+```
+
+### 9. Microbial Pathways - Data Import
+
+```{r}
+
+#Packages required:
+library(stringr)
+
+
+IBD_pathways <- read.table(file = "../Data/SI_project/PathwayData/IBD_humann2_pathways_uniref90_082017.txt", header = TRUE, sep = "\t", quote = "\\", row.names = 1) # Humann2 Pathways
+LLD_pathways <- read.table(file = "../Data/SI_project/PathwayData/LLD_humann2_Uniref90_092017.txt", header = TRUE, sep = "\t", quote = "\\", row.names = 1) # Humann2 Pathways
+IBD_ID.Key <- read.table(file = "../Data/SI_project/PathwayData/rename_IBD.txt", header = TRUE, sep = "\t", quote = "\\", row.names = 1) # Humann2 Pathways
+LLD_ID.Key <- read.table(file = "../Data/SI_project/PathwayData/rename_LLD.txt", header = TRUE, sep = "\t", quote = "\\", row.names = 1) # Humann2 Pathways
+
+#Remove 'X' at the beginning of ID numbers
+#colnames(IBD_pathways) <- gsub("^X", "", colnames(IBD_pathways))
+colnames(LLD_pathways) <- gsub("^X", "", colnames(LLD_pathways))
+
+#Remove '_kneaddata_merged_Abundance' at the end of ID numbers
+colnames(IBD_pathways) <- gsub("_kneaddata_merged_Abundance", "", colnames(IBD_pathways))
+colnames(LLD_pathways) <- gsub("_kneaddata_merged_Abundance", "", colnames(LLD_pathways))
+
+#Remove duplicate pathways
+LLD_pathways <- LLD_pathways[!grepl('\\|',rownames(LLD_pathways),ignore.case = T),]
+IBD_pathways <- IBD_pathways[!grepl('\\|',rownames(IBD_pathways),ignore.case = T),]
+
+
+#Translate IDs
+#IBD
+IBD_pathwaysT <- as.data.frame(t(IBD_pathways))
+IBD_pathwaysIDmerge <- merge(IBD_ID.Key, IBD_pathwaysT, by= 'row.names', all = T)
+
+IBD_pathwaysIDmerge$Row.names <- as.character(IBD_pathwaysIDmerge$Row.names)
+IBD_pathwaysIDmerge$Classic <- as.character(IBD_pathwaysIDmerge$Classic)
+
+IBD_pathwaysIDmerge$Classic[107:545] <- IBD_pathwaysIDmerge$Row.names[107:545]
+rownames(IBD_pathwaysIDmerge) <- IBD_pathwaysIDmerge$Classic
+IBD_pathwaysIDmerge$Classic <- NULL
+IBD_pathwaysIDmerge$Row.names <- NULL
+IBD_pathways_Final <- as.data.frame(t(IBD_pathwaysIDmerge))
+
+#LLD
+LLD_pathwaysT <- as.data.frame(t(LLD_pathways))
+LLD_pathwaysIDmerge <- merge(LLD_ID.Key, LLD_pathwaysT, by= 'row.names')
+
+LLD_pathwaysIDmerge$Row.names <- as.character(LLD_pathwaysIDmerge$Row.names)
+LLD_pathwaysIDmerge$Classic <- as.character(LLD_pathwaysIDmerge$Classic)
+
+LLD_pathwaysIDmerge$Classic[107:545] <- LLD_pathwaysIDmerge$Row.names[107:545]
+
+rownames(LLD_pathwaysIDmerge) <- LLD_pathwaysIDmerge$ID.1
+LLD_pathwaysIDmerge$ID.1 <- NULL
+LLD_pathwaysIDmerge$Row.names <- NULL
+LLD_pathways_Final <- as.data.frame(t(LLD_pathwaysIDmerge))
+
+#Merge both cohorts
+IBD_LLD_pathways <- merge(LLD_pathways_Final, IBD_pathways_Final, by = 'row.names', all = T)
+rownames(IBD_LLD_pathways) <- IBD_LLD_pathways$Row.names
+IBD_LLD_pathways$Row.names <- NULL
+IBD_LLD_pathways <- as.data.frame(t(IBD_LLD_pathways))
+
+IBD_LLD_pathways_RelAbun <- as.data.frame(t(apply(IBD_LLD_pathways, 1, function(x)
+  {x/sum(x, na.rm = T)
+})))
+
+# log transformation
+
+#IBD_LLD_pathways_log10 <- as.data.frame(t(apply(IBD_LLD_pathways_RelAbun, 1, function(x){
+#  -log10(x)
+#})))      - produces inf. value
+
+IBD_LLD_pathways_log <- normalize(as.data.frame(t(IBD_LLD_pathways_RelAbun)), to.abundance = F)
+IBD_LLD_pathways_log <- as.data.frame(t(IBD_LLD_pathways_log))
+
+#Replace special characters in column name
+colnames(IBD_LLD_pathways_log) <- str_replace_all(colnames(IBD_LLD_pathways_log), "[^[:alnum:]]", "_")
+
+
+#_Metadata
+#metadata (LLD and IBD faecal ID's combined in one column to allow for merge (see following steps))
+LLD.IBD_Meta <- read.table(file = "../Data/SI_project/Metadata16032020.txt", header = TRUE, sep = "\t", quote = "\\") #Metadata
+
+#To distinguish patients with no stoma and no resections from patients with resections and no stoma
+LLD.IBD_Meta <- LLD.IBD_Meta %>%
+  mutate(CurrentStomaOrPouchType = ifelse(ResectionAny=="yes", gsub('none', 'Resection NoStoma', CurrentStomaOrPouchType), as.character(CurrentStomaOrPouchType)))
+
+LLD.IBD_Meta <- LLD.IBD_Meta %>%
+  mutate(CurrentStomaOrPouchType = ifelse(ResectionAny=="no", gsub('none', 'No Resections', CurrentStomaOrPouchType), as.character(CurrentStomaOrPouchType)))
+
+LLD.IBD_Meta$CurrentStomaOrPouchType <- as.factor(LLD.IBD_Meta$CurrentStomaOrPouchType)
+
+#Add additional level to 'CurrentStomaOrPouchType' column to represent LLD individuals 
+levels <- levels(LLD.IBD_Meta$CurrentStomaOrPouchType)
+levels[length(levels) + 1] <- "HealthyControl"
+
+# refactor CurrentStomaOrPouchType to include "HealthyControl" as a factor level
+# and replace NA with "HealthyControl"
+LLD.IBD_Meta$CurrentStomaOrPouchType <- factor(LLD.IBD_Meta$CurrentStomaOrPouchType, levels = levels)
+LLD.IBD_Meta$CurrentStomaOrPouchType[is.na(LLD.IBD_Meta$CurrentStomaOrPouchType)] <- "HealthyControl"
+
+#Change order of the levels for variable CurrentStomaOrPouchType
+LLD.IBD_Meta$CurrentStomaOrPouchType <- factor(LLD.IBD_Meta$CurrentStomaOrPouchType, levels = c('HealthyControl', 'No Resections', 'Resection NoStoma', 'colostoma', 'pouch', 'ileostoma'))
+
+#Remove columns with 'Date' in the column names
+LLD.IBD_Meta1 <- LLD.IBD_Meta[,!grepl('Date', colnames(LLD.IBD_Meta),ignore.case = T)]
+
+#Remove rows with unknown ID
+LLD.IBD_Meta2 <- subset(LLD.IBD_Meta1, is.na(CombinedIDs) == 'FALSE')
+
+#Set IDs as rownames
+rownames(LLD.IBD_Meta2) <- LLD.IBD_Meta2$CombinedIDs
+LLD.IBD_Meta2$CombinedIDs <- NULL
+
+#Taxonomy
+LLD_Taxa <- read.table(file = "../Data/SI_project/LLD_taxonomy_unstrat_clean.txt", header = TRUE, sep = "\t", quote = "\\") #LLD Taxonomy 
+rownames(LLD_Taxa) <- LLD_Taxa$ID
+LLD_Taxa$ID <- NULL
+
+LLD <- gsub("^X", "", colnames(LLD_Taxa)) #Remove 'X' at the beginning of ID numbers
+colnames(LLD_Taxa) <- LLD
+
+IBD_Taxa <- read.table(file = "../Data/SI_project/IBD_taxonomy_unstrat_clean.txt", header = TRUE, sep = "\t", quote = "\\") #IBD Taxonomy 
+rownames(IBD_Taxa) <- IBD_Taxa$ID
+IBD_Taxa$ID <- NULL
+
+#Merge the cohort taxa's
+LLD_IBD_Taxa <- merge(LLD_Taxa, IBD_Taxa, by = 'row.names', all = T)
+rownames(LLD_IBD_Taxa) <- LLD_IBD_Taxa$Row.names
+LLD_IBD_Taxa$Row.names <- NULL
+LLD_IBD_Taxa <- as.data.frame(t(LLD_IBD_Taxa))
+
+#Extract Species only
+LLD_IBD_TaxaS <- LLD_IBD_Taxa[,grepl('s__',colnames(LLD_IBD_Taxa),ignore.case = T)]
+LLD_IBD_TaxaS <- LLD_IBD_TaxaS[,!grepl('t__',colnames(LLD_IBD_TaxaS),ignore.case = T)]
+LLD_IBD_TaxaS[is.na(LLD_IBD_TaxaS)] <- 0
+
+#Merge Species Taxo with stoma/pouch type and ID's
+LLD_IBD_MetTaxS <- merge(LLD.IBD_Meta2, LLD_IBD_TaxaS, by = 'row.names')
+
+x <- gsub('.*\\|s__','',colnames(LLD_IBD_MetTaxS)) #Keep taxonomy level name only i.e. 'class name' 
+colnames(LLD_IBD_MetTaxS) <- x
+
+rownames(LLD_IBD_MetTaxS) <- LLD_IBD_MetTaxS$Row.names
+LLD_IBD_MetTaxS$Row.names <- NULL
+
+
+write.table(LLD_IBD_MetTaxS, file = 'LLD_IBD_MetaSpecies150420.txt', sep = "\t", col.names = TRUE)
+LLD_IBD_MetTaxS <- read.table(file = "../RScripts/LLD_IBD_MetaSpecies150420.txt", header = TRUE, sep = "\t", quote = "\\", row.names = 1) #contains updated medicine  
+
+
+#Merge MetaData with pathways (same individuals as Taxonomy data)
+IBD_LLD_MetaPathways <- merge(LLD_IBD_MetTaxS[,1:680], IBD_LLD_pathways_log, by = 'row.names')  
+rownames(IBD_LLD_MetaPathways) <- IBD_LLD_MetaPathways$Row.names
+IBD_LLD_MetaPathways$Row.names <- NULL
+
+
+write.table(IBD_LLD_MetaPathways, file = "IBD_LLD_MetaPathways.txt", sep = "\t", col.names = TRUE)
+
+```
+
+### 10. Microbial Pathways - Univariate analyses
+
+```{r}
+#Packages & Functions required:
+univariate.analysis2 #see 'Functions' file, point 7.
+
+IBD_LLD_MetaPathways <- read.table(file = "IBD_LLD_MetaPathways.txt", header = TRUE, sep = "\t", quote = "\\",row.names = 1) #see PathwayMetaDataIBD&LLD script for details
+
+colnames(IBD_LLD_MetaPathways) <- gsub("^X", "", colnames(IBD_LLD_MetaPathways))
+
+#remove individual with no pathway abundances ...
+which(rowSums(IBD_LLD_MetaPathways[681:1168]) == 0)
+IBD_LLD_MetaPathways <- IBD_LLD_MetaPathways[-c(212,218,379,1554,1671),]
+
+#Merge with the metadata included in the taxa analyses
+IBD_LLD_MetaPathwaysx <- merge(LLD.IBD_MetaSp15[c(1:164)], IBD_LLD_MetaPathways[c(681:1168)], by = "row.names")
+rownames(IBD_LLD_MetaPathwaysx) <- IBD_LLD_MetaPathwaysx$Row.names
+IBD_LLD_MetaPathwaysx$Row.names <- NULL
+
+
+# Remove pathways from dataframe with a prevalence < 15%
+remove_cols <- vector()
+for (i in 165:ncol(IBD_LLD_MetaPathwaysx)) {
+  cname <- colnames(IBD_LLD_MetaPathwaysx)[i]
+  if(colSums(IBD_LLD_MetaPathwaysx[i] != 0) / nrow(IBD_LLD_MetaPathwaysx) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD.IBD_MetaPwy15 <- IBD_LLD_MetaPathwaysx %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+LLD.IBD_MetaPwy15$NumberIndicationabcessOrfistula <- as.numeric(as.character(LLD.IBD_MetaPwy15$NumberIndicationabcessOrfistula))
+
+LLD.IBD.UniA_Pathways <- univariate.analysis2(LLD.IBD_MetaPwy15,164,165,341) 
+
+LLD.IBD.UniA_Pathways$PrevalenceGroup1 <- as.numeric(as.character(LLD.IBD.UniA_Pathways$PrevalenceGroup1)) 
+LLD.IBD.UniA_Pathways$PrevalenceGroup2 <- as.numeric(as.character(LLD.IBD.UniA_Pathways$PrevalenceGroup2))
+LLD.IBD.UniA_Pathways$`NA` <- as.numeric(as.character(LLD.IBD.UniA_Pathways$`NA`))
+LLD.IBD.UniA_Pathways$`NSamplesG1/Nnonzero` <- as.numeric(as.character(LLD.IBD.UniA_Pathways$`NSamplesG1/Nnonzero`))
+LLD.IBD.UniA_Pathways$`NSampleG2/Nzero` <- as.numeric(as.character(LLD.IBD.UniA_Pathways$`NSampleG2/Nzero`))
+
+LLD.IBD.UniA_Pathways1 <- subset(LLD.IBD.UniA_Pathways, `NA` < 1720*0.95) #remove rows with NA > 95%
+LLD.IBD.UniA_Pathways2 <- LLD.IBD.UniA_Pathways1
+
+
+#Filter out tests with a group sample number < 20
+remove.rows <- function(x){ # to complete function replace LLD.IBD.UniA2 with 'x' 
+  remove_rows <- vector()
+  for (i in 1:nrow(LLD.IBD.UniA_Pathways2)) {
+    names <- row.names(LLD.IBD.UniA_Pathways2)[i] 
+    if(LLD.IBD.UniA_Pathways2[i,5] == 'Category' & LLD.IBD.UniA_Pathways2[i,7] < 20 | LLD.IBD.UniA_Pathways2[i,5] == 'Category' & LLD.IBD.UniA_Pathways2[i,8] < 20){
+      remove_rows <- c(remove_rows, names)
+    }
+  }
+  x_new <- subset(LLD.IBD.UniA_Pathways2, !(rownames(LLD.IBD.UniA_Pathways2) %in% remove_rows))
+  print(paste(c("Function removed a total of ",length(remove_rows), "variables"), collapse= ""))
+  return(x_new)
+}
+
+write.table(x_new, file = 'Pathways_UnivariateAnalysis.txt', sep = "\t", col.names = T)
+
+### Top 25 phenotypes with most bacterial associations
+Significant_pwy <- subset(x_new, BelowAdjustPval == 'yes') #subset associations with p-values below adjusted p-value
+
+Significant_pwy <- transform(Significant_pwy, Combinations=paste(Phenotype, Group1, Group2, sep=":")) #merge Phenotype, Group1, Group2 variables into a new variable
+
+colnames(Significant_pwy)[1] <- "Pathway"
+ 
+sorted_pwy_TopPhe <- Significant_pwy %>% #create dataframe with 'combinations' variable in descending order of frequency
+  count(Combinations) %>%
+  arrange(-n) %>% 
+  mutate(Combinations = factor(Combinations, levels = unique(Combinations)))
+
+#plot top 25 most frequent variables 
+ggplot(sorted_pwy_TopPhe[1:25,], aes(x = Combinations, y = n)) +
+  geom_bar(stat="identity", fill = "steelblue") + xlab('Phenotype') + geom_text(aes(label=n), vjust=-0.3, size=2) + 
+  ylab('Significant Associations (n)') + theme_classic() + theme(axis.text.x = element_text(angle = 55, hjust = 1, size=5)) +
+  scale_x_discrete(labels=c('CurrentStomaOrPouchType:HealthyControl:IleostomaPouch' = 'Bowel Phenotype\n (LLD General Population vs IBD Small Intestine)',
+                            'CurrentStomaOrPouchType:IleostomaPouch:No Resections' = 'Bowel Phenotype\n (IBD Small Intestine vs IBD Intact Colon)',
+                            'EverHadStomaOrPouch:no:yes' = 'Ever Had A Stoma Or Pouch\n (No/Yes)',
+                            'DiagnosisCurrent:CD:generalpopulation' = 'Current IBD Diagnosis\n (CD vs General Population)',
+                            'NumberOfResectionColonic:NumberOfResectionColonic:NumberOfResectionColonic' = 'Number Of Colonic Resections',
+                            'ResectionColonicAny:no:yes' = 'Colonic Resection Any\n (No/Yes)',
+                            'CurrentStomaOrPouchType:HealthyControl:Resections' = 'Bowel Phenotype\n (LLD General Population vs IBD Partially Intact Colon)',
+                            'IleocecalValveInSitu:no:yes' = 'Ileocecal Valve In Situ\n (No/Yes)',
+                            'ResectionAny:no:yes' = 'Resection Any\n (No/Yes)',
+                            'NumberOfResectionsAny:NumberOfResectionsAny:NumberOfResectionsAny' = 'Total Number Of Resections',
+                            'vitamin_B12:no:yes' = 'Vitamin B12\n (No/Yes)', 
+                            'PPI:no:yes' = 'PPI\n (No/Yes)',
+                            'CurrentStomaOrPouchType:IleostomaPouch:Resections' ='Bowel Phenotype\n (IBD Small Intestine vs IBD Partially Intact Colon)',
+                            'vitamin_D:no:yes' = 'Vitamin D\n (No/Yes)',
+                            'FecalCalprotectinOver200yesno:no:yes' = 'Fecal Calprotectin Over 200\n (No/Yes)',
+                            'Alc_en:Alc_en:Alc_en' = 'Alcohol\n (% Total Energy Intake)',
+                            'calcium:no:yes' = 'Calcium\n (No/Yes)',
+                            'CurrentStomaOrPouchType:No Resections:Resections' = 'Bowel Phenotype\n (IBD Intact Colon vs IBD Partially Intact Colon)',
+                            'ResectionIlealCecalAny:no:yes' = 'IlealCecal Resection Any\n (No/Yes)',
+                            'NumberOfResetionsIleoCecal:NumberOfResetionsIleoCecal:NumberOfResetionsIleoCecal' = 'Number Of IleoCecal Resections',
+                            'DiagnosisCurrent:generalpopulation:UC' = 'Current IBD Diagnosis\n (General Population vs UC)',
+                            'PFReads:PFReads:PFReads' = 'Reads Depth',
+                            'FrequencyFormedStoolDay:FrequencyFormedStoolDay:FrequencyFormedStoolDay' = 'Frequency Stool Formed Per Day',
+                            'oral_steroid:no:yes'= 'Oral Steroids\n (No/Yes)',
+                            'CurrentStomaOrPouchType:HealthyControl:No Resections' = 'Bowel Phenotype\n (LLD General Population vs IBD Intact Colon)'))
+                   
+
+
+## Top 25 species according to number of significant phenotype associations  
+sorted_TopPwy <- Significant_pwy %>% #create dataframe with 'Pathway' variable in descending order of frequency
+  count(Pathway) %>%
+  arrange(-n) %>% 
+  mutate(Pathway = factor(Pathway, levels = unique(Pathway)))
+
+sorted_TopPwy$Pathway <- as.character(gsub("_", " ", sorted_TopPwy$Pathway))
+
+ggplot(sorted_TopPwy[1:25,], aes(x = reorder(Pathway, -n), y = n)) +
+  geom_bar(stat="identity", fill = "steelblue") +  theme_classic() + geom_text(aes(label=n), vjust=-0.3, size=2) +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1, size=5)) + ylab('Significant Associations (n)') + xlab('Pathways') #plot top 25 most frequent variables
+
+
+write.table(Significant_pwy, file = 'Significant_pwy15_associations3.txt', sep = "\t", col.names = T)
+
+```
+
+### 11. Microbial pathways - Multivariate analysis
+
+```{r}
+
+#Packages required:
+library(Maaslin) 
+library(forcats)
+
+
+#***IleostomaPouch vs Healthy Controls***
+
+#Prepare input data for Maaslin 
+
+# 1. Metadata & Pathways
+# Dataframe needed: IBD_LLD_MetaPathwaysx (i.e. non-transformed) (see rscript 'Univariate_Analysis_Pathways' for dataframe)
+
+Maaslin_MetaPwy1 <- subset(LLD.IBD_MetaPwy15, CurrentStomaOrPouchType == 'IleostomaPouch' | CurrentStomaOrPouchType == 'HealthyControl')
+Maaslin_MetaPwy1 <- Maaslin_MetaPwy1[c(1,2,3,9,14,74,76,96,98,99,102,113,115,119,120,121,128,133,135,138,147,148,163,165:505)]
+Maaslin_MetaPwy1$CurrentStomaOrPouchType <- fct_drop(Maaslin_MetaPwy1$CurrentStomaOrPouchType)
+
+
+#for (i in 24:157) {
+#  Maaslin_MetaPwy1[,i] <- Maaslin_MetaPwy1[,i]/100
+#}     # Relative abundance should be between 0 - 1
+
+
+write.table(Maaslin_MetaPwy1, file = "MaaslinMetaPwy_HealthControl_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+Maaslin(strInputTSV = "MaaslinMetaPwy_HealthControl_vs_IleostomaPouch.tsv", strOutputDIR = "MaaslinPwy_HC_vs_Ileostoma_Output", strInputConfig = "MaaslinPwyConfig_HC_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0, strTransform = 'none')
+
+
+
+
+#***Within IBD __ IleostomaPouch vs No Resection***
+
+# 1. Metadata & Taxa
+Maaslin_MetaPwy2 <- subset(LLD.IBD_MetaPwy15, CurrentStomaOrPouchType == 'IleostomaPouch' | CurrentStomaOrPouchType == 'No Resections')
+Maaslin_MetaPwy2 <- Maaslin_MetaPwy2[c(1,2,3,9,14,15,74,76,96,98,99,102,113,115,119,120,121,127,128,133,135,138,147,148,163,165:505)]
+Maaslin_MetaPwy2$CurrentStomaOrPouchType <- fct_drop(Maaslin_MetaPwy2$CurrentStomaOrPouchType)
+
+Maaslin_MetaPwy2$CurrentStomaOrPouchType <- relevel(Maaslin_MetaPwy2$CurrentStomaOrPouchType, ref = 'No Resections') #Change Reference (Baseline) Category
+
+Maaslin_MetaPwy2$DiagnosisCurrent <- fct_drop(Maaslin_MetaPwy2$DiagnosisCurrent)
+
+write.table(Maaslin_MetaPwy2, file = "MaaslinMetaPwy_WithinIBD_NoResections_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+
+#2. Config file
+# Using R, name: MaaslinPwyConfig_NoResection_vs_IleostomaPouch.read.config.R
+
+Maaslin(strInputTSV = "MaaslinMetaPwy_WithinIBD_NoResections_vs_IleostomaPouch.tsv", strOutputDIR = "MaaslinPwy_NoResection_vs_Ileostoma_Output", strInputConfig = "MaaslinPwyConfig_NoResection_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0, strTransform = 'none')
+
+
+#***Within IBD __ IleostomaPouch vs Resections ***
+
+# 1. Metadata & Taxa
+Maaslin_MetaPwy3 <- subset(LLD.IBD_MetaPwy15, CurrentStomaOrPouchType == 'IleostomaPouch' | CurrentStomaOrPouchType == 'Resections')
+Maaslin_MetaPwy3 <- Maaslin_MetaPwy3[c(1,2,3,9,14,15,74,76,79,82,96,98,99,102,113,115,119,120,121,127,128,133,135,138,147,148,163,165:505)]
+Maaslin_MetaPwy3$CurrentStomaOrPouchType <- fct_drop(Maaslin_MetaPwy3$CurrentStomaOrPouchType)
+
+
+#Remove levels with 0 samples
+Maaslin_MetaPwy3$DiagnosisCurrent <- fct_drop(Maaslin_MetaPwy3$DiagnosisCurrent)
+
+
+write.table(Maaslin_MetaPwy3, file = "MaaslinMetaPwy_WithinIBD_Resections_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+
+#2. Config file
+# Using R, name: MaaslinPwyConfig_ResectionNoStoma_IleostomaPouch.read.config.R
+
+Maaslin(strInputTSV = "MaaslinMetaPwy_WithinIBD_Resections_vs_IleostomaPouch.tsv", strOutputDIR = "MaaslinPwy_Resection_vs_Ileostoma_Output", strInputConfig = "MaaslinPwyConfig_ResectionNoStoma_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0, strTransform = 'none')
+
+
+
+#***Within IBD __ IleostomaPouch vs ResectionsIleoCecalValveInSitu***
+
+# 1. Metadata & Taxa
+Maaslin_MetaPwy3a <- subset(Maaslin_MetaPwy3, CurrentStomaOrPouchType == 'Resections' & IleocecalValveInSitu == 'yes')
+Maaslin_MetaPwy3b <- rbind(subset(Maaslin_MetaPwy3, CurrentStomaOrPouchType == 'IleostomaPouch'), Maaslin_MetaPwy3a)
+Maaslin_MetaPwy3b$IleocecalValveInSitu <- NULL
+
+write.table(Maaslin_MetaPwy3b, file = "MaaslinMetaPwy_WithinIBD_ResectionsWithIleoCecalValveInSitu_vs_IleostomaPouch.tsv", sep = "\t", quote = F)
+
+#2. Config file
+# Using R, name: MaaslinPwyConfig_ResectionNoStoma_IleostomaPouch.read.config.R
+
+
+Maaslin(strInputTSV = "MaaslinMetaPwy_WithinIBD_ResectionsWithIleoCecalValveInSitu&NoStoma_vs_IleostomaPouch.tsv", strOutputDIR = "MaaslinPwy_ResectionsCecalValveInSitu_vs_Ileostoma_Output", strInputConfig = "MaaslinPwyConfig_HC_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0, strTransform = 'none')
+
+
+```
+
+
+###
