@@ -587,4 +587,83 @@ return(x_new)
 
 ```
 
-### 10.
+### 10. Remove Columns with >X% NAs
+
+```{r}
+#Function to remove N columns with a >= N% of NAs
+
+RemoveColumnsNA = function(DF, Threshold=0.9){
+  #packages
+  library(dplyr)
+  #Create vector where we will store the columns that have more NA than the threshold
+  Remove_columns = vector()
+  #Iterate through columns
+  for (i in 1:ncol(DF)){
+    #i is the column number, so we get the Name of the column and the values
+    Name = colnames(DF)[i]
+    Column = DF[,i]
+    #Calculate the % of NA 
+    Percentage_NAs = length(Column[is.na(Column)])/length(Column)
+    if (Percentage_NAs >= Threshold){
+      #Add to our vector the columns that cross the threshold 
+      Remove_columns = c(Remove_columns, Name)
+      }
+  }
+  #Finally, using the vector we remove all the columns which name are in the vector
+  DF_new <- DF %>% select(-Remove_columns) 
+  print(paste(c("Function removed a total of ",length(Remove_columns), " variables"), collapse= ""))
+  return(list(DF_new, Remove_columns))
+}
+```
+
+### 11. Heatmap conversion
+
+```{r}
+#Function to convert coeffiecient estimate and Q-value into a factor variable for a heatmap 
+
+# -3 = 0.0001,   -2 <= 0.001,    -1 <= 0.05,    0 > 0.05,    1 <= 0.05,    2 <= 0.001
+
+
+FactorVariableHeatmapMaaslin <- function(x){
+  for (i in 1:nrow(x)) {
+    if(x$Coefficient[i] < 0){
+      if(x$Q.value[i] <= 0.0001){
+        x$Maaslin_[i] <- -3
+      }
+      else{
+        if(x$Q.value[i] <= 0.001){
+          x$Maaslin_[i] <- -2
+        }
+        else{
+          if(x$Q.value[i] <= 0.05){
+            x$Maaslin_[i] <- -1
+          }
+          else{
+            x$Maaslin_[i] <- 0 
+          }
+        }
+      }
+    }
+    else{
+      if(x$Q.value[i] <= 0.0001){
+        x$Maaslin_[i] <- 3
+      }
+      else{
+        if(x$Q.value[i] <= 0.001){
+          x$Maaslin_[i] <- 2
+        }
+        else{
+          if(x$Q.value[i] <= 0.05){
+            x$Maaslin_[i] <- 1
+          }
+          else{
+            x$Maaslin_[i] <- 0 
+          }
+        }
+      }
+    }
+  }
+  return(x)
+}
+
+```
