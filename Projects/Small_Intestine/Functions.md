@@ -667,3 +667,103 @@ FactorVariableHeatmapMaaslin <- function(x){
 }
 
 ```
+
+### 12. Logistic Regression
+
+```{r}
+
+LogisticRegression.function <- function(DF, nPheno, colTaxa, my_preds){
+  Nlevels <- vector()
+  NonFactors <- vector()
+  for (i in 1:nPheno) {
+    if(is.factor(DF[,i])) {
+      Nlevels <- c(Nlevels, (nlevels(DF[,i])-1))
+    }
+    else {
+      NonFactors <- c(NonFactors, colnames(DF)[i])
+    }
+    #create matrix 
+    my_matrix<-  matrix(nrow = (length(NonFactors) + sum(Nlevels)) * ncol(DF[c(colTaxa:ncol(DF))]), ncol = 9)
+    colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Estimate', 'Std.Error', 'z_value','Pr(>|z|)','BonferroniAdjust','FDRAdjust', 'Prevalence')
+  }
+  
+  a=1
+  for (j in colTaxa:ncol(DF)) {
+    my_f <- as.formula(paste(colnames(DF)[j], paste(my_preds, collapse = " + "), sep = " ~ "))
+    my_lm <- glm(my_f, family = binomial(link="logit"), data = DF)
+    for(k in 2:nrow(summary(my_lm)$coefficients)){
+      my_matrix[a,1] <- colnames(DF)[j]
+      my_matrix[a,2] <- rownames(summary(my_lm)$coefficients)[k]
+      my_matrix[a,3] <- summary(my_lm)$coefficients[k,1]
+      my_matrix[a,4] <- summary(my_lm)$coefficients[k,2]
+      my_matrix[a,5] <- summary(my_lm)$coefficients[k,3]
+      my_matrix[a,6] <- summary(my_lm)$coefficients[k,4]
+      my_matrix[a,9] <- sum(DF[,j])/nrow(DF) *100
+      a=a+1
+    }
+  }
+  my_matrix <- as.data.frame(my_matrix)
+  my_matrix[,6] <- as.numeric(as.character(my_matrix[,6]))
+  my_matrix[,7] <- p.adjust(c(my_matrix[,6]), method = 'bonferroni')
+  my_matrix[,8] <- p.adjust(c(my_matrix[,6]), method = 'fdr')
+  return(my_matrix)
+}
+
+```
+
+### 13. Logistic regression descriptive statistics
+
+```{r}
+
+LgRgr.DescriptiveStats <- function(DF, nPheno, colTaxa){
+  Nlevels <- vector()
+  NonFactors <- vector()
+  for (i in 1:nPheno) {
+    if(is.factor(DF[,i])) {
+      Nlevels <- c(Nlevels, (nlevels(DF[,i])-1))
+    }
+    else {
+      NonFactors <- c(NonFactors, colnames(DF)[i])
+    }
+    #create matrix 
+    my_matrix<-  matrix(nrow = (length(NonFactors) + sum(Nlevels)) * ncol(DF[c(colTaxa:ncol(DF))]), ncol = 8)
+    colnames(my_matrix) <- c('Taxonomy', 'Phenotype','Group', 'nGroup', 'nGroupOther', 'PrevalenceWithinGroup', 'PrevalenceWithinGroupOther', 'TotalPrevalence')
+  }
+  
+  a=1
+  for (j in colTaxa:ncol(DF)) {
+    for (i in 1:nPheno) {
+      if(is.factor(DF[,i])){
+        Levels <- levels(DF[,i])[2:nlevels(DF[,i])]
+          for (m in 1:length(Levels)) {
+          my_matrix[a,1] <- colnames(DF)[j]
+          my_matrix[a,2] <- colnames(DF)[i]
+          my_matrix[a,3] <- Levels[m]
+          my_matrix[a,4] <- sum(DF[,i] == Levels[m])
+          n_samples <- sum(DF[,i] == Levels[m])
+          my_matrix[a,5] <- sum(DF[,i] != Levels[m], na.rm = T)
+          n_samplesother <- sum(DF[,i] != Levels[m], na.rm = T)
+          my_matrix[a,6] <- colSums(subset(DF, DF[c(i)] == Levels[m], select = j) == 1)/n_samples *100 #bacteria prevalence within the group/level 'm'
+          my_matrix[a,7] <- colSums(subset(DF, DF[c(i)] != Levels[m], select = j) == 1)/n_samplesother *100 #bacteria prevalence within the groups/levels other than m
+          my_matrix[a,8] <- sum(DF[,j])/nrow(DF) *100 #prevalence of bacteria within whole cohort
+          a=a+1
+          }
+      }
+      else{
+        my_matrix[a,1] <- colnames(DF)[j]
+        my_matrix[a,2] <- colnames(DF)[i]
+        my_matrix[a,3] <- colnames(DF)[i]
+        my_matrix[a,4] <- nrow(DF)
+        my_matrix[a,5] <- nrow(DF)
+        my_matrix[a,6] <- sum(DF[,j])/nrow(DF) *100 #prevalence of bacteria among the non NA individuals per numerical phenotype 
+        my_matrix[a,7] <- sum(DF[,j])/nrow(DF) *100 #prevalence of bacteria among the non NA individuals per numerical phenotype 
+        my_matrix[a,8] <- sum(DF[,j])/nrow(DF) *100 #prevalence of bacteria within whole cohort
+        a=a+1
+      }
+    }
+  }
+  my_matrix <- as.data.frame(my_matrix)
+  return(my_matrix)
+}
+
+```
