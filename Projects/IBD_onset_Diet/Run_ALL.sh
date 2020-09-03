@@ -1,0 +1,9 @@
+#python 00_Retrieve_DiseaseStatus_and_Covaraites.py
+#python 01_Prepare_food_tables.py
+python 02_Prepare_Input_Scores_and_PCA.py
+bash 03_Generate_Scores.sh
+python 04_Merge_Diet_Scores.py
+Rscript 05_PCA.R
+Rscript 06_Define_IBD_Development.R
+Rscriot 07_IBD_Onset_stats.R
+
