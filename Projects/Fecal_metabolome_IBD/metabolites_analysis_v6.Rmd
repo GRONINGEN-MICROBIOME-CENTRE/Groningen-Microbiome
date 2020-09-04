@@ -2763,9 +2763,7 @@ bgc_rpkm2$Row.names=NULL
 bgc_rpkm2$IDs_MGS=NULL
 bgc_rpkm2$PF_RD=NULL
 bgc_rpkm3=subset(bgc_rpkm2, row.names(bgc_rpkm2) %in% row.names(cc_pheno2))
-#bgc_rpkm3.1=bgc_rpkm3[,colnames(bgc_rpkm3) %in% colnames(bcg_fil_trans)]
-select2=subset(select,select$ibd_Diagnosis!="IBDU")
-summary_bgc=summary_stats(bgc_rpkm3,select2, missing_vals = 0)
+
 
 
 bgc_coverage=select(bgc, contains(".cov"))
@@ -2779,9 +2777,7 @@ bgc_coverage2$IDs_MGS=NULL
 bgc_coverage2$PF_RD=NULL
 bgc_coverage3=subset(bgc_coverage2, row.names(bgc_coverage2) %in% row.names(cc_pheno2))
 
-#h_genes=read.table("~/Documents/Project_Metabolome/7.Bacterial_genes_and_pathways/test_data_Hannah/RPKM_BiG-MAP_names.tsv", header = T)
 
-#Select samples in our study
 
 features_per_samples=data.frame(Sample=rownames(bgc_rpkm3), Counts=rowSums(bgc_rpkm3!=0))
 samples_per_feature=data.frame(BCG=colnames(bgc_rpkm3), Counts=colSums(bgc_rpkm3!=0))
@@ -2796,17 +2792,28 @@ ggplot(boxss, aes (ibd_Diagnosis, Counts, fill=ibd_Diagnosis)) + geom_violin() +
 ggplot(samples_per_feature, aes(reorder(BCG,-Counts), Counts )) + geom_bar(stat = "identity", fill="gray50") + theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + ylab ("Number of samples")  + xlab ("Biosynthetic genes clusters")
 
 #Filtering based on the region coverage (10%)
-bgc_coverage4=bgc_coverage3 [,colnames(bgc_coverage3) %in% colnames(bcg_fil_trans)]
+#bgc_coverage4=bgc_coverage3 [,colnames(bgc_coverage3) %in% colnames(bcg_fil_trans)]
+bgc_coverage4=bgc_coverage3
 bgc_mean_coverage=data.frame(BCG=colnames(bgc_coverage4), Mean=colMeans(bgc_coverage4))
 ggplot(bgc_mean_coverage, aes(reorder(BCG,-Mean), Mean )) + geom_bar(stat = "identity", fill="red4") + theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) + ylab ("Mean coverage")  + xlab ("Biosynthetic genes clusters")
 
 select_coverage=droplevels(bgc_mean_coverage$BCG[bgc_mean_coverage$Mean>0.1])
 
-bcg_fil_trans=bgc_rpkm3[,colnames(bgc_rpkm3) %in% select_coverage]
-
 #Filtering prevalence in 20% => 568 metabolites
-bcg_fil_trans2=transform_and_filter_taxa(bcg_fil_trans, samples_row = T, method = "clr",missing_filter = 20)
+bcg_fil_trans=transform_and_filter_taxa(bgc_rpkm3, samples_row = T, method = "clr",missing_filter = 20)
+bcg_fil_trans2=bcg_fil_trans[,colnames(bcg_fil_trans) %in% select_coverage]
 
+bgc_rpkm3.1=bgc_rpkm3[,colnames(bgc_rpkm3) %in% colnames(bcg_fil_trans2)]
+select2=subset(select,select$ibd_Diagnosis!="IBDU")
+summary_bgc=summary_stats(bgc_rpkm3.1,select2, missing_vals = 0)
+write.table(summary_bgc, "../../3.Preliminary_results/1.Summary_stats/BGC_summary.txt", sep = "\t", quote = F)
+
+################################
+##############################
+##############################
+###############################
+###############################
+#############################################################  HERE ######################################################################
 
 cc_ibd=cc_pheno6[,"ibd_Diagnosis", drop=F]
 bgc_ibd=merge(cc_ibd,bcg_fil_trans2, by="row.names")
