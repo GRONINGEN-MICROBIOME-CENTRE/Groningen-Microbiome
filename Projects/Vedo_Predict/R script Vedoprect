@@ -1,0 +1,345 @@
+# VedoPredict 
+
+#Creation Table 1 based on same clinical features of Ashwin et al. 
+library (gdata)
+phenos = read.xls ("PhenosAshwinUMCG3.xlsx",1)
+phenosUMCG = subset (phenos, phenos$Cohort=="UMCG")
+phenosUMCG2 = subset (phenosUMCG, phenosUMCG$Week.0==1)
+table (phenosUMCG2$response_week14)
+
+respons = subset (phenosUMCG2, phenosUMCG2$response_week14==1)
+norespons = subset (phenosUMCG2, phenosUMCG2$response_week14==0)
+
+mean (respons$baseline_alb, na.rm = TRUE)
+sd (respons$baseline_alb, na.rm = TRUE)
+mean (norespons$baseline_alb, na.rm = TRUE)
+sd (norespons$baseline_alb, na.rm = TRUE)
+
+wilcox.test (phenosUMCG2$baseline_alb~phenosUMCG2$response_week14)
+
+table (respons$current_immunomodulators)
+table (norespons$current_immunomodulators)
+chisq.test(phenosUMCG2$current_immunomodulators,phenosUMCG2$response_week14)
+
+Metarawduration = read.xls ("Table1Replication.xlsx",3)
+View(Metarawduration)
+MetaDiseaseDuration = Metarawduration[,1:7]
+Metarawduration2 <- metacont (n.e = MetaDiseaseDuration$Ne, mean.e = MetaDiseaseDuration$Me, sd.e = MetaDiseaseDuration$Se, n.c = MetaDiseaseDuration$Nc, mean.c = MetaDiseaseDuration$Mc, sd.c = MetaDiseaseDuration$Sc, data = MetaDiseaseDuration, studlab = paste(Author), comb.fixed = FALSE, comb.random = TRUE, method.tau = "SJ", hakn = TRUE, prediction = TRUE, sm = "SMD")
+Metarawduration2$pval.random
+Metarawduration2$pval.Q
+Metarawduration2$I2
+
+#Microbiome analyses in baseline samples
+library(vegan)
+library(ggplot2)
+library(RColorBrewer)
+library (gdata)
+
+#Vedopredict cohort alpha diversity
+Alphapredict = read.xls ("dataset")
+rownames (Alphapredict) = Alphapredict[,1]
+Alphapredict = Alphapredict[,2:235]
+TaxaPredict = Alphapredict[,67:234]
+PhenosPredict = Alphapredict[,1:66]
+Predict_SI <- as.data.frame(diversity(TaxaPredict, index="shannon"))
+PhenosPredict_m = merge (PhenosPredict, Predict_SI, by = "row.names")
+wilcox.test(PhenosPredict_m$`diversity(TaxaPredict, index = "shannon")`~PhenosPredict_m$ResponseDoc)
+ggplot(PhenosPredict_m, aes(x=as.factor(remission_week14),y=`diversity(TaxaPredict, index = "shannon")`)) + geom_violin() + geom_boxplot(width=0.1) + theme_classic() + xlab("Remission status") + ylab("Shannon Index")
+ggplot(PhenosPredict_m, aes(x=as.factor(RemissionScore),y=`diversity(TaxaPredict, index = "shannon")`),fill= RemissionScore) + geom_violin() + geom_boxplot(width=0.1) + theme_classic() + xlab("Remission status") + ylab("Shannon Index")
+SIRemissionPredict = subset (PhenosPredict_m, PhenosPredict_m$ResponseDoc==1)
+SINoRemissionPredict = subset (PhenosPredict_m, PhenosPredict_m$ResponseDoc==0)
+
+#Vedopredict cohort - Beta diversity
+betapredict<- vegdist(Betafinal[,3:28], method="bray")
+mypcoa=cmdscale(betapredict, k = 10)
+beta_predict=as.data.frame(mypcoa)
+PhenosPredict2 = merge (stap1, beta_predict, by = "row.names")
+wilcox.test(PhenosPredict2$V1~PhenosPredict2$ResponseScoreYesNo)
+PhenosPredict2$color="black"
+PhenosPredict2[PhenosPredict2$RemissionScore==1,]$color="red"
+PhenosPredict2[PhenosPredict2$RemissionScore==0,]$color="black"
+CD <- ggplot (PhenosPredict2, aes (x=V1,y=V2, geom="blank", colour=color)) + geom_point (size=2.5) + theme_classic() + labs(x="PC1",y="PC2") + scale_color_identity("Remission_status", breaks=PhenosPredict2$RemissionScore,guide="legend") 
+AdoPredict = adonis (betapredict ~ PhenosPredict2$V1_AgeatFecalSampling+PhenosPredict2$Female.+PhenosPredict2$ReadDepth+PhenosPredict2$ResponseDoc, permutations = 1000, parallel = 2 )
+
+# Microbiome - individual taxa Vedopredict, Broad, meta-analysis (in samples present in both cohorts)
+#Creating metadata and data files for Maaslin2
+library (Maaslin2)
+Metadata_Vedopredictdoc = read.xls ("Metadata_VedopredictDoc.xlsx")
+write.table (Metadata_Vedopredictdoc, "Metadata_VedopredictDoc.tsv", sep = "\t",row.names = FALSE)
+##Taxa
+#Vedopredict cohort, correcting for age, sex, BMI, sequencing depth & Remissionstatus
+Maaslin2("Data_Vedopredict.tsv", "Metadata_VedopredictDoc.tsv", "BaselineVedopredictDoc", normalization = "NONE", transform = "AST")
+#Vedorep cohort, correcting for age, sex, sequencing depth & Remissionstatus
+Maaslin2("Data_Vedorep.tsv", "Metadata_Vedorep.tsv", "BaselineVedorep", normalization = "NONE", transform = "AST")
+#Combined cohorts, correcting for age, sex, sequencing depth, cohort & remission status
+Maaslin2("Data_Vedocombo.tsv", "Metadata_Vedocombo.tsv", "BaselineVedocombo", normalization = "NONE", transform = "AST")
+## Pathways
+Maaslin2("Data_rep_metacyc.tsv", "Metadata_Vedorep.tsv", "BaselineVedorepMetacyc", normalization = "NONE") #no transform command, so default is log transformation
+#OlinkPanel - no normalization and transformation according to Shixian, has already been performed by the company
+Maaslin2("Data_rep_metacyc.tsv", "Metadata_Vedorep.tsv", "BaselineVedorepMetacyc", normalization = "NONE", transform = "NONE")
+
+# meta-analysis in a loop, without corrections of anything:
+library (meta)
+
+MetaFinalValues = data.frame ()
+for (i in 29:173) {
+  MetaValues = as.data.frame (matrix (ncol = 7, nrow = 2))
+  colnames (MetaValues) = c("Author", "Me",	"Se",	"Mc",	"Sc",	"Ne",	"Nc")
+  MetaValues[1,1] = c("BROAD")
+  MetaValues[2,1] = c("UMCG")
+  MetaValues[1,2] = mean (RemissionBroad[,i], na.rm = TRUE)
+  MetaValues[1,3] = sd (RemissionBroad[,i], na.rm = TRUE)
+  MetaValues[1,4] = mean (NoRemissionBroad[,i], na.rm = TRUE)
+  MetaValues[1,5] = sd (NoRemissionBroad[,i], na.rm = TRUE)
+  MetaValues[1,6] = nrow (RemissionBroad)
+  MetaValues[1,7] = nrow (NoRemissionBroad)
+  MetaValues[2,2] = mean (RemissionPredict[,i], na.rm = TRUE)
+  MetaValues[2,3] = sd (RemissionPredict[,i], na.rm = TRUE)
+  MetaValues[2,4] = mean (NoRemissionPredict[,i], na.rm = TRUE)
+  MetaValues[2,5] = sd (NoRemissionPredict[,i], na.rm = TRUE)
+  MetaValues[2,6] = nrow (RemissionPredict)
+  MetaValues[2,7] = nrow (NoRemissionPredict)
+  Metarawduration3 <- metacont (n.e = newP$NoUMCG, mean.e = newP$MeanDeltaV2V1UMCG, sd.e = newP$SDDeltaV2V1UMCG, n.c = newP$NoBroad, mean.c = newP$MeanDeltaV2V1Broad, sd.c = newP$SDDeltaV2V1Broad, data = newP, studlab = paste(Author), comb.fixed = FALSE, comb.random = TRUE, method.tau = "SJ", hakn = TRUE, prediction = TRUE, sm = "SMD")
+  MetaPValues = as.data.frame (matrix (ncol=3, nrow=1))
+  colnames(MetaPValues) = c("pval.random", "pval.Q", "I2")
+  x = colnames (RemissionBroad[i])
+  rownames (MetaPValues) = x
+  MetaPValues [1,1] = Metarawduration3$pval.random
+  MetaPValues [1,2] = Metarawduration3$pval.Q
+  MetaPValues [1,3] = Metarawduration3$I2
+  MetaFinalValues = rbind (MetaFinalValues, MetaPValues)
+}
+FDRTotal = p.adjust (MetaFinalValues$pval.random, method = c("BH"))
+View(FDRTotal)
+
+# meta-analysis in a loop by using coefficients and standard errors identified by previous Maaslin analyses (thereby corrected for the factors used in Maaslin steps)
+stap3 = data.frame ()
+for (i in 1:339){
+  TE=c(CombiResults[i,3], CombiResults[i,9])
+  SE=c(CombiResults[i,4], CombiResults[i,10])
+  stap1 = metagen(TE, SE)
+  stap2 = as.data.frame (matrix (ncol=3, nrow=1))
+  colnames(stap2) = c("pval.random", "pval.Q", "I2")
+  x = as.character (CombiResults[i,1])
+  rownames (stap2) = x
+  stap2 [1,1] = stap1$pval.random
+  stap2 [1,2] = stap1$pval.Q
+  stap2 [1,3] = stap1$I2
+  stap3 = rbind (stap3, stap2)
+}
+FDRTotal2 = p.adjust (stap3$pval.random, method = c("BH"))
+stap4 = cbind (stap3, FDRTotal2)
+
+#Prediction ---------------------------------
+library (ggplot2)
+library (lattice)
+library(caret)
+library (gdata)
+
+setwd()
+
+# load the library (download it from github first: 
+#https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome/tree/master/Scripts/RGacesa_ML_Scripts) )
+source('R_ML_scripts_v4.R')
+
+
+# load data
+inDF <- read.table('data/ForHiren_Vedopredict.txt',sep='\t',header=T)
+inDF3 = read.xls ("Meta_Input.xlsx")
+
+# clean data
+inDF$Gnumber <- NULL
+inDF$Week.0 <- NULL
+inDF$Week.14 <- NULL
+
+# test 1: prediction of cohort
+# ==========================================
+inDFcoh <- inDF3
+# clean NAs
+for (c in colnames(inDFcoh)) {
+  if (class(inDFcoh[[c]]) == "numeric") {
+    inDFcoh[[c]][is.na(inDFcoh[[c]])] <- median(inDFcoh[[c]],na.rm = T)
+  }
+}
+
+# run modelling: test 1 prediction of cohort
+doMLModelling(outFolderName = 'out_CohortPred',
+              allDM = list(inDFPredict6),
+              allDMn = c("Cohort_Test"),
+              responseVar = "Cohort",
+              posC = "MGH",
+              inTrainP = 0.75,
+              doLC = T,
+              doRFE = T,
+              doDataPrepPreselection = T,
+              doDataPrepPreselectP = 0.25,
+              doRFEpreselection = T,
+              doRFEpreselectP = 0.25,
+              doOptLC = T,
+              mtds = c("glm"),
+              smoothROCs = F,
+              rfeR = 5,
+              tBut = 5
+)
+
+# test 2: prediction of remission in samples combined, only MGH, only UMCG
+# ==========================================
+inDFPredict4 <- inDF3
+for (c in colnames(inDFPredict4)) {
+  if (class(inDFPredict4[[c]]) == "numeric") {
+    inDFPredict4[[c]][is.na(inDFPredict4[[c]])] <- median(inDFPredict4[[c]],na.rm = T)
+  }
+}
+inDFPredict4 = inDFPredict4[83:129,]
+inDFPredict4$SID <- NULL
+inDFPredict4$ResponseDoc <- as.character(inDFPredict4$ResponseDoc)
+inDFPredict4$ResponseDoc[inDFPredict4$ResponseDoc=="0"] <- "N"
+inDFPredict4$ResponseDoc[inDFPredict4$ResponseDoc=="1"] <- "Y"
+inDFPredict4$ResponseDoc <- as.factor(inDFPredict4$ResponseDoc)
+
+doMLModelling(outFolderName = 'out_ClinicalOlinkVariables2',
+              allDM = list(inDFPredict4),
+              allDMn = c("ResponseDoc"),
+              responseVar = "ResponseDoc",
+              posC = "yes",
+              inTrainP = 0.75,
+              doLC = T,
+              doRFE = T,
+              doDataPrepPreselection = T,
+              doDataPrepPreselectP = 0.25,
+              doRFEpreselection = T,
+              doRFEpreselectP = 0.25,
+              doOptLC = T,
+              mtds = c("glm"),
+              smoothROCs = F,
+              rfeR = 5,
+              tBut = 5
+)
+
+# Testing in independent cohort
+premod = readRDS ("ResponseScoreYesNo_trSet_prepMdl.RData") # Premodelling used on Vedopredict (training set), is in inputData file
+premod2 = predict(premod, inDFPredict5) #Using the same premod on your test set on your indepentdent cohort, this case Ashwins data
+stap3 = predict (mdl_opt_glm_ResponseScoreYesNo_vMax,premod2) # Using same variables in the independent cohort
+confusionMatrix(stap3, inDFPredict5$ResponseScoreYesNo) # analysing the results of the prediction. 
+
+#Go from confusion matrix to AUC values
+compareMdlsDatasets(  # this is function that tests fitted model and returns ROC curve,
+  mdls=list(mdl_opt_glm_ResponseScoreYesNo_vMax),    # put your fitted model here
+  dataSets = list(premod2),                 # test data goes here, 
+  posClass = "Y",          # this is what your "positive" class is encoded as, probably something like "Y", "Yes" or "Response" 
+  response = "ResponseScoreYesNo",   # this is name of column which encodes response in your data and test dataframe  
+  mdNames = c("Response"), # this is name of your model, used to label plots so put whatever you want in here
+  removeLegend = T
+)
+
+
+# Longitudinal analyses 
+#Paired diversity analyses
+library (gdata)
+stap1 = read.xls ("")
+#subset responders and non-responders
+stap1 = read.xls ("Taxa_Diversity_Marjo.xlsx")
+V1 = subset (stap1, stap1$Time==1)
+V2 = subset (stap1, stap1$Time==2)
+V1Resp = subset (V1, V1$ResponseDoc==1)
+V1NoResp = subset (V1, V1$ResponseDoc==0)
+V2Resp = subset (V2, V2$ResponseDoc==1)
+V2NoResp = subset (V2, V2$ResponseDoc==0)
+rownames (V1NoResp) = V1NoResp[,2]
+rownames (V2NoResp) = V2NoResp[,2]
+rownames (V1Resp) = V1Resp[,2]
+rownames (V2Resp) = V2Resp[,2]
+SI_V1Noresp <- as.data.frame(diversity(V1NoResp[,6:180], index="shannon"))
+SI_V2Noresp <- as.data.frame(diversity(V2NoResp[,6:180], index="shannon"))
+SI_V1resp <- as.data.frame(diversity(V1Resp[,6:180], index="shannon"))
+SI_V2resp <- as.data.frame(diversity(V2Resp[,6:180], index="shannon"))
+res3 <- wilcox.test(SI_V1Noresp$`diversity(V1NoResp[, 6:180], index = "shannon")`, SI_V2Noresp$`diversity(V2NoResp[, 6:180], index = "shannon")`, paired = TRUE, alternative = c("less"))
+res4 <- wilcox.test(SI_V1resp$`diversity(V1Resp[, 6:180], index = "shannon")`, SI_V2resp$`diversity(V2Resp[, 6:180], index = "shannon")`, paired = TRUE, alternative = c("less"))
+
+#Paired analyses individual taxa/pathways by paired wilcoxon
+stap1 = read.xls ("DataPredictLongitudinal.xlsx",12)
+stap2 = subset (stap1, stap1$Time==1)
+stap3 = subset (stap1, stap1$Time==2)
+rownames(stap2) = stap2[,1]
+rownames(stap3) = stap3[,1]
+V1resp = subset (stap2, stap2$ResponseScoreYesNo==1)
+V1noresp = subset (stap2, stap2$ResponseScoreYesNo==0)
+V2resp = subset (stap3, stap3$ResponseScoreYesNo==1)
+V2noresp = subset (stap3, stap3$ResponseScoreYesNo==0)
+
+stap5 = data.frame ()
+stap6 = data.frame ()
+for (i in 4:27){
+  stap5 = wilcox.test (V1noresp[,i], V2noresp[,i], paired = TRUE)$p.value  
+  stap6 = rbind (stap6, stap5)    
+  
+}
+rownames (stap6) = colnames (V1resp[4:27])
+
+dealteresp = V2noresp[,4:27] - V1noresp [,4:27]
+
+stap7 = data.frame ()
+stap8 = data.frame ()
+for (i in 1:ncol(dealteresp)){
+  stap7 = mean (dealteresp[,i], na.rm = TRUE)
+  stap8 = rbind (stap8, stap7)    
+  
+}
+rownames (stap8) = colnames (V1resp[4:27])
+
+stap11 = p.adjust (stap6$X1, method = "BH")
+View(stap11)
+STAP301 = cbind (stap6, stap8, stap11)
+rownames (STAP301) = colnames(V1resp[4:27])
+colnames (STAP301) = c("P_value","deltamean","Adjusted_P")
+View(STAP301)
+
+
+#Linking Olink to MGS
+#First alpha diversity based on species 
+library (vegan)
+library (gdata)
+Alphapredict = read.xls ("Olink_Jurne.xlsx",6)
+rownames (Alphapredict) = Alphapredict[,1]
+TaxaPredict = Alphapredict[,99:189]
+Predict_SI <- as.data.frame(diversity(TaxaPredict, index="shannon"))
+PhenosPredict_m = merge (Alphapredict, Predict_SI, by = "row.names")
+m = as.data.frame (cor (PhenosPredict_m$`diversity(TaxaPredict, index = "shannon")`, Alphapredict[,7:98], method = c("spearman"), use = "complete.obs"))
+o = cor.test (PhenosPredict_m$`diversity(TaxaPredict, index = "shannon")`, Alphapredict[,7], method = c("spearman"))$p.value
+
+stap6 = data.frame()
+stap9 = data.frame()
+for (i in 3:94){
+  stap6 = cor.test (Olink4$ShannonIndex, Olink4[,i], method = c("spearman"))$p.value
+  stap9 = rbind (stap9, stap6)
+}
+rownames (stap9) = colnames (Olink4[3:94])
+l = p.adjust (stap9$X0.557261401575845, method = "BH")
+
+# Relation proteins on beta diversity based on species 
+#With correction
+AdoBROAD = adonis (betapredict ~ Alphapredict$V1_AgeatFecalSampling+Alphapredict$Female.+Alphapredict$V1_BMI+Alphapredict[,7], permutations = 1000, parallel = 2 )$aov.tab[4,]
+
+stap7 = data.frame()
+stap10 = data.frame()
+for (i in 61:98){
+  stap7 = adonis (beta ~ Alphapredict$V1_AgeatFecalSampling+Alphapredict$Female.+Alphapredict$V1_BMI+Alphapredict$ReadDepth+Alphapredict[,i], permutations = 1000, parallel = 2 )$aov.tab[5,]
+  stap10 = rbind (stap10, stap7)
+}
+
+rownames (stap10) = colnames (Alphapredict[61:98])
+k = p.adjust (stap10$X0.519770550766421, method = "BH")
+
+#correlation test Olink and species
+stap10 = data.frame ()
+for (v in 7:98) { 
+  stap6 = data.frame()
+  stap9 = data.frame()
+  for (i in 99:189){
+    stap6 = cor.test (Alphapredict[,v], Alphapredict[,i], method = c("spearman"))$p.value
+    stap9 = rbind (stap9, stap6)
+  }
+  stap10 = cbind (stap10, stap9)
+}
+
+

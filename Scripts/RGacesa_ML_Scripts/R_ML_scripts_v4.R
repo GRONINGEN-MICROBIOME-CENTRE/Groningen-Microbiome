@@ -918,7 +918,9 @@ prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=
         }
         
         print (paste('test Set size =',nrow(testSet)))
+        
         # ROC (test)
+        # ==========================
         # > exclusion for testing 
         if (!is.null(excludeVars)) {
           testSet2 <- testSet[,!colnames(testSet) %in% excludeVars]
@@ -927,17 +929,34 @@ prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=
         }
         
         predP <- predict(mFit,newdata=testSet2,type="prob")
-        cauc <- roc(testSet2[[responseVar]],predP[[posClass]],auc=T)$auc+0.0
+        # resolve multi-class AUC
+        #    2-class prediction
+        if (length(levels(testSet2[[responseVar]])) == 2) {
+          cauc <- roc(testSet2[[responseVar]],predP[[posClass]],auc=T)$auc+0.0
+        } else {
+        #    3+ class prediction: we use multiclass.roc
+          cauc <- as.numeric(multiclass.roc(testSet2[[responseVar]],predP)$auc+0.0)
+        }
         # confusion (test)
         pred <- predict(mFit,newdata=testSet2)
         conf <- confusionMatrix(pred,testSet2[[responseVar]])
         cacc <- conf$overall[['Accuracy']]
         ckappa <- conf$overall[['Kappa']]
-        csens <- conf$byClass[['Sensitivity']]
-        cspec <- conf$byClass[['Specificity']]
-        cppv <- conf$byClass[['Pos Pred Value']]
-        cnpv <- conf$byClass[['Neg Pred Value']]
-        cf1 <- conf$byClass[['Balanced Accuracy']]
+        # > 2-class
+        if (length(levels(testSet2[[responseVar]])) == 2) {
+          csens <- conf$byClass[['Sensitivity']]
+          cspec <- conf$byClass[['Specificity']]
+          cppv <- conf$byClass[['Pos Pred Value']]
+          cnpv <- conf$byClass[['Neg Pred Value']]
+          cf1 <- conf$byClass[['Balanced Accuracy']]
+        } else {
+          # multi-class prediction: get averages of Sensitivity/Specificity/PPV/NPV/...
+          csens <- mean(as.data.frame(conf$byClass)[['Sensitivity']],na.rm = T)
+          cspec <-  mean(as.data.frame(conf$byClass)[['Specificity']],na.rm = T)
+          cppv <-  mean(as.data.frame(conf$byClass)[['Pos Pred Value']],na.rm = T)
+          cnpv <-  mean(as.data.frame(conf$byClass)[['Neg Pred Value']],na.rm = T)
+          cf1 <-  mean(as.data.frame(conf$byClass)[['Balanced Accuracy']],na.rm = T)
+        }
         
         
         # ROC (train)
@@ -946,18 +965,34 @@ prepLearningCurve <- function(dataIn,mdl,lcBoots=1,trSet=0.7,samStep=1.5,minSam=
           smpl <- smpl[,!colnames(smpl) %in% excludeVars]
         }
         predtP <- predict(mFit,newdata=smpl,type="prob")
-        cauct <- roc(smpl[[responseVar]],predtP[[posClass]],auc=T)$auc
+        
+        if (length(levels(testSet2[[responseVar]])) == 2) {
+          cauct <- as.numeric(roc(smpl[[responseVar]],predtP[[posClass]],auc=T)$auc)+0.0
+        } else {
+          #    3+ class prediction: we use multiclass.roc
+          cauct <- as.numeric(multiclass.roc(smpl[[responseVar]],predtP)$auc)+0.0
+        }
+        
         # confusion (train)
         predt <- predict(mFit,newdata=smpl)
         conft <- confusionMatrix(predt,smpl[[responseVar]])
         cacct <- conft$overall[['Accuracy']]
         ckappat <- conft$overall[['Kappa']]
-        csenst <- conft$byClass[['Sensitivity']]
-        cspect <- conft$byClass[['Specificity']]
-        cppvt <- conft$byClass[['Pos Pred Value']]
-        cnpvt <- conft$byClass[['Neg Pred Value']]
-        cf1t <- conft$byClass[['Balanced Accuracy']]        
+        if (length(levels(testSet2[[responseVar]])) == 2) {
+          csenst <- conft$byClass[['Sensitivity']]
+          cspect <- conft$byClass[['Specificity']]
+          cppvt <- conft$byClass[['Pos Pred Value']]
+          cnpvt <- conft$byClass[['Neg Pred Value']]
+          cf1t <- conft$byClass[['Balanced Accuracy']]
+        } else {
+          csenst <- mean(as.data.frame(conft$byClass)[['Sensitivity']],na.rm = T)
+          cspect <- mean(as.data.frame(conft$byClass)[['Specificity']],na.rm = T)
+          cppvt <- mean(as.data.frame(conft$byClass)[['Pos Pred Value']],na.rm = T)
+          cnpvt <- mean(as.data.frame(conft$byClass)[['Neg Pred Value']],na.rm = T)
+          cf1t <- mean(as.data.frame(conft$byClass)[['Balanced Accuracy']],na.rm = T)
+        }
         
+        # debug:
         #print (paste("TRAIN: SPEC",cspec))
         #print (paste("TRAIN: SENS",csens))       
         #print (paste("TEST: SPEC",cspect))
@@ -1226,11 +1261,11 @@ generateMultiClassROC <- function(fittedML,testSet,tit,respName,roc.conf=T,multi
   names(rocs) <- colnames(pred)
   for (i in seq(1,ncol(pred))) {
     if (class(rocsDFprecalc) != "data.frame") {
-      rocsDFprecalc <- as.data.frame(t(coords(rocs[[i]],x="all",ret= c("specificity","sensitivity"))))
+      rocsDFprecalc <- as.data.frame(t(coords(rocs[[i]],x="all",ret= c("specificity","sensitivity"),transpose = TRUE)))
       rocsDFprecalc$outcome <- names(rocs)[i]
       rocsDFprecalc$sz = 1
     } else {
-      rocsDFprecalctmp <- as.data.frame(t(coords(rocs[[i]],x="all",ret= c("specificity","sensitivity"))))
+      rocsDFprecalctmp <- as.data.frame(t(coords(rocs[[i]],x="all",ret= c("specificity","sensitivity"),transpose = TRUE )))
       rocsDFprecalctmp$outcome <- names(rocs)[i]
       rocsDFprecalctmp$sz = 1
       rocsDFprecalc <- rbind(rocsDFprecalc, rocsDFprecalctmp)
@@ -1287,9 +1322,9 @@ generateMultiClassROC <- function(fittedML,testSet,tit,respName,roc.conf=T,multi
   rocStep = 0.01
   for (i in seq(1,ncol(pred))) {
     if (smooth) {
-      rtmp <- as.data.frame(t(coords(smooth(rocs[[i]]),x=seq(0,1,rocStep),input="sensitivity", ret = c("specificity","sensitivity") )))
+      rtmp <- as.data.frame(t(coords(smooth(rocs[[i]]),x=seq(0,1,rocStep),input="sensitivity", ret = c("specificity","sensitivity"),transpose = T )))
     } else {
-      rtmp <- as.data.frame(t(coords((rocs[[i]]),x=seq(0,1,rocStep),input="sensitivity", ret = c("specificity","sensitivity") )))
+      rtmp <- as.data.frame(t(coords((rocs[[i]]),x=seq(0,1,rocStep),input="sensitivity", ret = c("specificity","sensitivity"),transpose = T )))
     }
     if (class(rocCoords) != "data.frame") {
       rocDF <- rtmp
@@ -1724,7 +1759,7 @@ prepModel <- function(dFrame,mdl) {
 dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",trP=0.75,positive="IBD",rfeMethod="glm",
                                  testMethod="glm",xvnr=5,xvreps=1,rfeReps=3,
                                  parallel=T,verb=T,szs=F,trainMethod="repeatedcv",optimiseMetric="Kappa",
-                                 saveRFE=T,saveRFEpath='rfe_model.RDS') {
+                                 saveRFE=T,saveRFEpath='rfe_model.RDS',doComparisons=T) {
   
   #trC <- trainControl(method=rfeMethod,number=tBut,repeats = tRep,savePredictions = T,classProbs = T,allowParallel = parallel)
   inTrain <- createDataPartition(dModel[[responseVar]],p=trP,list=F)
@@ -1810,19 +1845,26 @@ dataModelOptimiseRFE <- function(dModel,dModelName="",responseVar="Diagnosis",tr
   # compare
   mNames <- c(paste("All:",ncol(testSet)-1,sep=''),paste("M.max:",varNrMax,sep=''),
               paste("M.2:",varNr2,sep=''),paste("M.5:",varNr5,sep=''))
-  testComp <- compareMdlsDatasets(mdls = list(fitAll,fitMax,fitRfe2,fitRfe5),mdNames = mNames,dataSets = list(testSet),
-                                     posClass = positive, tit = "",response = responseVar,annotS = 4,textSize = 15)
   
-  cvComp <- compareModelsTrainingCV(fittedMdls = list(fitAll,fitMax,fitRfe2,fitRfe5),mtd = paste('x-val',testMethod), 
-                                    modelNames = mNames,posClass = positive)
+  if (length(unique(trSet[[responseVar]])) == 2 & doComparisons) {
+    testComp <- compareMdlsDatasets(mdls = list(fitAll,fitMax,fitRfe2,fitRfe5),mdNames = mNames,dataSets = list(testSet),
+                                    posClass = positive, tit = "",response = responseVar,annotS = 4,textSize = 15)
+    
+    cvComp <- compareModelsTrainingCV(fittedMdls = list(fitAll,fitMax,fitRfe2,fitRfe5),mtd = paste('x-val',testMethod), 
+                                      modelNames = mNames,posClass = positive)
+  }
   rfeplot <- ggplot(rfeProfile) + geom_vline(xintercept = varNrMax,linetype='longdash') + geom_vline(xintercept = varNr2,linetype='longdash')+
     geom_vline(xintercept = varNr5,linetype='longdash')+ggtitle(paste("RFE plot (",dModelName,' / ',rfeMethod,')',sep=""))
+  
   
   if (saveRFE) {
     saveRDS(rfeProfile,file = saveRFEpath)
   }
-  
-  return(list(varSelMax,varSel2,varSel5,testComp,cvComp,rfeplot,varImpPlot,c("Vars:Max","Vars:2%","Vars:5%","plot:testset","plot:X-val","RFE-plot","VarImp-DF")))
+  if (length(unique(trSet[[responseVar]])) == 2 & doComparisons) {
+    return(list(varSelMax,varSel2,varSel5,testComp,cvComp,rfeplot,varImpPlot,c("Vars:Max","Vars:2%","Vars:5%","plot:testset","plot:X-val","RFE-plot","VarImp-DF")))
+  } else {
+    return(list(varSelMax,varSel2,varSel5,rfeplot,varImpPlot,c("Vars:Max","Vars:2%","Vars:5%","RFE-plot","VarImp-DF")))
+  }
 }
 
 # ===============================================================================
@@ -2162,7 +2204,7 @@ doMLModelling <- function(outFolderName,
                         inTrainP=0.75, # how much goes into training set
                         keepTrSplit=T, # keep training / test split the same between datasets
                         doDataPrep=T,     # do data preparation (scaling, centering...)
-                        doDataPrepPreselection = T, # do pre-selection?
+                        doDataPrepPreselection = F, # do pre-selection?
                         doDataPrepPreselectP = 0.2, # pre-selection p-value of independance_test 
                         doDataPrepPreselectMaxFeatures = 50, #pre-selection max # of features
                         doDataPrepPreselectMinFeatures = 5,
@@ -2174,6 +2216,7 @@ doMLModelling <- function(outFolderName,
                         doRFEpreselectP = 0.1, # pre-selection p-value of independance_test 
                         doRFEpreselectMaxFeatures = 50, #pre-selection max # of features
                         doRFEpreselectMinFeatures = 5,
+                        doRfeComparisons = T,
                         doOptLC = T,   # do optimised learning curves
                         doRawMdls = T,  # do raw models
                         doOptMdls = T,  # do optimised models
@@ -2242,6 +2285,7 @@ doMLModelling <- function(outFolderName,
   }
   # do pre-selection?
   if (doDataPrepPreselection) {
+    print(' > PRE-SELECTING FEATURES')
     if (doDataPrep) {
       inData <- read.table(file = paste0(outFolderName,'/inputData/',mN,'_trSet_prep.csv'),header = T,sep=',')  
     } else {
@@ -2320,7 +2364,6 @@ doMLModelling <- function(outFolderName,
     # RFE parameters
     xvn = rfeR; xvr = tButXV
     # do RFE
-    
     for (mtd in mtds) {
       for (c in c(1:length(allDM))) {
         mN <- allDMn[[c]]
@@ -2335,17 +2378,25 @@ doMLModelling <- function(outFolderName,
             print (paste("    >> DOING PRE-SELECTION"))
             toTest <- colnames(inData)[colnames(inData) != responseVar]
             testRes <- data.frame()
-            for (t in toTest) {
-              rVC <- unique(inData[[responseVar]])
-              if ( class(inData[[t]]) == "factor" | class(inData[[t]]) == "character" )
-              {
-                tst <- chisq.test(table(inData[[t]],inData[[responseVar]]))
-              } else {
-                t1 <- inData[[t]][inData[[responseVar]]==rVC[1]]
-                t2 <- inData[[t]][inData[[responseVar]]==rVC[2]]
-                tst <- wilcox.test(t1,t2)
+            rVC <- unique(inData[[responseVar]])
+            combos <- combn(rVC,m = 2)
+            # do all pair-wise combos, get p-values for them
+            for (cmb in c(1:ncol(combos))) {
+              v1 <- combos[,cmb][1]
+              v2 <- combos[,cmb][2]
+              #print(paste(v1,',',v2))
+              for (t in toTest) {
+                rVC <- unique(inData[[responseVar]])
+                if ( class(inData[[t]]) == "factor" | class(inData[[t]]) == "character" )
+                {
+                  tst <- chisq.test(table(inData[[v1]],inData[[v2]]))
+                } else {
+                  t1 <- inData[[t]][inData[[responseVar]]==v1]
+                  t2 <- inData[[t]][inData[[responseVar]]==v2]
+                  tst <- wilcox.test(t1,t2)
+                }
+                testRes <- rbind.data.frame(testRes,data.frame(feature=t,v1=v1,v2=v2,pv=tst$p.value))
               }
-              testRes <- rbind.data.frame(testRes,data.frame(feature=t,pv=tst$p.value))
             }
             testRes$pv[is.na(testRes$pv) | is.nan(testRes$pv)] <- 1.0
             testRes <- testRes[order(testRes$pv),]
@@ -2361,25 +2412,37 @@ doMLModelling <- function(outFolderName,
             }
             inData <- inData[,colnames(inData) %in% c(responseVar,touse)]
             print (paste('   >> PRE-SELECTION DONE, selected',length(touse),'FEATURES!'))
+            write.table(testRes,paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_preselection.csv"),row.names = F,col.names = F)
           }
           
           # debug
           #dModel=allDM[[c]];xvnr=xvn;xvreps = xvr; rfeMethod = mtd; parallel = T;testMethod = mtd; dModelName=allDMn[[c]];positive = posC
           rfeRes <- dataModelOptimiseRFE(dModel=inData,xvnr=xvn,xvreps = xvr,rfeReps = rfeR,rfeMethod = mtd,optimiseMetric = optimiseMetric,
                                          testMethod = mtd, dModelName=allDMn[[c]],positive = posC,responseVar = responseVar,
-                                         parallel = allowParallel,saveRFE = T,saveRFEpath = paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_RFE.RDS") )
+                                         parallel = allowParallel,saveRFE = T,saveRFEpath = paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_RFE.RDS"),
+                                         doComparisons = doRfeComparisons)
           print('RFE done!')
-          write.table(rfeRes[[1]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_vmax.csv"),row.names = F,col.names = F)
-          write.table(rfeRes[[2]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v2.csv"),row.names = F,col.names = F)
-          write.table(rfeRes[[3]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v5.csv"),row.names = F,col.names = F)
-          write.table(rfeRes[[4]][[3]],  paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_opt_results.csv"),row.names = F)
-          ggsave(plot = rfeRes[[4]][[1]],paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_roc_test.png"),width = 8,height = 6)
-          ggsave(plot = rfeRes[[5]]     ,paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_roc_xval.png"),width = 8,height = 6)
-          ggsave(plot = rfeRes[[6]]     ,paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_opt.png"),width = 8,height = 6)
-          write.table(rfeRes[[7]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_opt_varImp.csv"),row.names = F)
-          vip <- ggplot(rfeRes[[7]], aes(x=Variable,y=Importance,col=Variable,fill=Variable)) + geom_col() + ylab('Relative Importance') +
-            theme(axis.text.x=element_blank())
-          ggsave(plot = vip     ,paste(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_varImp.png",sep = ''),width = 8,height = 6)
+          # return plots (2 classes & doRfeComparisons = T)
+          if (length(unique(inData[[responseVar]])) == 2 &  doRfeComparisons ) {
+            write.table(rfeRes[[1]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_vmax.csv"),row.names = F,col.names = F)
+            write.table(rfeRes[[2]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v2.csv"),row.names = F,col.names = F)
+            write.table(rfeRes[[3]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v5.csv"),row.names = F,col.names = F)
+            write.table(rfeRes[[4]][[3]],  paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_opt_results.csv"),row.names = F)
+            ggsave(plot = rfeRes[[4]][[1]],paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_roc_test.png"),width = 8,height = 6)
+            ggsave(plot = rfeRes[[5]]     ,paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_roc_xval.png"),width = 8,height = 6)
+            ggsave(plot = rfeRes[[6]]     ,paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_opt.png"),width = 8,height = 6)
+            write.table(rfeRes[[7]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_opt_varImp.csv"),row.names = F)
+            vip <- ggplot(rfeRes[[7]], aes(x=Variable,y=Importance,col=Variable,fill=Variable)) + geom_col() + ylab('Relative Importance') +
+              theme(axis.text.x=element_blank())
+            ggsave(plot = vip     ,paste(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_varImp.png",sep = ''),width = 8,height = 6)
+          } else {
+          # return tables
+            write.table(rfeRes[[1]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_vmax.csv"),row.names = F,col.names = F)
+            write.table(rfeRes[[2]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v2.csv"),row.names = F,col.names = F)
+            write.table(rfeRes[[3]],       paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v5.csv"),row.names = F,col.names = F)
+            ggsave(plot = rfeRes[[4]]     ,paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_opt.png"),width = 8,height = 6)
+            
+          }
         } else {
           write.table(colnames(inData)[colnames(inData) != responseVar],paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_vmax.csv"),row.names = F,col.names = F)
           write.table(colnames(inData)[colnames(inData) != responseVar],paste0(outFolderName,"/opt_RFE/rfe_",mtd,"_",allDMn[[c]],"_vars_v2.csv"),row.names = F,col.names = F)
@@ -2390,7 +2453,7 @@ doMLModelling <- function(outFolderName,
     print ("RFE RUNS DONE!")
   }
   
-  # remake models using REF-identified genera, species & pathways
+  # remake models using RFE-identified genera, species & pathways
   # make new learning curves with those
   # ===================================================================
   if (doOptLC) {
@@ -2490,21 +2553,32 @@ doMLModelling <- function(outFolderName,
         }
         # test set
         if (inTrainP != 1) {
-          compTest <- compareMdlsDatasets(mdls=list(fitRaw[[c]]),dataSets=list(tstSet),mdNames=c("test"),
+          # 2-class
+          if (length(unique(trSet[[responseVar]])) == 2) {
+            compTest <- compareMdlsDatasets(mdls=list(fitRaw[[c]]),dataSets=list(tstSet),mdNames=c("test"),
                                           posClass=posC,tit = paste0(posC," Mdl <test set> (",allDMn[[c]],", ",mtd,")"),
                                           roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
           # save it
-          ggsave(plot = compTest[[1]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test.png',sep = ''),width = 8,height = 6)
-          ggsave(plot = compTest[[2]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test_val.png',sep = ''),width = 8,height = 6)
-          write.table(compTest[[3]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test.csv',sep = ''),row.names = F,sep=',')
+            ggsave(plot = compTest[[1]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test.png',sep = ''),width = 8,height = 6)
+            ggsave(plot = compTest[[2]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test_val.png',sep = ''),width = 8,height = 6)
+            write.table(compTest[[3]],paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_test.csv',sep = ''),row.names = F,sep=',')
+          } else {
+            # multi-class
+            
+          }
         }
         # x-validation
-        # debug:
-        compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw[[c]]),modelNames=c("Raw-XV"),mtd=mtd,posClass=posC,
+        # 2-class
+        if (length(unique(trSet[[responseVar]])) == 2) {
+          compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw[[c]]),modelNames=c("Raw-XV"),mtd=mtd,posClass=posC,
                                           tit = paste0(posC," Mdl (",allDMn[[c]],", ",mtd,")"),
                                           roc.smooth = F,roc.conf = T,annotateAUConly = T,removeLegend=T)
         # save it
-        ggsave(plot = compXV,paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_xv.png',sep = ''),width = 8,height = 6)
+          ggsave(plot = compXV,paste(outFolderName,"/raw_mdlResults/roc_raw_",mtd,"_",allDMn[[c]],'_xv.png',sep = ''),width = 8,height = 6)
+        } else {
+          # multi-class
+          
+        }
       }
     }
   }
@@ -2573,21 +2647,30 @@ doMLModelling <- function(outFolderName,
             saveRDS(fit, paste(outFolderName,"/opt_fittedmdls/mdl_opt_",mtd,"_",mN,'_v2.rds',sep = ''))
           }
           # compare on test set
+          # > 2 class prediction
           if (inTrainP != 1) {
-            compTest <- compareMdlsDatasets(mdls=list(fit),dataSets=list(tstSet),mdNames=c("test"),
-                                            posClass=posC,tit = paste0(posC," v2 opt mdl [",length(optVars),"f] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
-            # save it
-            ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test.png',sep = ''),width = 8,height = 6)
-            ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test_val.png',sep = ''),width = 8,height = 6)
-            write.table(compTest[[3]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test.csv',sep = ''),row.names = F,sep=',')
-          }
+            if (length(unique(trSet[[responseVar]])) == 2) {
+              compTest <- compareMdlsDatasets(mdls=list(fit),dataSets=list(tstSet),mdNames=c("test"),
+                                              posClass=posC,tit = paste0(posC," v2 opt mdl [",length(optVars),"f] <test set> (",mN,", ",mtd,")"),
+                                              roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
+              # save it
+              ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test.png',sep = ''),width = 8,height = 6)
+              ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test_val.png',sep = ''),width = 8,height = 6)
+              write.table(compTest[[3]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_test.csv',sep = ''),row.names = F,sep=',')
+            } else {
+              # > multi-class prediction
+            }
+          } 
           # x-validation
-          compXV <- compareModelsTrainingCV(fittedMdls = list(fit),modelNames=c("Raw-XV"),mtd=mtd,posClass=posC,
-                                            tit = paste0(posC," v2 opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
-                                            roc.smooth = smoothROCs,roc.conf = T,annotateAUConly = T,removeLegend=T,roc.conf.boot = 10)
-          # save it
-          ggsave(plot = compXV,paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_xv.png',sep = ''),width = 8,height = 6)
+          if (length(unique(trSet[[responseVar]])) == 2) {
+            compXV <- compareModelsTrainingCV(fittedMdls = list(fit),modelNames=c("Raw-XV"),mtd=mtd,posClass=posC,
+                                              tit = paste0(posC," v2 opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
+                                              roc.smooth = smoothROCs,roc.conf = T,annotateAUConly = T,removeLegend=T,roc.conf.boot = 10)
+            # save it
+            ggsave(plot = compXV,paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_v2_xv.png',sep = ''),width = 8,height = 6)
+          } else {
+            
+          }
         }
         if (doOptMax) {
           print (paste(" >> Training optimised model for",mN,'/',mtd,' (max optimisation) '))
@@ -2622,20 +2705,27 @@ doMLModelling <- function(outFolderName,
           }
           # compare on test set
           if (inTrainP != 1) {
-            compTest <- compareMdlsDatasets(mdls=list(fit),dataSets=list(tstSet),mdNames=c("test"),
-                                            posClass=posC,tit = paste0(posC," max opt mdl [",length(optVars),"f] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
-            # save it
-            ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test.png',sep = ''),width = 8,height = 6)
-            ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test_val.png',sep = ''),width = 8,height = 6)
-            write.table(compTest[[3]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test.csv',sep = ''),row.names = F,sep=',')
+            if (length(unique(trSet[[responseVar]])) == 2) {
+              compTest <- compareMdlsDatasets(mdls=list(fit),dataSets=list(tstSet),mdNames=c("test"),
+                                              posClass=posC,tit = paste0(posC," max opt mdl [",length(optVars),"f] <test set> (",mN,", ",mtd,")"),
+                                              roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=T,response = responseVar)
+              # save it
+              ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test.png',sep = ''),width = 8,height = 6)
+              ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test_val.png',sep = ''),width = 8,height = 6)
+              write.table(compTest[[3]],paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_test.csv',sep = ''),row.names = F,sep=',')
+            }
           }
           # x-validation
-          compXV <- compareModelsTrainingCV(fittedMdls = list(fit),modelNames=c("Raw-XV"),mtd=mtd,posClass=posC,
-                                            tit = paste0(posC," max opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
-                                            roc.smooth = smoothROCs,roc.conf = T,annotateAUConly = T,removeLegend=T,roc.conf.boot = 10)
-          # save it
-          ggsave(plot = compXV,paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_xv.png',sep = ''),width = 8,height = 6)
+          # > 2 class prediction
+          if (length(unique(trSet[[responseVar]])) == 2) {
+            compXV <- compareModelsTrainingCV(fittedMdls = list(fit),modelNames=c("Raw-XV"),mtd=mtd,posClass=posC,
+                                              tit = paste0(posC," max opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
+                                              roc.smooth = smoothROCs,roc.conf = T,annotateAUConly = T,removeLegend=T,roc.conf.boot = 10)
+            # save it
+            ggsave(plot = compXV,paste(outFolderName,"/opt_mdlResults/roc_opt_",mtd,"_",mN,'_vmax_xv.png',sep = ''),width = 8,height = 6)
+          } else {
+          # > multi-class prediction
+          }
         }
       }
     }
@@ -2675,40 +2765,50 @@ doMLModelling <- function(outFolderName,
             fitOpt2 <- readRDS(paste(outFolderName,"/opt_fittedmdls/mdl_opt_",mtd,"_",mN,'_v2.rds',sep = ''))
           } else {fitOpt2 <- NULL}
           # compare on test set
-          if (!is.null(fitOpt2) & !is.null(fitOptM)) {
-            compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOptM,fitOpt2),dataSets=list(tstSet),mdNames=c("Raw","Opt[2]","Opt[M]"),
-                                            posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),",",length(predictors(fitOptM)),"] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
-          } else if (is.null(fitOpt2) & !is.null(fitOptM)) {
-            compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOptM),dataSets=list(tstSet),mdNames=c("Raw","Opt[M]"),
-                                            posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOptM)),"] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
-          } else if (!is.null(fitOpt2) & is.null(fitOptM)) {
-            compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOpt2),dataSets=list(tstSet),mdNames=c("Raw","Opt[2]"),
-                                            posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),"] <test set> (",mN,", ",mtd,")"),
-                                            roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
+          # > 2 class prediction
+          if (length(unique(trSet[[responseVar]])) == 2) {
+            if (!is.null(fitOpt2) & !is.null(fitOptM)) {
+              compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOptM,fitOpt2),dataSets=list(tstSet),mdNames=c("Raw","Opt[2]","Opt[M]"),
+                                              posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),",",length(predictors(fitOptM)),"] <test set> (",mN,", ",mtd,")"),
+                                              roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
+            } else if (is.null(fitOpt2) & !is.null(fitOptM)) {
+              compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOptM),dataSets=list(tstSet),mdNames=c("Raw","Opt[M]"),
+                                              posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOptM)),"] <test set> (",mN,", ",mtd,")"),
+                                              roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
+            } else if (!is.null(fitOpt2) & is.null(fitOptM)) {
+              compTest <- compareMdlsDatasets(mdls=list(fitRaw,fitOpt2),dataSets=list(tstSet),mdNames=c("Raw","Opt[2]"),
+                                              posClass=posC,tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),"] <test set> (",mN,", ",mtd,")"),
+                                              roc.conf.boot = 100,roc.smooth = smoothROCs,removeLegend=F,response = responseVar)
+            }
+            # save it
+            ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_test.png',sep = ''),width = 8,height = 6)
+            ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_test_val.png',sep = ''),width = 8,height = 6)
+            write.table(compTest[[3]],paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_test.csv',sep = ''),row.names = F,sep=',')
+          } else {
+            # > multi-class prediction
           }
-          # save it
-          ggsave(plot = compTest[[1]],paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_test.png',sep = ''),width = 8,height = 6)
-          ggsave(plot = compTest[[2]],paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_test_val.png',sep = ''),width = 8,height = 6)
-          write.table(compTest[[3]],paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_test.csv',sep = ''),row.names = F,sep=',')
-        
-        # x-validation
-        if (!is.null(fitOpt2) & !is.null(fitOptM)) {
-          compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw,fitOptM,fitOpt2),modelNames=c("Raw-XV","Opt[M]","Opt[2]"),mtd=mtd,posClass=posC,
-                                            tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),",",length(predictors(fitOptM)),"] (",mN,", ",mtd,")"),
-                                            roc.smooth = T,roc.conf = T,annotateAUConly = T,removeLegend=F,roc.conf.boot = 10)
-        } else if (is.null(fitOpt2) & !is.null(fitOptM)) {
-          compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw,fitOptM),modelNames=c("Raw-XV","Opt[M]"),mtd=mtd,posClass=posC,
-                                            tit = paste0(posC," Opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
-                                            roc.smooth = T,roc.conf = T,annotateAUConly = T,removeLegend=F,roc.conf.boot = 10)
-        } else if (!is.null(fitOpt2) & is.null(fitOptM)) {
-          compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw,fitOpt2),modelNames=c("Raw-XV","Opt[2]"),mtd=mtd,posClass=posC,
-                                            tit = paste0(posC," Opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
-                                            roc.smooth = T,roc.conf = T,annotateAUConly = T,removeLegend=F,roc.conf.boot = 10)
-        }
-        # save it
-        ggsave(plot = compXV,paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_xv.png',sep = ''),width = 8,height = 6)
+          # x-validation
+          # > 2 class prediction
+          if (length(unique(trSet[[responseVar]])) == 2) {
+            if (!is.null(fitOpt2) & !is.null(fitOptM)) {
+              compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw,fitOptM,fitOpt2),modelNames=c("Raw-XV","Opt[M]","Opt[2]"),mtd=mtd,posClass=posC,
+                                                tit = paste0(posC,", Raw[",length(predictors(fitRaw)),"] vs Opt[",length(predictors(fitOpt2)),",",length(predictors(fitOptM)),"] (",mN,", ",mtd,")"),
+                                                roc.smooth = T,roc.conf = T,annotateAUConly = T,removeLegend=F,roc.conf.boot = 10)
+            } else if (is.null(fitOpt2) & !is.null(fitOptM)) {
+              compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw,fitOptM),modelNames=c("Raw-XV","Opt[M]"),mtd=mtd,posClass=posC,
+                                                tit = paste0(posC," Opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
+                                                roc.smooth = T,roc.conf = T,annotateAUConly = T,removeLegend=F,roc.conf.boot = 10)
+            } else if (!is.null(fitOpt2) & is.null(fitOptM)) {
+              compXV <- compareModelsTrainingCV(fittedMdls = list(fitRaw,fitOpt2),modelNames=c("Raw-XV","Opt[2]"),mtd=mtd,posClass=posC,
+                                                tit = paste0(posC," Opt mdl [",length(optVars),"f] <x-val> (",mN,", ",mtd,")"),
+                                                roc.smooth = T,roc.conf = T,annotateAUConly = T,removeLegend=F,roc.conf.boot = 10)
+            }
+            # save it
+            ggsave(plot = compXV,paste(outFolderName,"/opt_vs_raw/roc_",mtd,"_",mN,'_xv.png',sep = ''),width = 8,height = 6)
+          }
+        } else {
+          # multi-class prediction
+          
         }
       }
     }

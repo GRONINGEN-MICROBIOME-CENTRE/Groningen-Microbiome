@@ -139,6 +139,82 @@ Metabolite_iteration = function(Input, Summary){
   return(list(Variability_explained, All_model_info))
 }
 
+Metabolite_iteration_nested = function(Input, Summary){
+  ##there are some duplicated records with a _1 at the end, remove them from Input and from summary (in summary instead of _ ther is a .)
+  colnames(Input)[grepl("[a-z]_1$",colnames(Input))] -> Remove
+  Input %>% select(-Remove) -> Input ; Summary %>% select(-one_of(str_replace(Remove,"_","."))) -> Summary
+  #List of all metabolites to iterate 
+  Metabolites <- unique(Summary$metabolite)
+  #Divide phenotypes in categories
+  Microbes <- c(unique(Summary$phenotype)[grepl("sp_",unique(Summary$phenotype))],  "Shannon_Index")
+  Diet <- unique(Summary$phenotype)[grepl("diet_",unique(Summary$phenotype))]
+  Covariates <- c("LC.COLUMN","clinical_BowelMovementADayDef","metabolon_Month_in_freezer","host_Age","host_BMI","host_Sex") #Possibly include others?
+  Other <- setdiff(unique(Summary$phenotype), c(Diet,Microbes)) #whatever was tested and is not already in diet/microbes
+  
+  #Output dataframe
+  Variability_explained = tibble()
+  #Name of the models
+  Name_models <- c("Null", "Microbes", "Diet", "Clinical")
+  
+  #Make all variables in numberic/character, currently the function does not accept highly multifactorial variables. 2 level factors become numeric.
+  select(Input, -one_of(c("Row.names", "run_day_cat"))) -> Variables_Input
+  apply(Variables_Input,2, FUN=Make_numeric) %>% as_tibble() -> Variables_Input #Check Make_numeric function
+  #This are the column names that are used to save the Betas, so if you need the beta of a specific varaible, should be in Variables_col vector
+  Variables_Input %>% select(c(Microbes, Diet, Covariates, Other)) -> Variables_col 
+  colnames(Variables_col) -> Variables_col
+  
+  All_model_info ={}
+  for (Metabolite in Metabolites){
+    Logit = F
+    #Get the metabolite of interest and their associations 
+    Summary %>% filter(metabolite == Metabolite & FDR<0.05)  -> Selected_phenotypes
+    if (dim(Selected_phenotypes)[1] == 0 ){ next }  #if no associations, go to next metabolite
+    print(Metabolite)
+    #From the Input after transforming it to numeric select the Metabolite (dependent), phenotypes assocaited and Covariates. Remove all records with NA.
+    Variables_Input %>% select(one_of(c(Metabolite, unique(Selected_phenotypes$phenotype),Covariates ))) %>% drop_na() -> Input_model
+    #Make a vector out of dependent
+    Dependent <- as.vector(as_vector(Input_model[,1]))
+    #If dependent is a character, then do logistic
+    if (class(Dependent[0]) == "character"){ Logit = T}
+    #Prepare the different inputs for each model
+    Variables_null <- select(Input_model, one_of(Covariates))
+    Variables_microbiome <- select(Input_model, one_of(c(Microbes, Covariates)))
+    Variables_diet <- select(Input_model, one_of(c(Diet, Covariates,Microbes)))
+    Variables_clinical <- select(Input_model, one_of(c(Other, Covariates, Microbes, Diet)))
+    
+    
+    Models <- list( Variables_null, Variables_microbiome, Variables_diet, Variables_clinical)
+    #Vector of R2s for output 1
+    Variability_model = c()
+    #Data.frame of variables for output 2
+    tibble(Variable = Variables_col) -> Variables
+    #For each model, fit lasso (normal or logistic) and save R2 and variables
+    for (N in seq(1:length(Name_models)) ){
+      Input_model <- Models[[N]] ; Name <- Name_models[[N]]
+      #If 0 significant features add as 0 all beta and R2 and go to next
+      if (dim(Input_model)[2] < 1){ 
+        Variability_model = c(Variability_model,0)
+        Model_summary = tibble(Variable=Variables, Beta=NA) %>% t() %>% as_tibble() %>% `colnames<-`(Summary$metabolite)
+        Model_summary %>% mutate(Model = Name, Metabolite = Metabolite) -> Model_summary
+        next 
+      }
+      if (Logit == F){ Fit_lasso(Dependent = Dependent, Regressors = Input_model) -> Lasso_results
+      }else{ Fit_logistic_lasso(Dependent = Dependent, Regressors = Input_model) -> Lasso_results }
+      #Add the betas to the Data.frame of features (only features included in that data.frame are going to get the Beta saved)   
+      left_join(Variables,Lasso_results[[1]],by = "Variable") %>% t() %>% as_tibble() %>% `colnames<-`(Variables$Variable) -> Model_summary
+      Model_summary[2,] %>% mutate(Model = Name, Metabolite = Metabolite) -> Model_summary
+      All_model_info = rbind(All_model_info, Model_summary)
+      #Save R2
+      Variability_model = c(Variability_model,as.numeric(Lasso_results[[2]]))
+    }
+    #Make R2s into a data.frame with each model per column
+    as_tibble(matrix(Variability_model,nrow = 1,ncol = 4)) %>% mutate(V5 = Metabolite) -> Variability_model
+    colnames(Variability_model) = c(Name_models, "Metabolite")
+    rbind(Variability_explained, Variability_model) -> Variability_explained
+  }
+  return(list(Variability_explained, All_model_info))
+}
+
 Make_numeric = function(x){
   if(length(unique(x)) == 2 ){
     x = as.numeric(as.factor(x))-1
