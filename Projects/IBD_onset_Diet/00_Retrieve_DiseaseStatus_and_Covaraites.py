@@ -86,7 +86,7 @@ l = len(dic_sample)
 
 
 HEAD = ["ID", "Disease", "Baseline assessment, questionnaire 1", "Second assessment, questionnaire 1", "Second assessment, questionnaire 2", "Follow-up questionnaire (1B)", "Follow-up questionnaire (1C)", "Age_n","Sex_n", "BMI_n", "Smoking_n"]
-
+with open("TABLES/Metadata_LLD.tsv","w") as F: F.write("\t".join(["Age_n","Sex_n", "BMI_n", "Smoking_n", "ID"]))
 with open("TABLES/Data_v2.tsv", "w") as Final:
         Final.write("\t".join(HEAD) + "\n")
         for ID in dic_sample:
@@ -102,10 +102,13 @@ with open("TABLES/Data_v2.tsv", "w") as Final:
                         for keys in ["Age_n","Sex_n", "BMI_n", "Smoking_n"]:
                                 try: ITEM = dic_covariates[ID][keys] 
                                 except: print(ID) ; ITEM = "NA"
-                                to_add.append(ITEM)                   
+                                to_add.append(ITEM)
+			
                         Out.extend(to_add)
                         
                         Entry = "\t".join(Out)
                         Final.write(Entry + "\n")
-
-
+		
+		to_add.append(ID)
+		Entry2 =  "\t".join(to_add)
+		with open("TABLES/Metadata_LLD.tsv","a") as Meta: Meta.write(Entry2+"\n")
