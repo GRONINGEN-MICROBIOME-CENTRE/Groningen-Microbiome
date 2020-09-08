@@ -60,14 +60,24 @@ print("Testing CD and UC")
 To_test %>% filter(! is.na(Status_CD)) %>% mutate(Status = Status_CD) %>% select(-c(Status_CD,Status_UC)) -> CD_to_Test
 To_test %>% filter(! is.na(Status_UC)) %>% mutate(Status = Status_UC) %>% select(-c(Status_CD,Status_UC))  -> UC_to_Test
 
-#Logistic_model(CD_to_Test) -> CD_results
-#Logistic_model(UC_to_Test) -> UC_results
+
+Logistic_model(CD_to_Test) -> CD_results
+Logistic_model(UC_to_Test) -> UC_results
+
+write_tsv(x=CD_results[[1]], "RESULTS/CD_associations_uncorrected.tsv")
+write_tsv(x=CD_results[[2]], "RESULTS/CD_associations_corrected.tsv")
+
+write_tsv(x=UC_results[[1]],"RESULTS/UC_associations_uncorrected.tsv")
+write_tsv(x=UC_results[[2]], "RESULTS/UC_associations_corrected.tsv")
+
 
 #print(CD_results)
 #print(UC_results)
+options("width"=200)
 
 
 Final_food_group = tibble()
+Final_food_group_Corrected = tibble()
 for (Food_Group in colnames(To_test)[23:length( colnames(To_test))]){
 	Regressor  <- as.vector(as_vector(select(To_test , Food_Group)))
 	To_test %>% mutate(Regressor = Regressor) -> Test_food_group
@@ -79,6 +89,16 @@ for (Food_Group in colnames(To_test)[23:length( colnames(To_test))]){
 	Final_food_group = rbind(Final_food_group, R1)
 	Final_food_group = rbind(Final_food_group, R2)
 
+	as.data.frame(summary(glm(Status ~ Regressor +Age_n + Sex_n + BMI_n + Smoking_n ,CD_to_Test, family=binomial(link="logit")))$coefficients)["Regressor",] %>% mutate(Regressor = Food_Group) %>% mutate(Status = "CD_dev") -> R1
+	 as.data.frame(summary(glm(Status ~ Regressor +Age_n + Sex_n + BMI_n + Smoking_n,UC_to_Test, family=binomial(link="logit")))$coefficients)["Regressor",] %>% mutate(Regressor = Food_Group) %>% mutate(Status = "UC_dev") -> R2
+	Final_food_group_Corrected =  rbind(rbind(Final_food_group_Corrected, R1), R2)
+
 }
-print( arrange(Final_food_group, `Pr(>|z|)`))
+
+Final_food_group %>% mutate(FDR = p.adjust(`Pr(>|z|)`, "fdr")) -> Food_group_results
+write_tsv(x=Food_group_results, "RESULTS/Food_groups_associations.tsv")
+Final_food_group_Corrected %>% mutate(FDR = p.adjust(`Pr(>|z|)`, "fdr")) -> Final_food_group_Corrected
+write_tsv(x=Final_food_group_Corrected, "RESULTS/Food_groups_associations_corrected.tsv")
+
+
 
