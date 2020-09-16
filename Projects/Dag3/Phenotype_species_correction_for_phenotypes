@@ -1,0 +1,146 @@
+args = commandArgs(trailingOnly=TRUE)
+dataType = as.character(args[1])
+phenoOut = as.character(args[2])
+pheno2covar = as.character(args[3])
+pheno2covar = unlist(strsplit(split = ",",pheno2covar))
+
+
+library(data.table)
+##script with all associations
+do_clr_externalWeighting = function(interest_matrix, core_matrix){
+  if(any(interest_matrix==0)) interest_matrix = interest_matrix + min(interest_matrix[interest_matrix>0])/2
+  if(any(core_matrix==0)) core_matrix = core_matrix + min(core_matrix[core_matrix>0])/2
+  
+  #estimate weighting parameter
+  gm_mean = function(x, na.rm=TRUE){
+    exp(sum(log(x), na.rm=na.rm) / length(x))
+  }
+  Gmean_core = apply(core_matrix, 1, gm_mean)
+  
+  #do transformation
+  data_prepared = cbind(Gmean_core,interest_matrix)
+  data_transformed = t(apply(data_prepared,1,function(x){
+    log(x / x[1])[-1]
+  }))
+  colnames(data_transformed) = colnames(data_transformed)
+  rownames(data_transformed) = rownames(data_transformed)
+  data_transformed
+}
+
+
+workPWD = setwd("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov")
+covar = read.table(paste0(workPWD,"/Association.analysis.input/covariates.txt")) # add your covariates here!!!!  
+covar_path = read.table(paste0(workPWD,"/Association.analysis.input/covariates_path.txt")) 
+covar = covar[,-8]
+covar_path = covar_path[,-8]
+
+taxa = read.table(paste0(workPWD,"/Association.analysis.input/taxa.txt"))
+pathways = read.table(paste0(workPWD,"/Association.analysis.input/pathways_metacyc.txt"))
+
+taxa_transformed = do_clr_externalWeighting(taxa,taxa[,grep("[.]s__",colnames(taxa))])
+taxa_transformed = taxa_transformed[,colSums(taxa>0)>nrow(taxa) * 0.05]
+
+pathways_transformed = do_clr_externalWeighting(pathways,pathways)
+pathways_transformed = pathways_transformed[,colSums(pathways>0)>nrow(pathways)*0.05]
+
+KOterms = fread("/groups/umcg-lifelines/tmp01/projects/dag3_fecal_mgs/DAG3_data_ready/microbiome/processed/dag3_kegg_unfiltered_lvl3.csv",header=T,sep=",")
+KOterms = as.data.frame(KOterms)
+rownames(KOterms) = KOterms[,ncol(KOterms)]
+KOterms = KOterms[,-ncol(KOterms)]
+KOterms = KOterms[intersect(rownames(KOterms),rownames(taxa)),]
+KOterms_transformed = do_clr_externalWeighting(KOterms,KOterms)
+KOterms_transformed = KOterms_transformed[,colSums(KOterms>0)>0.05 * nrow(KOterms)]
+
+
+CARD = fread("/groups/umcg-lifelines/tmp01/projects/dag3_fecal_mgs/DAG3_data_ready/microbiome/processed/DAG3_CARD_nofiltering.txt",header=T)
+CARD = as.data.frame(CARD,stringsAsFactors=F)
+rownames(CARD) = CARD[,1]
+CARD = CARD[,-1]
+CARD = CARD[intersect(rownames(CARD),rownames(taxa)),]
+CARD_transformed = do_clr_externalWeighting(CARD,CARD)
+CARD_transformed = CARD_transformed[,colSums(CARD>0)>0.05 * nrow(CARD)]
+
+VFDB = fread("/groups/umcg-lifelines/tmp01/projects/dag3_fecal_mgs/DAG3_data_ready/microbiome/processed/DAG3_VFDB_VFs_nofiltering.txt",header=T)
+VFDB = as.data.frame(VFDB,stringsAsFactors=F)
+rownames(VFDB) = VFDB[,1]
+VFDB = VFDB[,-1]
+VFDB = VFDB[intersect(rownames(taxa),rownames(VFDB)),]
+VFDB_transformed = do_clr_externalWeighting(VFDB,VFDB)
+VFDB_transformed = VFDB_transformed[,colSums(VFDB>0)>0.05 * nrow(VFDB)]
+
+
+
+
+covar = covar[rownames(taxa_transformed),]
+
+load(paste0(workPWD,"/Association.analysis.input/pheno_release26.RData"))
+pheno = pheno26[rownames(taxa_transformed),]
+covar_indices = c(1,4,208,224,225,which(colnames(pheno) %in% pheno2covar)) # Here remove the covariates that you have added 
+pheno_covar = pheno[,covar_indices]
+pheno_covar$META.POOP.COLLECTION_SEASON = as.character(pheno_covar$META.POOP.COLLECTION_SEASON)
+pheno_covar$META.POOP.COLLECTION_SEASON[is.na(pheno_covar$META.POOP.COLLECTION_SEASON)] = "Unknown"
+pheno_covar$META.POOP.COLLECTION_SEASON = factor(pheno_covar$META.POOP.COLLECTION_SEASON)
+
+covar = data.frame(covar,pheno[,which(colnames(pheno) %in% pheno2covar),drop = F])
+pheno = pheno[,-covar_indices]
+
+
+pheno_backup = pheno
+pheno_covar_backup = pheno_covar
+
+print ("run associations")
+if(dataType=="pathways"){
+  taxa_transformed = pathways_transformed
+}else if (dataType=="KO"){
+  taxa_transformed = KOterms_transformed
+} else if (dataType=="CARD"){
+  taxa_transformed = CARD_transformed
+} else if (dataType = "VFDB") {
+  taxa_transformed = VFDB_transformed
+} else if {dataType = "taxa"} {
+  else if (quit ("wrong data type requested!"))
+}
+
+# taxa analysis -----------------------------------------------------------
+
+library(foreach)
+result_taxa = foreach(i = 1:ncol(pheno),.combine = rbind) %:% 
+  foreach(j = 1:ncol(taxa_transformed),.combine = rbind)%do%{
+    
+    predictors = data.frame(covar[!is.na(pheno[,i]),],
+                            model.matrix(
+                              as.formula(paste0("~ ",colnames(pheno)[i])),data = pheno)[,-1,drop = F])
+    
+    
+    cleaned_data = predictors[complete.cases(predictors),]
+    taxa.cleaned = taxa_transformed[rownames(cleaned_data),]
+    
+    s1 = lm(
+      as.formula(paste("taxa.cleaned[,j] ~ ",paste(collapse=" + ",colnames(cleaned_data)))),
+      data = cleaned_data
+    )
+    s0 = lm(
+      as.formula(paste("taxa.cleaned[,j] ~ ",paste(collapse=" + ",colnames(cleaned_data)[1:ncol(covar)]))),
+      data = cleaned_data
+    )
+    an1 = anova(s1,s0)
+    output = data.frame(
+      phenotype = colnames(pheno)[i],
+      taxon = colnames(taxa.cleaned)[j],
+      Nsamples = nrow(cleaned_data),
+      levels = if(class(pheno[,i]) == "factor") paste(collapse=":",levels(pheno[,i])) else "Not Applicable",
+      levels_SampleSize = 
+        if(class(pheno[,i]) == "factor" | length(table(pheno[,i]))==2) paste(collapse= ":",table(pheno[,i])) else "Not Applicable",
+      effect.size = if(class(pheno[,i]) == "factor") {paste(collapse = ":",c(0,round(digits = 5, s1$coef[grep(colnames(pheno)[i],names(s1$coef))])))}
+        else round(digits = 5, s1$coef[grep(colnames(pheno)[i],names(s1$coef))]) ,
+    
+    R2 = summary(s1)$r.squared- summary(s0)$r.squared,
+    F.stat = an1[2,5],
+    Pvalue = an1[2,6]
+    )
+    #add covariates
+    
+  output  
+  }
+print("taxa_done")
+write.table(result_taxa,file = phenoOut,row.names=F,quote = F,sep="\t")
