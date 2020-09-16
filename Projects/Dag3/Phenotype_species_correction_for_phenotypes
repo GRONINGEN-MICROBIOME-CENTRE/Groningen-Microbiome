@@ -1,4 +1,6 @@
 ### Script to correct the phenotype-species associations for mutiple covariates###
+## Author: A.Kur, 12 th August, 2020
+## Updates: T.Sinha, 16th August, 2020
 
 args = commandArgs(trailingOnly=TRUE)
 dataType = as.character(args[1])
