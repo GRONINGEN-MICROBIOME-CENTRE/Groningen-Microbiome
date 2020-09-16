@@ -1,3 +1,4 @@
+### Script to correct the phenotype-species associations for mutiple covariates###
 args = commandArgs(trailingOnly=TRUE)
 dataType = as.character(args[1])
 phenoOut = as.character(args[2])
@@ -6,7 +7,8 @@ pheno2covar = unlist(strsplit(split = ",",pheno2covar))
 
 
 library(data.table)
-##script with all associations
+
+## CLR transformation function 
 do_clr_externalWeighting = function(interest_matrix, core_matrix){
   if(any(interest_matrix==0)) interest_matrix = interest_matrix + min(interest_matrix[interest_matrix>0])/2
   if(any(core_matrix==0)) core_matrix = core_matrix + min(core_matrix[core_matrix>0])/2
@@ -29,19 +31,19 @@ do_clr_externalWeighting = function(interest_matrix, core_matrix){
 
 
 workPWD = setwd("/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov")
-covar = read.table(paste0(workPWD,"/Association.analysis.input/covariates.txt")) # add your covariates here!!!!  
-covar_path = read.table(paste0(workPWD,"/Association.analysis.input/covariates_path.txt")) 
-covar = covar[,-8]
+covar = read.table(paste0(workPWD,"/Association.analysis.input/New_covariates_TS_inc_StoolFQ_BMI_Bris_reads.txt")) # add your covariates here, this file already contains the ones already used: DNA conc,batch, age, sex, season and BMI and Bristol (added later by TS)!!!!  
+covar_path = read.table(paste0(workPWD,"/Association.analysis.input/covariates_path.txt")) # here add your covariates for pathways
+covar = covar[,-8] #Removing covariate Geomean
 covar_path = covar_path[,-8]
 
 taxa = read.table(paste0(workPWD,"/Association.analysis.input/taxa.txt"))
 pathways = read.table(paste0(workPWD,"/Association.analysis.input/pathways_metacyc.txt"))
 
-taxa_transformed = do_clr_externalWeighting(taxa,taxa[,grep("[.]s__",colnames(taxa))])
-taxa_transformed = taxa_transformed[,colSums(taxa>0)>nrow(taxa) * 0.05]
+taxa_transformed = do_clr_externalWeighting(taxa,taxa[,grep("[.]s__",colnames(taxa))]) # Performing transformation 
+taxa_transformed = taxa_transformed[,colSums(taxa>0)>nrow(taxa) * 0.05] # Filtering 
 
-pathways_transformed = do_clr_externalWeighting(pathways,pathways)
-pathways_transformed = pathways_transformed[,colSums(pathways>0)>nrow(pathways)*0.05]
+pathways_transformed = do_clr_externalWeighting(pathways,pathways) # Performing transformation 
+pathways_transformed = pathways_transformed[,colSums(pathways>0)>nrow(pathways)*0.05]# Filtering 
 
 KOterms = fread("/groups/umcg-lifelines/tmp01/projects/dag3_fecal_mgs/DAG3_data_ready/microbiome/processed/dag3_kegg_unfiltered_lvl3.csv",header=T,sep=",")
 KOterms = as.data.frame(KOterms)
@@ -69,20 +71,18 @@ VFDB_transformed = do_clr_externalWeighting(VFDB,VFDB)
 VFDB_transformed = VFDB_transformed[,colSums(VFDB>0)>0.05 * nrow(VFDB)]
 
 
-
-
 covar = covar[rownames(taxa_transformed),]
 
-load(paste0(workPWD,"/Association.analysis.input/pheno_release26.RData"))
+load(paste0(workPWD,"/Association.analysis.input/pheno_release26.RData")) # Contains all phenotypes, NOTE the current newest version is 27! 
 pheno = pheno26[rownames(taxa_transformed),]
-covar_indices = c(1,4,208,224,225,which(colnames(pheno) %in% pheno2covar)) # Here remove the covariates that you have added 
+covar_indices = c(1,4,208,224,225,which(colnames(pheno) %in% pheno2covar)) # Here add indices of the covariates in the phenotype file (you wil remove them later), alternatively just add names here  
 pheno_covar = pheno[,covar_indices]
 pheno_covar$META.POOP.COLLECTION_SEASON = as.character(pheno_covar$META.POOP.COLLECTION_SEASON)
 pheno_covar$META.POOP.COLLECTION_SEASON[is.na(pheno_covar$META.POOP.COLLECTION_SEASON)] = "Unknown"
 pheno_covar$META.POOP.COLLECTION_SEASON = factor(pheno_covar$META.POOP.COLLECTION_SEASON)
 
 covar = data.frame(covar,pheno[,which(colnames(pheno) %in% pheno2covar),drop = F])
-pheno = pheno[,-covar_indices]
+pheno = pheno[,-covar_indices]  # Here remove the covariates that you have added 
 
 
 pheno_backup = pheno
