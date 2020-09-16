@@ -101,8 +101,8 @@ if(dataType=="pathways"){
 } else if {dataType = "taxa"} {
   else if (quit ("wrong data type requested!"))
 }
-
-# taxa analysis -----------------------------------------------------------
+###------------------###
+### Taxa analysis (do this separately for each of the above data layers) 
 
 library(foreach)
 result_taxa = foreach(i = 1:ncol(pheno),.combine = rbind) %:% 
