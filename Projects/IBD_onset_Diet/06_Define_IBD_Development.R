@@ -75,6 +75,13 @@ print("Adding PCs or robust PCA")
 read_tsv("TABLES/PCs_robust.tsv") -> PCs_r
 left_join(To_test, PCs_r, by="ID") -> To_test
 
+#Add Food items
+read_tsv("TABLES/Table_participant_GDAG.tsv_PCA_input") -> Food_groups
+col_remove = str_split(str="SumOfkcal       SumOfkJ SumOfeiwittot   SumOfeiwitplant SumOfeiwitdier  SumOfvettot     SumOfkhtot      SumOfmodis      SumOfpolys     SumOfalcohol     SumOffree_sug   SumOfadd_sug    SumOfglucose    SumOffructose   SumOflactose    SumOfmaltose    SumOfsucrose    SumOfGlyc_ind   SumOfGlyc_load  leeftijd  GESLACHT        GEWICHT LENGTE  BMI     BMR     EI_BMR",pattern=" ")
+col_remove = unique(col_remove[[1]][col_remove[[1]] != ""])
+Food_groups %>% select(-col_remove) %>% mutate(ID = Participant) %>% select(-Participant)  -> Food_groups
+
+left_join(To_test, Food_groups) -> To_test
 
 
 print("Saving complete dataset in TABLES/Dataset_IBD_test.tsv")

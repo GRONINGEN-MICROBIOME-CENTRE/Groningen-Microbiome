@@ -10,10 +10,14 @@ set.seed(99)
 Meta = read_tsv("TABLES/Metadata_LLD.tsv")
 Meta %>% mutate(Participant = ID) -> Meta
 DF = read_tsv("TABLES/Table_participant_GDAG.tsv_PCA_input")
+
 #DF = read_tsv("TABLES/Table_participant_KCAL.tsv_PCA_input")
-left_join(DF,Meta, by="Participant") -> Ex_data
+left_join(DF,select(Meta, -Sex_n), by="Participant") -> Ex_data
+Ex_data %>% mutate(Sex_n = GESLACHT) -> Ex_data
+
 Data_filter = function(Exploration_data = Ex_data, Filter = 3){
 	#Filters
+	Exploration_data %>% filter(is.na(Sex_n)) %>% summarise(n())
 	Exploration_data %>% drop_na(Sex_n) %>% mutate(SumOfkcal =as.numeric(SumOfkcal)) -> Exploration_data
 	quantile(filter(Exploration_data, Sex_n=="Male")$SumOfkcal,probs=c(0.025, 0.975)) -> Male_bounds
 	quantile(filter(Exploration_data, Sex_n=="Female")$SumOfkcal,probs=c(0.025, 0.975)) -> Female_bounds
@@ -75,10 +79,12 @@ Compute_PCA = function(DF, ncomp, Do_others=F){
 		print(round(cor_matrix, 3))
 
 		t_bart_1 <- psych::cortest.bartlett(cor_matrix, n=nrow(DF))
+		print("Barlett results")
 		print(t_bart_1)
 
 		print(" KMO (Kaiser-Meyer-Olkin)")
 		t_kmo <- psych::KMO(cor_matrix)
+		print(t_kmo)
 		#summary(t_kmo$MSAi)
 		print("MSAi below 0.5")
 		print(t_kmo$MSAi[t_kmo$MSAi<0.5])
@@ -96,7 +102,7 @@ write_tsv(Filtered , "TABLES/Samples_BMR_filtered.tsv")
 DF %>% filter(Participant %in% Filtered$Participant) %>% select(-Participant) -> DF_filtered1
 print("PCA on Filter #1")
 #Compute_PCA(DF_filtered1,2, T)
-Compute_PCA(DF_filtered1,5) -> PCs
+Compute_PCA(DF_filtered1,5,Do_others=T) -> PCs
 PCs <-loadings(PCs)
 
 
@@ -125,38 +131,46 @@ res_pca_rot_scores <- scale(DF_f) %*% inv_loadings
 as_tibble(res_pca_rot_scores) %>% mutate(ID = filter(DF, Participant %in% Filtered$Participant)$Participant) -> res_pca_rot_scores
 write.table(res_pca_rot_scores,file='TABLES/PCs_robust.tsv', quote=FALSE, sep='\t',row.names = F)
 
+print(inv_loadings)
+
+# Variance (Proportion)
+r3 <- diag(cor(DF_f, use = "pairwise"))
+communalities3 <- rowSums(rotated_loadings^2)
+uniquenesses3 <- r3 - communalities3
+vx3 <- colSums(rotated_loadings^2)
+vtotal3 <- sum(communalities3 + uniquenesses3)
+# Proportion Var
+vx3/vtotal3
+#Cumulative Var
+cumsum(vx3/vtotal3)
+#Proportion Explained
+vx3/sum(vx3)
+#Cumulative Proportion
+cumsum(vx3/sum(vx3))
 
 
-q()
 
 
 
 #####Do PCA separately for CD/UC and healthy
 Info_Disease = read_tsv("TABLES/Dataset_IBD_test.tsv") #After script 7
-Info_Disease %>% filter(CD_dev == 1) -> CD_samples
-Info_Disease %>% filter(UC_dev == 1) -> UC_samples
-Info_Disease %>% filter(UC_dev == 0 & CD_dev == 0) -> Healthy_samples
+Info_Disease %>% filter(Status_CD == 1) -> CD_samples
+Info_Disease %>% filter(Status_UC == 1) -> UC_samples
+Info_Disease %>% filter(Status_UC == 0 & Status_CD == 0) -> Healthy_samples
 
-DF_filtered %>% filter(Participant %in% CD_samples$ID) %>% filter(Participant %in% Filtered$Participant) %>% select(-Participant) -> DF_filtered_CD
-DF_filtered %>% filter(Participant %in% UC_samples$ID) %>% filter(Participant %in% Filtered$Participant) %>% select(-Participant) -> DF_filtered_UC
-DF_filtered %>% filter(Participant %in% Healthy_samples$ID) %>% filter(Participant %in% Filtered$Participant) %>% select(-Participant) -> DF_filtered_health
+DF %>% filter(Participant %in% CD_samples$ID) %>% filter(Participant %in% Filtered$Participant) %>% select(-Participant) -> DF_filtered_CD
+DF %>% filter(Participant %in% UC_samples$ID) %>% filter(Participant %in% Filtered$Participant) %>% select(-Participant) -> DF_filtered_UC
+DF %>% filter(Participant %in% Healthy_samples$ID) %>% filter(Participant %in% Filtered$Participant) %>% select(-Participant) -> DF_filtered_health
 
-Compute_PCA(DF_filtered_CD,5)
-Computes_PCA(DF_filtered_UC, 5)
-Compute_PCA(DF_filtered_health,5)
+
+print("PCA CD dev")
+Compute_PCA(DF_filtered_CD,5) -> PCA_CD
+print("PCA UC dev")
+Compute_PCA(DF_filtered_UC, 5) -> PCA_UC
+print("PCA healthy")
+Compute_PCA(DF_filtered_health,5) -> PCA_Healthy
 #######
 
 
 
-q()
-
-data.matrix(select(DF, -Participant)) %*% PCs -> RMS
-as_tibble(RMS) %>% mutate(ID = DF$Participant) -> RMS
-
-write.table(RMS,file='TABLES/PCs.tsv', quote=FALSE, sep='\t',row.names = F)
-
-q()
-for (i in seq(3,6)){
-	Compute_PCA(DF_filtered1,i)
-}
 
