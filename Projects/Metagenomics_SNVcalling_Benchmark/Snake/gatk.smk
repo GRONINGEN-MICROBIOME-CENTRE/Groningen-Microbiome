@@ -9,7 +9,8 @@ rule prepare_Dic:
 		"ml picard/2.18.26-Java-1.8.0_74 ;\n"
 		"PATH_i=$(readlink -f  {input.REF}) ;\n"
 		"ln -s $PATH_i {output.ref2} ;\n"
-		"ln -s  $PATH_i.fai  {output.ref2}.fai ;\n"
+		"rm -f {output.ref2}.fai ;\n"
+		"ln -s  $PATH_i\.fai  {output.ref2}.fai ;\n"
 		"java -jar $EBROOTPICARD/picard.jar CreateSequenceDictionary R={output.ref2} O={output.dicti}"
 
 rule add_group:

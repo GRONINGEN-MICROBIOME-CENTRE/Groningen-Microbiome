@@ -38,13 +38,16 @@ rule Introduce_mutations:
 		mutations = config["Number_mutations"],
 		py = "/home/umcg-sandreusanchez/.conda/envs/myenv/bin/python3.6" #Python 3.6 required for random.choices ; biopython needed
 	shell:
-		"{params.py} scripts/add_mutations.py --fasta {input.Ref} --N_mutations {params.mutations} --output {output.Fasta} --output_m {output.Mutations}"
-
+		"if {design}==uniref; then ;\n"
+		"{params.py} scripts/add_mutations.py --fasta {input.Ref} --N_mutations {params.mutations} --output {output.Fasta} --output_m {output.Mutations} --N_strains 1 ;\n"
+		"else;\n"
+		"{params.py} scripts/add_mutations.py --fasta {input.Ref} --N_mutations {params.mutations} --output {output.Fasta} --output_m {output.Mutations} --N_strains 2;\n"
+		"fi"
 
 rule Simulate:
 	input: expand(Working_dir+"Simulation/Reference/{ID}.fa",ID=dic_ref)
 	output: 
-		Ref = temp(Working_dir + "Simulation/Reference/Reference.fa"),
+		#Ref = temp(Working_dir + "Simulation/Reference/Reference.fa"),
 		flag = touch(Working_dir +"Simulations_completed.flag"),
 		Read_f =  touch(Working_dir +"Simulation/FQ/simulated_R1.fastq"),
 		Read_r = touch(Working_dir +"Simulation/FQ/simulated_R2.fastq"),
@@ -56,15 +59,21 @@ rule Simulate:
 		"""
 		module load  Miniconda3/4.4.10 ; source activate  /groups/umcg-lld/tmp04/umcg-sandreusanchez/Conda_env/InSilicoSeq
 
-		cat {input} > {output.Ref}
 		if [ ! -d "{Working_dir}Simulation/FQ/" ]; then  mkdir {Working_dir}Simulation/FQ/ ; fi
 		if [ {params.Abundance} != "NA" ]
 		then
-			iss generate --n_reads {params.n_reads} --genomes {output.Ref} --model hiseq --output {params.PrefixOut} --seed 5 --abundance_file {params.Abundance} --cpus 1
-		else
-			iss generate --n_reads {params.n_reads} --genomes {output.Ref} --model hiseq --output {params.PrefixOut} --seed 5 --cpus 1
+			set +e
+			iss generate --n_reads {params.n_reads} --draft {input} --model hiseq --output {params.PrefixOut} --seed 5 --abundance_file {params.Abundance} --cpus 1
+			exitcode=$?
+			if [ $exitcode -eq 1 ]
+			then
+			exit 0
+			fi
+		else 
+			iss generate --n_reads {params.n_reads} --draft {input} --model hiseq --output {params.PrefixOut} --seed 5 --cpus 1
 		fi
 		"""
+		
 
 
 rule Combine_polymorphisms:
@@ -80,7 +89,7 @@ rule Combine_polymorphisms:
 		cat {Working_dir}Simulation/Variants/*_mutations.tsv > {output.Mutations}
 		if [ {params.design} == "uniref" ]
 		then
-			touch {output.Polymorphisms}
+			touch {output.Polymorphisms2} ; touch {output.Polymorphisms}
 		else
 			cat {Working_dir}Simulation/Variants/Polymorphisms/*.snp > {output.Polymorphisms}
 			python scripts/Format_polymorphism_mauve.py {output.Polymorphisms} {output.Polymorphisms2}

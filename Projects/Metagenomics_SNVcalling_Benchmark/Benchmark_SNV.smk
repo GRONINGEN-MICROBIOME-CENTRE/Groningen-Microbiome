@@ -4,7 +4,7 @@ from subprocess import call
 #snakemake -s Run_shortbred_process.smk -np all
 
 basedir = workflow.basedir
-configfile: "config.yaml"
+configfile:"config_Paper.yaml" #"config.yaml"
 localrules: All_stats_together, Index
 Output_list = []
 
@@ -53,7 +53,10 @@ for tool in tools.split(","):
 	if tool not in Available_tool:
 		print("Error: Tool {NAME} provided in 'tools' is not in the list of available tools {LIST}".format(NAME=tool, LIST=",".join(Available_tool)))
 		exit()
-			
+
+wildcard_constraints:
+	TOOL = "[a-zA-Z]+",
+	threshold = "\d+",
 ##TARGETS##
 rule all:
 	input:	

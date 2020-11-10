@@ -53,19 +53,22 @@ def Variants_to_dic(File, Threshold):
 
 def Estimation_False_n_True_calls(Reference_variants, Called_variants,Called_variants_mutations ,Total_positions):
 	Results = []
-	TP = 0 ;TN = 0 ; FP = 0 ; FN = 0
 	for Chr in Called_variants:
+		TP = 0 ;TN = 0 ; FP = 0 ; FN = 0
+		#TT = []
 		Ref_variants =  Reference_variants[Chr]
 		if not Chr in Called_variants: called = []
 		else : called = Called_variants[Chr]
 		for Variant in Ref_variants:
 			if Variant in called: TP += 1 #; TT.append(Variant)
 			elif Variant not in called: FN += 1
-		
+		#for V in called:
+		#	if V not in TT:
+		#		print(V)
 		FP += len(called) - TP
 		TN = Length_Chromosome[Chr] - (TP + FP) - FN
-	R = "\t".join([str(TP),str(TN),str(FP),str(FN)])
-	Results.append(R)
+		R = "\t".join([str(TP),str(TN),str(FP),str(FN)])
+		Results.append(R)
 	return(Results)
 
 #Steps
