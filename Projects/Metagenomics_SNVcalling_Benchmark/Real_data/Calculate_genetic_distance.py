@@ -178,6 +178,8 @@ def Compare_distances(Distance_matrix,Index_list, Boxplot_name):
 	print("Performing wilcox test between inter and intra individual distanes")
 	w, p = stats.mannwhitneyu(Intra_individual, Inter_individual)
 	print("Pvalue=" + str(p))
+	M = abs(np.mean(np.array(Intra_individual)) - np.mean(np.array(Inter_individual)))
+	print("Mean difference=" + str(M))
 	print("Plotting distributions")
 	data = [np.array(Intra_individual), np.array(Inter_individual)]
 	fig, ax = plt.subplots()
