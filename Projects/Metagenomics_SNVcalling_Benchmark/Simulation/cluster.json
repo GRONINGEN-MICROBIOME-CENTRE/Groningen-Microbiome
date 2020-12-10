@@ -1,0 +1,39 @@
+{
+    "__default__":
+    {
+        "mem": "16G",
+        "time": "6:00:00",
+        "name": "{rule}.{wildcards}",
+        "output": "logs/{rule}.{wildcards}.out",
+        "error": "logs/{rule}.{wildcards}.err",
+        "c": "1",
+        "qos": "regular"
+    },
+    "Simulate":
+     {
+    "c": "1",
+    "mem": "60G",
+    "time": "48:00:00"
+     },
+    "Alignment":
+     {
+         "c": "12"
+     },
+     "threads":
+     {
+         "c": "7"
+     },
+    "MarkDuplicates":
+    {
+         "mem": "30G",
+    },
+    "freebayes":
+    {
+         "time": "14:00:00"
+    },
+    "gatk":
+    {
+         "time": "14:00:00"
+    }
+}
+
