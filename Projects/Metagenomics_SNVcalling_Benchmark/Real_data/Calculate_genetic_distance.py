@@ -8,20 +8,11 @@ from pathlib import Path
 import sys
 import numpy as np
 from scipy import spatial,stats,cluster
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('agg')
+from matplotlib import pyplot as plt
 print("> Running script")
 
-if len(sys.argv) < 2:
-	print("Please specify the tool to use: python Calculate_genetic_distance.py [haplotypecaller|mutect2|intrain]")
-	exit()
-tool = sys.argv[1] ; Tool = tool
-Tool2= "No"
-if "-" in Tool:
-	T = Tool.split("-")
-	Tool = T[0]
-	Tool2 = T[1]
-if len(sys.argv) > 2: Threshold = int(sys.argv[2])
-else: Threshold = 0
 
 def Find_variants(Tool):
 	dic_overall_variation = {}
@@ -59,14 +50,49 @@ def Create_variation_profile(Tool,Threshold, Tool2="No"):
 		Reference_variation = {}
 		for Variant in dic_overall_variation:
 			N = len(dic_overall_variation[Variant])
-			if N <= Threshold: continue
+			if N < Threshold: continue
 			Reference_variation[Variant] = dic_overall_variation[Variant]
 
 	else: Reference_variation = dic_overall_variation
 	print("Recovered {x} variants from {y} samples ; under prevalence threshold {z} variants remained".format(x=len(dic_overall_variation.keys()), y = len(Sample_list), z=len(Reference_variation.keys())))
 	return(Reference_variation, Sample_list)
-			
-		
+def Create_variation_profile_taxa(Tool,Variants,Taxa, Threshold=0):
+	print("> Filtering variants for  taxa")
+	Reference_variation = {}
+	for Variant in Variants:
+		CHR = Variant.split("-")[0]
+		if CHR in Taxa:
+			N = len(Variants[Variant])
+			if N < Threshold: continue
+			Reference_variation[Variant] = Variants[Variant]
+	return(Reference_variation)
+
+				
+def SFS_plot(Tool, Plot_name ,Taxa= "No"):
+	print("> Starting to compile variants for SFS")
+	dic_overall_variation, Sample_list = Find_variants(Tool)
+	print("> Computing frequency per allele")
+	Variation_freq = {}
+	Total_number_variants = len(dic_overall_variation.keys())
+	for Variant in dic_overall_variation:
+		if Taxa !=  "No": 
+			CHR = Variant.split("-")[0]
+			if CHR not in Taxa: continue
+		N = len(dic_overall_variation[Variant])
+		if N not in Variation_freq: Variation_freq[N] = 0
+		Variation_freq[N] += 1
+	data = list(Variation_freq.items())
+	data = np.array(data)
+	print("Plotting  site frequency spectrum (SFS)")
+	
+	rects1 = plt.bar(data[:,0], data[:,1])
+	print("Total number of variants = {N}".format(N=str(Total_number_variants)))
+	plt.xlabel('Derived allele frequency')
+	plt.ylabel('Number of sites')
+	labels = data[:,0]
+	plt.xlim([1, 86])
+	plt.savefig(Plot_name,bbox_inches='tight')
+	plt.clf() 	
 def Sample_variants(Reference_variation, Sample_list):
 	print("> Creating a binary profile of reference variants per sample")
 	#Create profile per sample
@@ -115,7 +141,7 @@ def Dendogram_plotting(Cluster,Sample_list, Index_list,Dedogram_name):
 	#for lbl in xlbls:
 	#	lbl.set_color(label_colors[lbl.get_text()])
 	plt.savefig(Dedogram_name)
-
+	plt.clf()
 
 def Clustering_samples(Distance_matrix,Sample_list, Index_list,Dedogram_name):
 	print("> Using distance matrix for clustering")
@@ -126,14 +152,15 @@ def Clustering_samples(Distance_matrix,Sample_list, Index_list,Dedogram_name):
 	Identical = 0
 	Not_identical = 0
 	for HMP_sample in Index_list:
+		#For eachHMP sample we have the index, thus, we take the row where this index is found. We first try in the first column, if no match,, try in the second 
 		Indexes  = Index_list[HMP_sample]
 		mask = Cluster[:,0] == Indexes[0]
 		Row = Cluster[mask, :]
-		if Row.shape[0] == 0: Row = Cluster[Cluster[:,0]==Indexes[1], :]
+		if Row.shape[0] == 0: Row = Cluster[Cluster[:,1]==Indexes[0], :]
 		if Row[0,0] in Indexes  and  Row[0,1] in  Indexes: Identical+=1
 		else: Not_identical+=1
 	print("Number of participants were samples in basiline and follow up cluster together: {I}\nNumber of participants that do not: {N}".format(I=str(Identical), N=str(Not_identical)))
-	return(Cluster)
+	return(str(float(Identical)/(Identical+Not_identical)))
 
 def Make_index_list(Sample_list, HMP):
 	#Make a list of indexes from Sample_list that go together in HMP
@@ -148,7 +175,7 @@ def Make_index_list(Sample_list, HMP):
 
 def Compare_distances(Distance_matrix,Index_list, Boxplot_name):
 	print("> Comparing genetic distances beween same individual and different samples")
-	Distance_matrix = spatial.distance.squareform(Matrix_distance)
+	Distance_matrix = spatial.distance.squareform(Distance_matrix)
 	#Split matrix in two vectors, distances between same ID and  interindividual distance, compare by a stat test
 	Intra_individual = []
 	Inter_individual = []
@@ -188,6 +215,31 @@ def Compare_distances(Distance_matrix,Index_list, Boxplot_name):
 	labels = ("Intra-individual", "Inter-individual")
 	plt.xticks(positions, labels)
 	plt.savefig(Boxplot_name)	
+	plt.clf()
+def Prepare_table(Percentage, Tool, N, Clustered, Taxa="No", Thresh=1):
+	if Taxa=="No":
+		return(["Total SNV profile", Tool, str(N), Clustered , "NA", "NA", Thresh])
+	else:
+		O = [Taxa, Tool, str(N), Clustered]
+		with open("info/SupTable3.tsv") as F:
+			#TP      TN      FP      FN      Taxa    Tool    Length_genome   Benchmark_Design
+			for line in F:
+				if "TP" in line: continue
+				l = line.rstrip().split()
+				if l[4] != Taxa: continue
+				if l[-3] != Tool: continue
+				TP = float(l[0]) ; FN =float(l[3]) ; FP=float(l[2])
+				SN = TP/(TP+FN)
+				Precision=TP/(TP+FP)
+				O.extend([str(SN), str(Precision), Thresh])
+		return(O)
+
+
+
+
+
+
+
 
 print("Getting info on participants")
 HMP = {}
@@ -200,16 +252,98 @@ with open("Key_participants_HMP.tsv") as I_file:
 		#HMP[ID].append(l[0])a
 
 
-Dendogram_File = "Plots/Cluster_{Tool}_{T}.png".format(Tool=tool, T= str(Threshold))
-Boxplot_File = "Plots/Inter-vs-Intra_{Tool}_{T}.png".format(Tool=tool, T= str(Threshold))
-
-Reference_variation, Sample_list = Create_variation_profile(Tool,Threshold, Tool2)
-Sample_profile = Sample_variants(Reference_variation, Sample_list) 
-Matrix_distance =  Distance(Sample_profile)
-Index_list =  Make_index_list(Sample_list, HMP)
-Compare_distances(Matrix_distance,Index_list,Boxplot_File)
-Clusters  = Clustering_samples(Matrix_distance,Sample_list,Index_list,Dendogram_File)
 
 
 
+def Run_analysis(Tool, Threshold, SFS, tool= "", Tool2="No"):
+	if tool == "": tool= Tool
+	#Output files
+	Dendogram_File = "Plots/Cluster_{Tool}_{T}.pdf".format(Tool=tool, T= str(Threshold))
+	Boxplot_File = "Plots/Inter-vs-Intra_{Tool}_{T}.pdf".format(Tool=tool, T= str(Threshold))
+	FS_Plot = "Plots/SFS_{P}.pdf".format(P=tool)
+	if SFS == True:
+		SFS_plot(Tool, FS_Plot)
+		
+	###For all bacteria at the same time
+	Index_list = False
+	Table = []
+	
+	Reference_variation, Sample_list = Create_variation_profile(Tool,Threshold, Tool2)
+	Sample_profile = Sample_variants(Reference_variation, Sample_list) 
+	Matrix_distance =  Distance(Sample_profile)
+	Index_list =  Make_index_list(Sample_list, HMP)
+	Compare_distances(Matrix_distance,Index_list,Boxplot_File)
+	Clusters  = Clustering_samples(Matrix_distance,Sample_list,Index_list,Dendogram_File)
+
+	Table.append(Prepare_table(Clusters, Tool, len(Reference_variation), Clusters, Taxa="No",Thresh=str(Threshold)))
+
+	##Per bacteria taxa
+	print("> Starting individual taxa analysis (requires PythonPlus)")
+	dic_taxa = {}
+	from Bio import SeqIO
+	print("Compiling contigs per reference")
+	with open("Bacterial_selection.tsv") as B:
+		for line in B:
+			l = line.split()[0]
+			with open("References/{F}.fa".format(F=l)) as handle:
+				Chrs = SeqIO.parse(handle, "fasta")
+				dic_taxa[l] = []
+				for Chr in Chrs:
+					dic_taxa[l].append(str(Chr.id))
+	
+	
+	print("Compiling all variants")
+	Variants, Sample_list = Find_variants(Tool)
+	for taxa in dic_taxa:
+		print("> Runing for taxa: {t}".format(t=taxa))
+		Dendogram_File_S =  "Plots/Cluster_{Tool}_{T}_{S}.pdf".format(Tool=tool, T= str(Threshold), S=taxa)
+		Boxplot_File_S =  "Plots/Inter-vs-Intra_{Tool}_{T}_{S}.pdf".format(Tool=tool, T= str(Threshold), S=taxa)
+		SFS_Plot = "Plots/SFS_{P}_{T}.pdf".format(P=Tool, T=taxa)
+		if SFS == True: 
+			SFS_plot(Tool, SFS_Plot ,Taxa= dic_taxa[taxa])
+
+		Reference_variation =Create_variation_profile_taxa(Tool,Variants,dic_taxa[taxa],Threshold)
+		Sample_profile = Sample_variants(Reference_variation, Sample_list)
+		Matrix_distance =  Distance(Sample_profile)
+	
+		if Index_list == False: Index_list =  Make_index_list(Sample_list, HMP)
+
+
+		Compare_distances(Matrix_distance,Index_list,Boxplot_File_S)
+		Clusters  = Clustering_samples(Matrix_distance,Sample_list,Index_list,Dendogram_File_S)
+		Table.append(Prepare_table(Clusters, Tool, len(Reference_variation), Clusters, Taxa=taxa, Thresh=str(Threshold)))
+
+	Output = "Plots/Table_stats_{T}-{N}.tsv".format(T=Tool, N=Threshold)
+	print("Saving results at "+Output)
+	with open(Output.format(T=Tool, N=Threshold) , "w") as O:
+		Header = "\t".join(["Taxa_profiled", "Tool","Number Variants", "% Clustered", "Sensitivity", "Precision", "Threshold"]) + "\n"
+		O.write(Header)
+		for item in Table:
+			O.write("\t".join(item) + "\n")
+
+if sys.argv[1] == "all":
+	Run_analysis("haplotypecaller", 1, True)
+	Run_analysis("haplotypecaller", 2, False)
+	Run_analysis("mutect2", 1, True)
+	Run_analysis("mutect2", 2, False)
+else:
+	if len(sys.argv) < 2:
+		print("Please specify the tool to use: python Calculate_genetic_distance.py [haplotypecaller|mutect2|intrain]")
+		exit()
+	tool = sys.argv[1] ; Tool = tool
+	Tool2= "No"
+	if "-" in Tool:
+		T = Tool.split("-")
+		Tool = T[0]
+		Tool2 = T[1]
+	if len(sys.argv) == 3:
+		Threshold = int(sys.argv[2])
+		SFS = False
+	elif  len(sys.argv) > 3:
+		Threshold = int(sys.argv[2])
+		SFS =True
+	else:
+		Threshold = 0
+		SFS = False
+	Run_analysis(Tool, Threshold, SFS,tool, Tool2) #Tool2	
 
