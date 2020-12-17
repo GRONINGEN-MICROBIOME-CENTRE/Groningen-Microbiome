@@ -1,0 +1,254 @@
+---
+title: "SNV benchmark summary statistics"
+author: "Daoming Wang"
+date: "2020/12/12"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## 1 Preparation
+### 1.1 Import
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+library(tidyverse)
+
+
+wsjPal <- c('#65C1E8',
+            '#D85B63',
+            '#D680AD',
+            '#5C5C5C',
+            '#C0BA80',
+            '#FDC47D',
+            '#EA3B46')
+```
+
+
+### 1.2 Inputs
+
+```{r 1.2, echo=TRUE}
+n50<-read.table("00.data/ref_stat.tsv",header = T)
+
+abun<-read.table("00.data/Abundances_formatted.tsv")
+uni_ref<-read.table("00.data/Benchmark_uniref.tsv", header = T)
+multi_ref<-read.table("00.data/Benchmark_multiref.tsv", header = T)
+reads_n<-read.table("00.data/Number_simulated_reads.txt")
+
+```
+
+
+## 2 Assembly quality assessment
+
+```{r 2}
+if(!dir.exists("01.Assembly_quatlity")){dir.create("01.Assembly_quatlity")}
+
+
+pdf("01.Assembly_quatlity/ref_N50_density_log10.pdf", width = 3, height = 2)
+ggplot(n50,aes(x=N50), color = "#2EC4B6")+
+  geom_density(alpha = 0.2, color = "#2EC4B6", fill = "#2EC4B6", alpha = 0.5)+
+  geom_rug(color = "#2EC4B6",alpha = 0.5,length = unit(0.05, "npc"))+
+  geom_vline(xintercept  = mean(n50$N50,na.rm = T), linetype = "dashed",color = "#ee6352")+
+  ylab('Density')+
+  xlab('N50')+
+  scale_y_continuous(expand = c(0,0))+
+  scale_x_log10()+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = "none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+dev.off()
+
+pdf("01.Assembly_quatlity/ref_contig_N_density_log10.pdf", width = 3, height = 2)
+ggplot(n50,aes(x=seqs), color = "#2EC4B6")+
+  geom_density(alpha = 0.2, color = "#2EC4B6", fill = "#2EC4B6", alpha = 0.5)+
+  geom_rug(color = "#2EC4B6",alpha = 0.5,length = unit(0.05, "npc"))+
+  geom_vline(xintercept  = mean(n50$seqs,na.rm = T), linetype = "dashed",color = "#ee6352")+
+  ylab('Density')+
+  xlab('Contig Number')+
+  scale_y_continuous(expand = c(0,0))+
+  scale_x_log10()+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = "none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+dev.off()
+
+
+
+pdf("01.Assembly_quatlity/ref_total_length_density_log10.pdf", width = 3, height = 2)
+ggplot(n50,aes(x=size), color = "#2EC4B6")+
+  geom_density(alpha = 0.2, color = "#2EC4B6", fill = "#2EC4B6", alpha = 0.5)+
+  geom_rug(color = "#2EC4B6",alpha = 0.5,length = unit(0.05, "npc"))+
+  geom_vline(xintercept  = mean(n50$size,na.rm = T), linetype = "dashed",color = "#ee6352")+
+  ylab('Density')+
+  xlab('Total length')+
+  scale_y_continuous(expand = c(0,0))+
+  scale_x_log10()+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = "none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+dev.off()
+
+
+pdf("01.Assembly_quatlity/ref_auN_density_log10.pdf", width = 3, height = 2)
+ggplot(n50,aes(x=auN), color = "#2EC4B6")+
+  geom_density(alpha = 0.2, color = "#2EC4B6", fill = "#2EC4B6", alpha = 0.5)+
+  geom_rug(color = "#2EC4B6",alpha = 0.5,length = unit(0.05, "npc"))+
+  geom_vline(xintercept  = mean(n50$auN,na.rm = T), linetype = "dashed",color = "#ee6352")+
+  ylab('Density')+
+  xlab('auN')+
+  scale_y_continuous(expand = c(0,0))+
+  scale_x_log10()+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = "none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+dev.off()
+
+```
+
+
+
+
+
+
+## 3 Effect of coverage and abundance
+
+### 3.1 Clean tables
+```{r 3}
+if(!dir.exists("02.Coverage_effect")){dir.create("02.Coverage_effect")}
+
+abun$V1 <- abun$V1 %>% 
+  str_replace_all(".*/", "") %>% 
+  str_replace_all(".fa","")
+
+uni_ref <- uni_ref %>% 
+  mutate(Specificity = TN/(TN+FN), 
+         Sensitivity = TP/(TP+FN),
+         Precision=TP/(TP+FP) ) 
+
+multi_ref <- multi_ref %>% 
+  mutate(Specificity = TN/(TN+FN), 
+         Sensitivity = TP/(TP+FN),
+         Precision=TP/(TP+FP) ) 
+
+
+res<-rbind(uni_ref, multi_ref)
+res$Abundance<-abun$V2[match(res$Taxa, abun$V1)]
+res.long<-gather(res, "Performance",  "Value", c(9:11))
+res.long$Reads_N<-14998739
+res.long$Reads_N[res.long$Benchmark_Design=="multiref"]<-14997408
+res.long$Coverage<-(res.long$Reads_N*res.long$Abundance*126)/res.long$Length_genome
+
+res.long<-res.long[res.long$Performance != "Specificity",]
+
+res.long$Benchmark_Design[res.long$Benchmark_Design=="multiref"]<-"Two strains"
+res.long$Benchmark_Design[res.long$Benchmark_Design=="uniref"]<-"One strain"
+
+```
+
+### 3.2 Visualization
+
+```{r 3.2}
+
+pdf("02.Coverage_effect/Performance_abundance.pdf", width = 8, height = 6)
+ggplot(res.long, aes(Abundance, Value, color = Tool))+
+  geom_point(alpha = 0.6)+
+  geom_smooth(method = loess,alpha = 0.2)+
+  scale_x_log10()+
+  scale_color_manual(values = wsjPal)+
+  ylim(0,1)+
+  facet_grid(vars(Performance),vars(Benchmark_Design))+
+  theme_light()
+dev.off()
+
+
+pdf("02.Coverage_effect/Performance_coverage.pdf", width = 8, height = 6)
+ggplot(res.long, aes(Coverage, Value, color = Tool))+
+  geom_point(alpha = 0.6)+
+  geom_smooth(method = loess,alpha = 0.2)+
+  scale_x_log10()+
+  scale_color_manual(values = wsjPal)+
+  ylim(0,1)+
+  facet_grid(vars(Performance),vars(Benchmark_Design))+
+  theme_light()
+dev.off()
+```
+
+
+### 3.3 Calculate statistic values
+
+```{r 3.3}
+Benchmark_Design<-unique(res.long$Benchmark_Design)
+Tool<-unique(res.long$Tool)
+Performance<-unique(res.long$Performance)
+
+tool_stat<-NULL
+for (i in Benchmark_Design) {
+    for (j in Tool) {
+      for (k in Performance) {
+        #i<-Benchmark_Design[1]
+        #j<-Tool[1]
+        #k<-Performance[1]
+        
+        res.long.lane<-res.long[res.long$Benchmark_Design==i & res.long$Tool==j &res.long$Performance==k,]
+        
+        tool_abund_res<-cor.test(res.long.lane$Abundance, res.long.lane$Value,method = "spearman")
+        tool_cover_res<-cor.test(res.long.lane$Coverage, res.long.lane$Value,method = "spearman")
+        
+        tool_stat_lane<-c(i,j,k,
+                          tool_abund_res$estimate,tool_abund_res$p.value,
+                          tool_cover_res$estimate,tool_cover_res$p.value)
+        tool_stat<-rbind(tool_stat, tool_stat_lane)
+        
+      }
+    }
+}
+
+
+colnames(tool_stat)<-c("Benchmark_Design","Tool","Performance",
+                       "Abundance.cor.r","Abundance.cor.p",
+                       "Coverage.cor.r","Coverage.cor.p")
+tool_stat<-as.data.frame(tool_stat)
+tool_stat[,c(4:7)] <- apply(tool_stat[,c(4:7)], 2, as.numeric)
+
+write.table(tool_stat,"02.Coverage_effect/performance_abun_cover.tsv",
+            sep = "\t",col.names = T,row.names = F,quote = F)
+```
