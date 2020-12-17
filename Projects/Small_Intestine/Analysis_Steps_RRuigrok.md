@@ -4,6 +4,17 @@ Small Intestine Microbiota Project
 Creator: Renate Ruigrok
 Year: 2020
 
+### Key
+
+```{r}
+
+# HealthyControl = General population (LifelinesDEEP samples)
+# Ileostoma + pouch (IleostomaPouch) = IBD-SI (samples from 1000IBD patients with an ileostomy or ileoanal pouch)
+# No Resections = IBD-NoRes (samples from 1000IBD patients with no intestinal resections)
+# Resections = IBD-Res (samples from 1000IBD patients with segmental intestinal resections)
+
+```
+
 ### 1. Cohort Summary Statistics
 
 ```{r}
@@ -28,6 +39,7 @@ LLD_IBD_MetTaxS$CurrentStomaOrPouchType <- as.factor(gsub("colostoma", "Resectio
 #Subsetting
 LLD.IBD_MetTaxS.F <- LLD_IBD_MetTaxS[c(2,4:6,8,9,14:17,20,22,24:28,30:37,42:48,50:69,71:86,88:181,183:197,202,203,408:416,418:425,427:678,681:1332)]
 
+#renaming diagnosis from dutch to english abbreviation
 x <- gsub('CU','UC', LLD.IBD_MetTaxS.F$DiagnosisFirst) 
 LLD.IBD_MetTaxS.F$DiagnosisFirst <- as.factor(x)
 
@@ -35,17 +47,15 @@ LLD.IBD_MetTaxS.F$DiagnosisCurrent <- as.factor(gsub("ReconsideringDiagnosis", "
 
 LLD.IBD_MetTaxS.F$TimeEndPreviousExacerbation <- as.numeric(as.character(LLD.IBD_MetTaxS.F$TimeEndPreviousExacerbation))
 
-
 LLD.IBD_MetTaxS.F$ReasonUnclearSurgeryResectionProcedures <- NULL
 
-
-LLD.IBD_Final <- Remove_FactCols(LLD.IBD_MetTaxS.F) 
+LLD.IBD_Final <- Remove_FactCols(LLD.IBD_MetTaxS.F) #remove factor variables with only 1 level
 
 LLD.IBD_Final <- LLD.IBD_Final[c(1:114,142:1080)] #remove logical variables, not informative in this case 
 
 #library(forcats)
 LLD.IBD_Final[408,128] <- NA #change 'NA' to NA 
-LLD.IBD_Final$NumberIndicationabcessOrfistula <- fct_drop(LLD.IBD_Final$NumberIndicationabcessOrfistula) #remove level 'NA'
+LLD.IBD_Final$NumberIndicationabcessOrfistula <- fct_drop(LLD.IBD_Final$NumberIndicationabcessOrfistula) #remove the level 'NA'
 
 LLD.IBD_Final$IncludedSamples <- NULL
 
@@ -107,6 +117,41 @@ LLD.IBD.Stats2a <- LLD.IBD.Stats2[,c(45,1:3,9,14,24,36,41,43,44,62:69,74:107,119
 Test2 <- kruskal.test_function(LLD.IBD.Stats2a)
 
 write.table(Test2, "Pval_DescrpStats_SIvsLLD.txt", sep = "\t",col.names = T)
+
+=============================================================================================================
+Revised Manuscript
+=============================================================================================================
+
+# Read depth range per group
+aggregate(x = LLD.IBD_Finalx$PFReads,  # Specify data column
+          by = list(LLD.IBD_Finalx$CurrentStomaOrPouchType), # Specify group indicator
+          FUN = range, na.rm = T)  
+
+# Histogram - sequencing read depth per group
+
+LLD.IBD_Finalx <-  LLD.IBD_Final
+LLD.IBD_Finalx$CurrentStomaOrPouchType <- as.factor(gsub("ileostoma", "IleostomaPouch", LLD.IBD_Finalx$CurrentStomaOrPouchType))
+LLD.IBD_Finalx$CurrentStomaOrPouchType <- as.factor(gsub("pouch", "IleostomaPouch", LLD.IBD_Finalx$CurrentStomaOrPouchType))
+
+LLD.IBD_Finalx$CurrentStomaOrPouchType <- factor(LLD.IBD_Finalx$CurrentStomaOrPouchType, levels=c("HealthyControl", "No Resections", "Resections", "IleostomaPouch"))
+ReadDepthDiv1m <- LLD.IBD_Finalx[,c("CurrentStomaOrPouchType","PFReads")]
+ReadDepthDiv1m$PFReads <- ReadDepthDiv1m$PFReads/1000000
+ReadDepthDiv1m$ID <- rownames(ReadDepthDiv1m)
+ReadDepthDiv1m <- ReadDepthDiv1m[order(ReadDepthDiv1m$CurrentStomaOrPouchType),]
+
+names <- c(
+  "HealthyControl" = 'General Population',
+  'No Resections' = 'IBD non-resected intestine',
+  'Resections' = 'IBD resected intestine',
+  "IleostomaPouch" = 'IBD small intestine'
+)
+
+# plot histogram
+ggplot(ReadDepthDiv1m) + geom_histogram(aes(x=PFReads,fill=CurrentStomaOrPouchType),color="black") +
+  facet_grid(scales = "free", CurrentStomaOrPouchType~., labeller = as_labeller(names)) + 
+  theme_minimal() + scale_fill_manual(values=c('grey54','slateblue2', 'gold1', 'red2'))+
+  labs(x=bquote('Sequencing Read Depth' ~(x10^6)), color = "Bowel Phenotype") + theme (legend.position = "none")
+
 ```
 
 ### 2. Genus Composition  
