@@ -9,9 +9,9 @@ Year: 2020
 ```{r}
 
 # HealthyControl = General population (LifelinesDEEP samples)
-# Ileostoma + pouch (IleostomaPouch) = IBD-SI (samples from 1000IBD patients with an ileostomy or ileoanal pouch)
 # No Resections = IBD-NoRes (samples from 1000IBD patients with no intestinal resections)
 # Resections = IBD-Res (samples from 1000IBD patients with segmental intestinal resections)
+# Ileostoma + pouch (IleostomaPouch) = IBD-SI (samples from 1000IBD patients with an ileostomy or ileoanal pouch)
 
 ```
 
@@ -119,7 +119,7 @@ Test2 <- kruskal.test_function(LLD.IBD.Stats2a)
 write.table(Test2, "Pval_DescrpStats_SIvsLLD.txt", sep = "\t",col.names = T)
 
 =============================================================================================================
-Revised Manuscript
+Revised Manuscript - 17.12.20
 =============================================================================================================
 
 # Read depth range per group
