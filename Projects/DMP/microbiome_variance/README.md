@@ -5,4 +5,7 @@ and groups of phentypes
 
 ### Files:
 
-- WIP
+- DMP_do_univar_adonis_taxa.R : script for quantification of microbiome composition variance explained by one phenotype
+- DMP_do_univar_adonis_PWYs.R : script for quantification of microbiome functionality variance explained by one phenotype
+- DMP_collect_adonis_results.R : script for collection of results produced by DMP_do_univar_adonis_taxa or DMP_do_univar_adonis_PWYs results
+- DMP_check_adonis_results.R : script for identification of failed adonis jobs
