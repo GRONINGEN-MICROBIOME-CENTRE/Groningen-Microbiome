@@ -154,7 +154,7 @@ ggplot(ReadDepthDiv1m) + geom_histogram(aes(x=PFReads,fill=CurrentStomaOrPouchTy
 
 ```
 
-### 2. Genus Composition  
+### 2. Taxonomic Composition  
 
 ```{r}
 # Packages & Functions Required:
@@ -208,11 +208,12 @@ LLD.IBD_Meta$CurrentStomaOrPouchType <- as.factor(gsub("colostoma", "Resections"
 #Change order of the levels for variable CurrentStomaOrPouchType
 LLD.IBD_Meta$CurrentStomaOrPouchType <- factor(LLD.IBD_Meta$CurrentStomaOrPouchType, levels = c('HealthyControl', 'No Resections', 'Resections', 'IleostomaPouch'))
 
+
 #IBD Taxonomy 
 IBD_Taxa <- read.table(file = "../Data/SI_project/IBD_taxonomy_unstrat_clean.txt", header = TRUE, sep = "\t", quote = "\\") 
 rownames(IBD_Taxa) <- IBD_Taxa$ID
 IBD_Taxa$ID <- NULL
-IBD_Taxa <- as.data.frame(t(IBD_Taxa)) #transform
+#IBD_Taxa <- as.data.frame(t(IBD_Taxa)) #transform
 
 #LLD Taxonomy
 LLD_Taxa <- read.table(file = "../Data/SI_project/LLD_taxonomy_unstrat_clean.txt", header = TRUE, sep = "\t", quote = "\\") #LLD Taxonomy 
@@ -223,28 +224,28 @@ LLD <- gsub("^X", "", colnames(LLD_Taxa)) #Remove 'X' at the beginning of ID num
 colnames(LLD_Taxa) <- LLD
 
 #Merge the two cohort taxa's
-IBD_Taxa1 <- as.data.frame(t(IBD_Taxa))
-LLD_IBD_Taxa <- merge(LLD_Taxa, IBD_Taxa1, by = 'row.names', all = T)
+#IBD_Taxa1 <- as.data.frame(t(LLD_Taxa))
+LLD_IBD_Taxa <- merge(LLD_Taxa, IBD_Taxa, by = 'row.names', all = T)
 rownames(LLD_IBD_Taxa) <- LLD_IBD_Taxa$Row.names
 LLD_IBD_Taxa$Row.names <- NULL
 LLD_IBD_Taxa <- as.data.frame(t(LLD_IBD_Taxa))
 
+
 #Merge metadata with taxa
 LLD_IBD_MetTax <- merge(LLD.IBD_Meta,LLD_IBD_Taxa, by.x = 'CombinedIDs', by.y = 'row.names')
 
+*************
+GENUS Profile
+*************
 
-****
-
-
-
-# Top Genus composition according to Healthy control group
+# Top Genera within the Healthy control group
   
-#Extract genus only from Taxa table
+#Extract only genera from Taxa table
 LLD_IBD_TaxaG <- LLD_IBD_Taxa[,grepl('g__',colnames(LLD_IBD_Taxa),ignore.case = T)]
 LLD_IBD_TaxaG <- LLD_IBD_TaxaG[,!grepl('s__',colnames(LLD_IBD_TaxaG),ignore.case = T)]
   
   
-#Merge genus Taxo with LLD_IBD_MetaTaxa
+#Merge genus Taxa with LLD_IBD_MetaTaxa
   LLD_IBD_MetTaxG <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaG, by.x = 'CombinedIDs', by.y = 'row.names')
   rownames(LLD_IBD_MetTaxG) <- LLD_IBD_MetTaxG$CombinedIDs
   LLD_IBD_MetTaxG$CombinedIDs <- NULL
@@ -268,8 +269,10 @@ LLD_IBD_TaxaG <- LLD_IBD_TaxaG[,!grepl('s__',colnames(LLD_IBD_TaxaG),ignore.case
   
   LLD_IBD_MetTaxG <- LLD_IBD_MetTaxG[c("CurrentStomaOrPouchType",TopNTaxa(Means,10))]
   
-  LLD_IBD_MetTaxG$g__Other <- 100 - rowSums(LLD_IBD_MetTaxG[,grep('__',colnames(LLD_IBD_MetTaxG))]) # minus numbers?
+  LLD_IBD_MetTaxG$g__Other <- 100 - rowSums(LLD_IBD_MetTaxG[,grep('__',colnames(LLD_IBD_MetTaxG))])
   
+  write.table(LLD_IBD_MetTaxG, file = 'LLD_IBD_GenusComposition_top10HC.txt', sep = '\t', col.names = T)
+ 
   #Plot graph by stoma type
   #column mean by group
   LLD_IBD_MetTaxG <- aggregate(LLD_IBD_MetTaxG[,2:12], list(LLD_IBD_MetTaxG$CurrentStomaOrPouchType), mean)
@@ -281,7 +284,7 @@ LLD_IBD_TaxaG <- LLD_IBD_TaxaG[,!grepl('s__',colnames(LLD_IBD_TaxaG),ignore.case
   
   rowSums(LLD_IBD_MetTaxG[,grep('__',colnames(LLD_IBD_MetTaxG))]) #to check the sum of each row adds to 100... i.e correctly calculated mean as a percentage
   
-  LLD <- gsub('.*\\|g__','',colnames(LLD_IBD_MetTaxG)) #Keep taxonomy level name only i.e. 'class name' 
+  LLD <- gsub('.*\\|g__','',colnames(LLD_IBD_MetTaxG)) #Keep taxonomy level name only  
   colnames(LLD_IBD_MetTaxG) <- LLD
   
   #Graph
@@ -298,11 +301,9 @@ cols <- c("Eubacterium" = "#66C2A5", "Bifidobacterium" = "#FC8D62", "Ruminococcu
     labs(y = "Mean Relative Abundance", x = 'Current Phenotype', title = 'Microbial Genus Composition Top HealthyControl') + scale_x_discrete(labels=c('HealthyControl' = 'General population', 'No Resections' = 'IBD non-resected bowel', 'Resections' = 'IBD resected bowel', 'IleostomaPouch' = 'IBD small intestine')) + theme_minimal() 
   #+ theme(axis.text.x = element_text(angle = 45)) 
   
-  write.table(LLD_IBD_MetTaxG, file = 'LLD_IBD_GenusComposition_top10HC.txt', sep = '\t', col.names = T)
   
-
   
-#Top Genus composition according to IleostomaPouch group
+#Top Genera within the IleostomaPouch group
   
   #Merge Genera with LLD_IBD_MetaTaxa
   LLD_IBD_MetTaxG <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaG, by.x = 'CombinedIDs', by.y = 'row.names')
@@ -329,6 +330,8 @@ cols <- c("Eubacterium" = "#66C2A5", "Bifidobacterium" = "#FC8D62", "Ruminococcu
   
   LLD_IBD_MetTaxG$g__Other <- 100 - rowSums(LLD_IBD_MetTaxG[,grep('__',colnames(LLD_IBD_MetTaxG))]) 
   
+  write.table(LLD_IBD_MetTaxG, file = 'LLD_IBD_GenusComposition_top10SI.txt', sep = '\t', col.names = T)
+
   #Plot graph by stoma type
   
   #column mean by group
@@ -358,13 +361,395 @@ cols <- c("Eubacterium" = "#66C2A5", "Bifidobacterium" = "#FC8D62", "Ruminococcu
     labs(y = "Mean Relative Abundance", x = 'Current Phenotype', title = 'Microbial Genus Composition Top SI') + scale_x_discrete(labels=c('HealthyControl' = 'General population', 'No Resections' = 'IBD non-resected bowel', 'Resections' = 'IBD resected bowel', 'IleostomaPouch' = 'IBD small intestine')) + theme_minimal() 
   #+ theme(axis.text.x = element_text(angle = 45)) 
   
+======================================================================================================================================================         
+REVISED Manuscript - 17.12.20
+======================================================================================================================================================         
+
+*******************************
+GENUS Profile cont'd - Boxplots
+*******************************
+
+#Merge genus Taxo with LLD_IBD_MetaTaxa
+  LLD_IBD_MetTaxG <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaG, by.x = 'CombinedIDs', by.y = 'row.names')
+  rownames(LLD_IBD_MetTaxG) <- LLD_IBD_MetTaxG$CombinedIDs
+  LLD_IBD_MetTaxG$CombinedIDs <- NULL
   
-write.table(LLD_IBD_MetTaxG, file = 'LLD_IBD_GenusComposition_top10SI.txt', sep = '\t', col.names = T)
- 
+  remove_cols <- vector()
+  for (i in 2:ncol(LLD_IBD_MetTaxG)) {
+    cname <- colnames(LLD_IBD_MetTaxG)[i]
+    if(colSums(LLD_IBD_MetTaxG[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxG) *100 < 15){
+      remove_cols <- c(remove_cols, cname) 
+    }
+  }
+  LLD_IBD_MetTaxG <- LLD_IBD_MetTaxG %>% select(-remove_cols)
+  print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+#Select top 12 abundant genera in General population
+#subset 'HealthyControl' individuals only
+  HC <- subset(LLD_IBD_MetTaxG, CurrentStomaOrPouchType == 'HealthyControl')
+  
+  #Vector with mean relative abundances in descending order
+  Means <- colMeans(HC[,c(2:ncol(HC))]) #mean
+  Means <- sort(Means, decreasing = T) #order
+  
+LLD_IBD_MetTaxG1 <- LLD_IBD_MetTaxG[c("CurrentStomaOrPouchType",TopNTaxa(Means,12))]
+
+#Select top 12 abundant genera in SI
+SI <- subset(LLD_IBD_MetTaxG, CurrentStomaOrPouchType == 'IleostomaPouch')
+  
+  #Vector with mean relative abundances in descending order
+  Means <- colMeans(SI[,c(2:ncol(SI))]) #mean
+  Means <- sort(Means, decreasing = T) #order
+
+Dataframe top 12 genera in SI and General population group
+LLD_IBD_MetTaxG2 <- LLD_IBD_MetTaxG[c(colnames(LLD_IBD_MetTaxG1),TopNTaxa(Means,12))]
+  
+#Transform genera abundances
+MetTaxG_transformed <- transform_and_filter_taxa(LLD_IBD_MetTaxG2[,c(2:ncol(LLD_IBD_MetTaxG2))])
+MetTaxG_transformed <-cbind(LLD_IBD_MetTaxG[1],MetTaxG_transformed)
+
+colnames(MetTaxG_transformed) <- gsub('.*g__','',colnames(MetTaxG_transformed)) 
+
+#Plot graph
+MetTaxG_transformed1<- melt(MetTaxG_transformed, 'CurrentStomaOrPouchType')
+
+#Facet boxplots - Top 12 General population
+ggplot(data = MetTaxG_transformed1[1:20556,], aes(x=variable, y=value,fill=CurrentStomaOrPouchType),color = "black") + scale_fill_manual(values=c('grey54','slateblue2', 'gold1', 'red2')) +  geom_point(position=position_jitterdodge(),alpha=0.2) + theme_minimal()+ geom_boxplot(outlier.shape = NA) + labs(x="", y="Relative Abundance (log10)", color = "Bowel Phenotype") +
+     coord_cartesian(ylim = c(0, 1.25)) + scale_y_continuous(breaks=c(0,0.25,0.5,0.75,1,1.25)) + facet_wrap( ~ variable, scales = "free_x") 
+
+#Facet boxplots - Top 12 SI
+ggplot(data = MetTaxG_transformed1[20557:41112,], aes(x=variable, y=value,fill=CurrentStomaOrPouchType),color = "black") + scale_fill_manual(values=c('grey54','slateblue2', 'gold1', 'red2')) +  geom_point(position=position_jitterdodge(),alpha=0.2) + theme_minimal()+ geom_boxplot(outlier.shape = NA) + labs(x="", y="Relative Abundance (log10)", color = "Bowel Phenotype")+ facet_wrap( ~ variable, scales = "free_x") 
+
+
+**************
+PHYLUM Profile
+**************
+
+#Extract only phyla from LLD_IBD_Taxa table
+LLD_IBD_TaxaP <- LLD_IBD_Taxa[,grepl('p__',colnames(LLD_IBD_Taxa),ignore.case = T)]
+LLD_IBD_TaxaP<- LLD_IBD_TaxaP[,!grepl('c__',colnames(LLD_IBD_TaxaP),ignore.case = T)]
+
+
+#Merge Phyla Taxa with LLD_MetaTaxa IDs & CurrentStomaOrPouchType variable
+LLD_IBD_MetTaxP <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaP, by.x = 'CombinedIDs', by.y = 'row.names')
+rownames(LLD_IBD_MetTaxP) <- LLD_IBD_MetTaxP$CombinedIDs
+LLD_IBD_MetTaxP$CombinedIDs <- NULL
+
+# Remove phyla from dataframe with a prevalence < 15%
+remove_cols <- vector()
+for (i in 2:ncol(LLD_IBD_MetTaxP)) {
+  cname <- colnames(LLD_IBD_MetTaxP)[i]
+  if(colSums(LLD_IBD_MetTaxP[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxP) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD_IBD_MetTaxP1 <- LLD_IBD_MetTaxP %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+LLD_IBD_MetTaxP1 <- LLD_IBD_MetTaxP1[,-c(2,8)]
+
+#Vector with mean relative abundances in descending order
+#PMeans <- colMeans(LLD_IBD_MetTaxP1[,c(2:ncol(LLD_IBD_MetTaxP1))]) #mean
+#PMeans <- sort(PMeans, decreasing = T) #order
+
+#LLD_IBD_MetTaxP1 <- LLD_IBD_MetTaxP1[c("CurrentStomaOrPouchType",TopNTaxa(PMeans,7))]
+
+LLD_IBD_MetTaxP1$p__Other <- 100 - rowSums(LLD_IBD_MetTaxP1[,grep('__',colnames(LLD_IBD_MetTaxP1))]) 
+
+write.table(LLD_IBD_MetTaxP1, file = 'LLD_IBD_PhylumComposition.txt', sep = '\t', col.names = T)
+  
+#Plot graph by stoma type
+
+#column mean by group
+LLD_IBD_MetTaxP1 <- aggregate(LLD_IBD_MetTaxP1[,2:7], list(LLD_IBD_MetTaxP1$CurrentStomaOrPouchType), mean)
+colnames(LLD_IBD_MetTaxP1)[1] <- "CurrentStomaOrPouchType"
+
+#Convert each mean relative abundance to a percentage of total means 
+LLD_IBD_MetTaxP1[,grep('__',colnames(LLD_IBD_MetTaxP1))] <- LLD_IBD_MetTaxP1[,grep('__',colnames(LLD_IBD_MetTaxP1))]/
+  rowSums(LLD_IBD_MetTaxP1[,grep('__',colnames(LLD_IBD_MetTaxP1))])*100
+
+rowSums(LLD_IBD_MetTaxP1[,grep('__',colnames(LLD_IBD_MetTaxP1))]) #to check the sum of each row adds to 100... i.e correctly calculated mean as a percentage
+
+colnames(LLD_IBD_MetTaxP1) <- gsub('.*p__','',colnames(LLD_IBD_MetTaxP1))
+
+#Plot graph
+LLD_IBD_MetTaxP1<- melt(LLD_IBD_MetTaxP1, 'CurrentStomaOrPouchType')
+
+LLD_IBD_MetTaxP1 %>%
+  group_by(CurrentStomaOrPouchType) %>%
+  summarise(Sum = sum(value)) #Check each group sums to 100
+
+ggplot(data = LLD_IBD_MetTaxP1, aes(x = CurrentStomaOrPouchType, y = value, fill = variable)) +
+  geom_bar(stat = "identity",color = "black") + scale_fill_brewer(palette = 'Set2') +
+  labs(y = "Relative Abundance", x = 'Bowel Phenotype', title = 'Microbial Phylum Composition') + scale_x_discrete(labels=c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD Small Intestine')) + theme_minimal() + theme(axis.text.x = element_text(angle = 45)) 
+
+
+**************
+FAMILY Profile
+**************
+
+# Top Families within the Healthy control group
+
+#Extract Family only from Taxa table
+LLD_IBD_TaxaF <- LLD_IBD_Taxa[,grepl('f__',colnames(LLD_IBD_Taxa),ignore.case = T)]
+LLD_IBD_TaxaF <- LLD_IBD_TaxaF[,!grepl('g__',colnames(LLD_IBD_TaxaF),ignore.case = T)]
+
+
+#Merge Family Taxo with LLD_IBD_MetaTaxa
+LLD_IBD_MetTaxF <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaF, by.x = 'CombinedIDs', by.y = 'row.names')
+rownames(LLD_IBD_MetTaxF) <- LLD_IBD_MetTaxF$CombinedIDs
+LLD_IBD_MetTaxF$CombinedIDs <- NULL
+
+remove_cols <- vector()
+for (i in 2:ncol(LLD_IBD_MetTaxF)) {
+  cname <- colnames(LLD_IBD_MetTaxF)[i]
+  if(colSums(LLD_IBD_MetTaxF[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxF) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD_IBD_MetTaxF <- LLD_IBD_MetTaxF %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+#subset 'HealthyControl' individuals only
+HC <- subset(LLD_IBD_MetTaxF, CurrentStomaOrPouchType == 'HealthyControl')
+
+#Vector with mean relative abundances in descending order
+Means <- colMeans(HC[,c(2:ncol(HC))]) #mean
+Means <- sort(Means, decreasing = T) #order
+
+LLD_IBD_MetTaxF <- LLD_IBD_MetTaxF[c("CurrentStomaOrPouchType",TopNTaxa(Means,10))]
+
+LLD_IBD_MetTaxF$f__Other <- 100 - rowSums(LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))]) 
+
+write.table(LLD_IBD_MetTaxF, file = 'LLD_IBD_FamilyComposition_top10HC.txt', sep = '\t', col.names = T)
+
+#Plot graph by stoma type
+#column mean by group
+LLD_IBD_MetTaxF <- aggregate(LLD_IBD_MetTaxF[,2:12], list(LLD_IBD_MetTaxF$CurrentStomaOrPouchType), mean)
+colnames(LLD_IBD_MetTaxF)[1] <- "CurrentStomaOrPouchType"
+
+#Convert each mean relative abundance to a percentage of total means 
+LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))] <- LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))]/
+  rowSums(LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))])*100
+
+rowSums(LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))]) #to check the sum of each row adds to 100... i.e correctly calculated mean as a percentage
+
+LLD <- gsub('.*f__','',colnames(LLD_IBD_MetTaxF)) #Keep taxonomy level name only i.e. 'class name' 
+colnames(LLD_IBD_MetTaxF) <- LLD
+
+#Graph
+LLD_IBD_MetTaxF<- melt(LLD_IBD_MetTaxF, 'CurrentStomaOrPouchType')
+
+LLD_IBD_MetTaxF %>%
+  group_by(CurrentStomaOrPouchType) %>%
+  summarise(Sum = sum(value)) #Check each group sums to 100
+
+cols <- c("Eubacteriaceae" = "#66C2A5", "Bifidobacteriaceae" = "#FC8D62", "Ruminococcaceae" = "#8DA0CB", "Lachnospiraceae" = "#FFFF33", "Methanobacteriaceae" = "#E78AC3", "Verrucomicrobiaceae" = "#BC8F8F", "Other" = "#D9D9D9", "Veillonellaceae" = "#A6CEE3", "Bacteroidaceae" = "#E5C494", "Streptococcaceae" = "#E41A1C", "Coriobacteriaceae" = "#FF6347")
+
+ggplot(data = LLD_IBD_MetTaxF, aes(x = CurrentStomaOrPouchType, y = value, fill = variable)) +
+  geom_bar(stat = "identity",color = "black") + scale_fill_manual(values = cols) +
+  labs(y = "Relative Abundance", x = 'Bowel Phenotype', title = 'Most Abundant Families: GP') + scale_x_discrete(labels=c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD Small Intestine')) + theme_minimal() + theme(axis.text.x = element_text(angle = 45)) 
+
+
+
+# Top Families within the IleostomaPouch group
+
+#Merge Family Taxo with LLD_IBD_MetaTaxa
+LLD_IBD_MetTaxF <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaF, by.x = 'CombinedIDs', by.y = 'row.names')
+rownames(LLD_IBD_MetTaxF) <- LLD_IBD_MetTaxF$CombinedIDs
+LLD_IBD_MetTaxF$CombinedIDs <- NULL
+
+remove_cols <- vector()
+for (i in 2:ncol(LLD_IBD_MetTaxF)) {
+  cname <- colnames(LLD_IBD_MetTaxF)[i]
+  if(colSums(LLD_IBD_MetTaxF[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxF) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD_IBD_MetTaxF <- LLD_IBD_MetTaxF %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+#subset 'SI' individuals only
+SI <- subset(LLD_IBD_MetTaxF, CurrentStomaOrPouchType == 'IleostomaPouch')
+
+#Vector with mean relative abundances in descending order
+Means <- colMeans(SI[,c(2:ncol(SI))]) #mean
+Means <- sort(Means, decreasing = T) #order
+
+LLD_IBD_MetTaxF <- LLD_IBD_MetTaxF[c("CurrentStomaOrPouchType",TopNTaxa(Means,10))]
+
+LLD_IBD_MetTaxF$f__Other <- 100 - rowSums(LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))])
+
+write.table(LLD_IBD_MetTaxF, file = 'LLD_IBD_FamilyComposition_top10SI.txt', sep = '\t', col.names = T)
+
+#Plot graph by stoma type
+#column mean by group
+LLD_IBD_MetTaxF <- aggregate(LLD_IBD_MetTaxF[,2:12], list(LLD_IBD_MetTaxF$CurrentStomaOrPouchType), mean)
+colnames(LLD_IBD_MetTaxF)[1] <- "CurrentStomaOrPouchType"
+
+#Convert each mean relative abundance to a percentage of total means 
+LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))] <- LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))]/
+  rowSums(LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))])*100
+
+rowSums(LLD_IBD_MetTaxF[,grep('__',colnames(LLD_IBD_MetTaxF))]) #to check the sum of each row adds to 100... i.e correctly calculated mean as a percentage
+
+LLD <- gsub('.*f__','',colnames(LLD_IBD_MetTaxF)) #Keep taxonomy level name only i.e. 'class name' 
+colnames(LLD_IBD_MetTaxF) <- LLD
+
+#Graph
+LLD_IBD_MetTaxF<- melt(LLD_IBD_MetTaxF, 'CurrentStomaOrPouchType')
+
+LLD_IBD_MetTaxF %>%
+  group_by(CurrentStomaOrPouchType) %>%
+  summarise(Sum = sum(value)) #Check each group sums to 100
+
+
+cols <- c("Eubacteriaceae" = "#66C2A5", "Bifidobacteriaceae" = "#FC8D62", "Ruminococcaceae" = "#8DA0CB", "Lachnospiraceae" = "#FFFF33", "Methanobacteriaceae" = "#E78AC3", "Enterococcaceae" = "#A6D854", "Other" = "#D9D9D9", "Coprococcus" = "#377EB8", "Bacteroidaceae" = "#E5C494", "Streptococcaceae" = "#E41A1C", "Enterobacteriaceae" = "#C2A5CF", "Peptostreptococcaceae" = "#BF5B17", "Lactobacillaceae" = "#CCEBC5", "Veillonellaceae" = "#A6CEE3", "Clostridiaceae" = "#F0027F")
+
+
+ggplot(data = LLD_IBD_MetTaxF, aes(x = CurrentStomaOrPouchType, y = value, fill = variable)) +
+  geom_bar(stat = "identity",color = "black") + scale_fill_manual(values = cols) +
+  labs(y = "Relative Abundance", x = 'Bowel Phenotype', title = 'Most Abundant Families: SI') + scale_x_discrete(labels=c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD Small Intestine')) + theme_minimal() + theme(axis.text.x = element_text(angle = 45)) 
+
+
+***************
+SPECIES Profile
+***************
+
+#Extract Species only
+LLD_IBD_TaxaS <- LLD_IBD_Taxa[,grepl('s__',colnames(LLD_IBD_Taxa),ignore.case = T)]
+LLD_IBD_TaxaS<- LLD_IBD_TaxaS[,!grepl('t__',colnames(LLD_IBD_TaxaS),ignore.case = T)]
+
+# Top Species within the General population group
+
+#Merge Species Taxo with stoma/pouch type and ID's
+LLD_IBD_MetTaxS <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaS, by.x = 'CombinedIDs', by.y = 'row.names')
+rownames(LLD_IBD_MetTaxS) <- LLD_IBD_MetTaxS$CombinedIDs
+LLD_IBD_MetTaxS$CombinedIDs <- NULL
+
+remove_cols <- vector()
+for (i in 2:ncol(LLD_IBD_MetTaxS)) {
+  cname <- colnames(LLD_IBD_MetTaxS)[i]
+  if(colSums(LLD_IBD_MetTaxS[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxS) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD_IBD_MetTaxS <- LLD_IBD_MetTaxS %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+#subset ileostomy individuals only
+HC <- subset(LLD_IBD_MetTaxS, CurrentStomaOrPouchType == 'HealthyControl')
+
+#Vector with mean relative abundances in descending order
+Means <- colMeans(HC[,c(2:ncol(HC))]) 
+Means <- sort(Means, decreasing = T) #order from most abundant species to least 
+
+LLD_IBD_MetTaxS <- LLD_IBD_MetTaxS[c("CurrentStomaOrPouchType",TopNTaxa(Means,10))]
+LLD_IBD_MetTaxS$s__Other <- 100 - rowSums(LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))]) 
+
+write.table(LLD_IBD_MetTaxS, file = 'LLD_IBD_SpeciesComposition_top10HC.txt', sep = '\t', col.names = T)
+  
+
+#Plot graph by stoma type
+
+#column mean by group
+LLD_IBD_MetTaxS <- aggregate(LLD_IBD_MetTaxS[,2:12], list(LLD_IBD_MetTaxS$CurrentStomaOrPouchType), mean)
+colnames(LLD_IBD_MetTaxS)[1] <- "CurrentStomaOrPouchType"
+
+#Convert each mean relative abundance to a percentage of total means 
+LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))] <- LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))]/
+  rowSums(LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))])*100
+
+rowSums(LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))]) #to check the sum of each row adds to 100... i.e correctly calculated mean as a percentage
+
+IBD <- gsub('.*s__','',colnames(LLD_IBD_MetTaxS)) #Keep taxonomy level name only i.e. 'class name' 
+colnames(LLD_IBD_MetTaxS) <- IBD
+
+
+#Plot graph
+LLD_IBD_MetTaxS<- melt(LLD_IBD_MetTaxS, 'CurrentStomaOrPouchType')
+
+LLD_IBD_MetTaxS %>%
+  group_by(CurrentStomaOrPouchType) %>%
+  summarise(Sum = sum(value)) #Check each group sums to 100
+
+cols <- c("Eubacterium_rectale" = "#66C2A5", "Bifidobacterium_adolescentis" = "#FC8D62", 
+          "Ruminococcus_sp_5_1_39BFAA" = "#8DA0CB", "Ruminococcus_bromii" = "#E5C494", 
+          "Subdoligranulum_unclassified" = "#E78AC3", "Faecalibacterium_prausnitzii" = 
+            "#A6D854", "Bifidobacterium_longum" = "#FFD92F", "Collinsella_aerofaciens" ="#9846AC", 
+          "Dorea_longicatena" = "#EF3A3A", "Eubacterium_hallii" = "#66C2A5", "Other" = "#D9D9D9" )
+
+r <- ggplot(data = LLD_IBD_MetTaxS, aes(x = CurrentStomaOrPouchType, y = value, fill = variable)) +geom_bar(stat = "identity",color = "black") + scale_fill_manual(values = cols) +labs(y = "Mean Relative Abundance", x = 'Bowel Phenotype', title = 'Most Abundant Species in General Population') + scale_x_discrete(labels=c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD Small Intestine')) + theme_minimal() 
+
+
+
+# Top Species within the IleostomaPouch group
+
+#Merge Species Taxo with stoma/pouch type and ID's
+LLD_IBD_MetTaxS <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaS, by.x = 'CombinedIDs', by.y = 'row.names')
+rownames(LLD_IBD_MetTaxS) <- LLD_IBD_MetTaxS$CombinedIDs
+LLD_IBD_MetTaxS$CombinedIDs <- NULL
+
+remove_cols <- vector()
+for (i in 2:ncol(LLD_IBD_MetTaxS)) {
+  cname <- colnames(LLD_IBD_MetTaxS)[i]
+  if(colSums(LLD_IBD_MetTaxS[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxS) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD_IBD_MetTaxS <- LLD_IBD_MetTaxS %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+#subset IleostomaPouch individuals only
+Ileo <- subset(LLD_IBD_MetTaxS, CurrentStomaOrPouchType == 'IleostomaPouch')
+
+#Vector with mean relative abundances in descending order
+Means <- colMeans(Ileo[,c(2:ncol(Ileo))]) 
+Means <- sort(Means, decreasing = T) #order from most abundant species to least 
+
+LLD_IBD_MetTaxS <- LLD_IBD_MetTaxS[c("CurrentStomaOrPouchType",TopNTaxa(Means,10))]
+LLD_IBD_MetTaxS$s__Other <- 100 - rowSums(LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))]) 
+
+write.table(LLD_IBD_MetTaxS, file = 'LLD_IBD_SpeciesComposition_top10SI.txt', sep = '\t', col.names = T)
+
+#Plot graph by stoma type
+
+#column mean by group
+LLD_IBD_MetTaxS <- aggregate(LLD_IBD_MetTaxS[,2:12], list(LLD_IBD_MetTaxS$CurrentStomaOrPouchType), mean)
+colnames(LLD_IBD_MetTaxS)[1] <- "CurrentStomaOrPouchType"
+
+#Convert each mean relative abundance to a percentage of total means 
+LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))] <- LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))]/
+  rowSums(LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))])*100
+
+rowSums(LLD_IBD_MetTaxS[,grep('__',colnames(LLD_IBD_MetTaxS))]) #to check the sum of each row adds to 100... i.e correctly calculated mean as a percentage
+
+IBD <- gsub('.*s__','',colnames(LLD_IBD_MetTaxS)) #Keep taxonomy level name only i.e. 'class name' 
+colnames(LLD_IBD_MetTaxS) <- IBD
+
+#Plot graph
+LLD_IBD_MetTaxS<- melt(LLD_IBD_MetTaxS, 'CurrentStomaOrPouchType')
+
+LLD_IBD_MetTaxS %>%
+  group_by(CurrentStomaOrPouchType) %>%
+  summarise(Sum = sum(value)) #Check each group sums to 100
+
+cols <- c("Escherichia_coli" = "#C2A5CF","Streptococcus_salivarius" = "#E41A1C", "Ruminococcus_gnavus" = 
+            "#CCEBC5","Peptostreptococcaceae_noname_unclassified" = "#BF5B17","Streptococcus_parasanguinis" = "#377EB8",
+          "Streptococcus_thermophilus" = "#F0027F","Veillonella_unclassified" = "#A6CEE3","Eubacterium_rectale" = "#66C2A5",
+          "Bifidobacterium_longum" = "#FFD92F", "Prevotella_copri" = "#FF6347", "Other" = "#D9D9D9")
+          
+
+ggplot(data = LLD_IBD_MetTaxS, aes(x = CurrentStomaOrPouchType, y = value, fill = variable)) +
+  geom_bar(stat = "identity",color = "black") + scale_fill_manual(values = cols) +
+  labs(y = "Mean Relative Abundance", x = 'Bowel Phenotype', title = 'Most Abundant Species in IBD Small Intestine') + 
+  scale_x_discrete(labels=c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 
+                            'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD Small Intestine')) + theme_minimal() 
+
 ```
 
 
-### 3. Genus Composition: Wilcoxon test
+### 3. Taxonomic Composition: Wilcoxon test
 
 ```{r}
 Top10HCGenera <- read.table(file = "LLD_IBD_GenusComposition_top10HC.txt", header = TRUE, sep = "\t",row.names = 1)
@@ -458,6 +843,421 @@ my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
 
 
 write.table(my_matrix, file = "Top10_SI_Genera.txt", sep = "\t", col.names = T)
+
+======================================================================================================================================================         
+REVISED Manuscript - 17.12.20
+======================================================================================================================================================         
+
+******
+GENERA
+******
+
+#Top genera within the General population group
+  
+ #Merge genus Taxo with LLD_IBD_MetaTaxa
+  LLD_IBD_MetTaxG <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaG, by.x = 'CombinedIDs', by.y = 'row.names')
+  rownames(LLD_IBD_MetTaxG) <- LLD_IBD_MetTaxG$CombinedIDs
+  LLD_IBD_MetTaxG$CombinedIDs <- NULL
+  
+  remove_cols <- vector()
+  for (i in 2:ncol(LLD_IBD_MetTaxG)) {
+    cname <- colnames(LLD_IBD_MetTaxG)[i]
+    if(colSums(LLD_IBD_MetTaxG[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxG) *100 < 15){
+      remove_cols <- c(remove_cols, cname) 
+    }
+  }
+  LLD_IBD_MetTaxG <- LLD_IBD_MetTaxG %>% select(-remove_cols)
+  print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+  
+  #subset 'HealthyControl' individuals only
+  HC <- subset(LLD_IBD_MetTaxG, CurrentStomaOrPouchType == 'HealthyControl')
+  
+  #Vector with mean relative abundances in descending order
+  Means <- colMeans(HC[,c(2:ncol(HC))]) #mean
+  Means <- sort(Means, decreasing = T) #order
+  
+  LLD_IBD_MetTaxG <- LLD_IBD_MetTaxG[c("CurrentStomaOrPouchType",TopNTaxa(Means,12))]
+  
+  LLD_IBD_MetTaxG$Other <- 100 - rowSums(LLD_IBD_MetTaxG[,grep('__',colnames(LLD_IBD_MetTaxG))]) 
+  
+  LLD <- gsub('.*\\|g__','',colnames(LLD_IBD_MetTaxG)) #Keep taxonomy level name only i.e. 'class name' 
+  colnames(LLD_IBD_MetTaxG) <- LLD
+  
+  Top12HCGenera <- LLD_IBD_MetTaxG
+  Top12HCGenera <- Top12HCGenera[-c(14)]
+  
+  my_matrix<-  matrix(nrow = 6 * ncol(Top12HCGenera[c(2:ncol(Top12HCGenera))]), ncol = 13)
+  colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Group1', 'Group2', 'NGroups', 'NSamplesG1', 'NSampleG2', 'NA', 'P-value', 'BonferroniAdjust', 'FDRadjust',  'Mean1', 'Mean2')
+  
+  
+  #__Add correlation analysis data to the matrix 
+  a=1 
+  #Iterate through taxonomy columns
+  for (j in 2:ncol(Top12HCGenera)) {
+    #iterate through phenotype columns
+    for (k in 1:1) {
+      #following conditions applied to all factor variables
+      combos <- combn(levels(Top12HCGenera[,k]),2)
+      #pairwise.wilcox.test 
+      wilcox <- (pairwise.wilcox.test(Top12HCGenera[,j], Top12HCGenera[,k], p.adjust.method = 'none'))$p.value
+      #condition applied to all factor variables with more than 2 groups
+      for (z in 1:ncol(combos)) {
+        #for each column in the combiantion matrices fill a row in my_matrix with the taxa name 
+        my_matrix[a,1] <- colnames(Top12HCGenera)[j]
+        #for each column in the combination matrices fill a row in my_matrix with the relevant phenotype  
+        my_matrix[a,2] <- colnames(Top12HCGenera)[k]
+        #adding the group combinations to my_matrix
+        my_matrix[a,3] <- combos[1,z]
+        my_matrix[a,4] <- combos[2,z]
+        my_matrix[a,5] <- nlevels(Top12HCGenera[,k])
+        my_matrix[a,6] <- sum(Top12HCGenera[,k]==combos[1,z], na.rm = T) #Number of samples in group1
+        my_matrix[a,7] <- sum(Top12HCGenera[,k]==combos[2,z], na.rm = T) #Number of samples in group2
+        my_matrix[a,8] <- colSums(is.na(Top12HCGenera[1]))
+        my_matrix[a,9] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test
+        my_matrix[a,12] <- mean(subset(Top12HCGenera, Top12HCGenera[c(k)] == combos[1,z], select = j)[,k])
+        my_matrix[a,13] <- mean(subset(Top12HCGenera, Top12HCGenera[c(k)] == combos[2,z], select = j)[,k])
+        a=a+1
+      }
+    }
+  }
+  my_matrix <- as.data.frame(my_matrix)
+  my_matrix[,9] <- as.numeric(as.character(my_matrix[,9]))
+  my_matrix[,10] <- p.adjust(c(my_matrix[,9]), method = 'bonferroni')
+  my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
+  
+  
+  write.table(my_matrix, file = "Top12_HC_Genera.txt", sep = "\t", col.names = T)
+  
+  
+
+  
+#Top genera within the IleostomaPouch group
+  
+  #Merge Genera with LLD_IBD_MetaTaxa
+  LLD_IBD_MetTaxG <- merge(LLD_IBD_MetTax[c(1,170)], LLD_IBD_TaxaG, by.x = 'CombinedIDs', by.y = 'row.names')
+  rownames(LLD_IBD_MetTaxG) <- LLD_IBD_MetTaxG$CombinedIDs
+  LLD_IBD_MetTaxG$CombinedIDs <- NULL
+  
+  remove_cols <- vector()
+  for (i in 2:ncol(LLD_IBD_MetTaxG)) {
+    cname <- colnames(LLD_IBD_MetTaxG)[i]
+    if(colSums(LLD_IBD_MetTaxG[i] != 0, na.rm = T) / nrow(LLD_IBD_MetTaxG) *100 < 15){
+      remove_cols <- c(remove_cols, cname) 
+    }
+  }
+  LLD_IBD_MetTaxG <- LLD_IBD_MetTaxG %>% select(-remove_cols)
+  print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+  #subset ileostomaPouch individuals only
+  Ileo <- subset(LLD_IBD_MetTaxG, CurrentStomaOrPouchType == 'IleostomaPouch')
+  
+  #Vector with mean relative abundances in descending order
+  Means <- colMeans(Ileo[,c(2:ncol(Ileo))]) #mean
+  Means <- sort(Means, decreasing = T) #order
+  
+  LLD_IBD_MetTaxG <- LLD_IBD_MetTaxG[c("CurrentStomaOrPouchType",TopNTaxa(Means,12))]
+  
+  LLD_IBD_MetTaxG$Other <- 100 - rowSums(LLD_IBD_MetTaxG[,grep('__',colnames(LLD_IBD_MetTaxG))]) 
+  
+  LLD <- gsub('.*\\|g__','',colnames(LLD_IBD_MetTaxG)) #Keep taxonomy level name only i.e. 'class name' 
+  colnames(LLD_IBD_MetTaxG) <- LLD
+
+  
+
+  #Top SI Genera
+  
+  Top12SIGenera <- LLD_IBD_MetTaxG
+  Top12SIGenera <- Top12SIGenera[-c(14)]
+  
+  my_matrix<-  matrix(nrow = 6 * ncol(Top12SIGenera[c(2:ncol(Top12SIGenera))]), ncol = 13)
+  colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Group1', 'Group2', 'NGroups', 'NSamplesG1', 'NSampleG2', 'NA', 'P-value', 'BonferroniAdjust', 'FDRadjust',  'Mean1', 'Mean2')
+  
+  
+  #__Add correlation analysis data to the matrix 
+  a=1 
+  #Iterate through taxonomy columns
+  for (j in 2:ncol(Top12SIGenera)) {
+    #iterate through phenotype columns
+    for (k in 1:1) {
+      #following conditions applied to all factor variables
+      combos <- combn(levels(Top12SIGenera[,k]),2)
+      #pairwise.wilcox.test 
+      wilcox <- (pairwise.wilcox.test(Top12SIGenera[,j], Top12SIGenera[,k], p.adjust.method = 'none'))$p.value
+      #condition applied to all factor variables with more than 2 groups
+      for (z in 1:ncol(combos)) {
+        #for each column in the combiantion matrices fill a row in my_matrix with the taxa name 
+        my_matrix[a,1] <- colnames(Top12SIGenera)[j]
+        #for each column in the combination matrices fill a row in my_matrix with the relevant phenotype  
+        my_matrix[a,2] <- colnames(Top12SIGenera)[k]
+        #adding the group combinations to my_matrix
+        my_matrix[a,3] <- combos[1,z]
+        my_matrix[a,4] <- combos[2,z]
+        my_matrix[a,5] <- nlevels(Top12SIGenera[,k])
+        my_matrix[a,6] <- sum(Top12SIGenera[,k]==combos[1,z], na.rm = T) #Number of samples in group1
+        my_matrix[a,7] <- sum(Top12SIGenera[,k]==combos[2,z], na.rm = T) #Number of samples in group2
+        my_matrix[a,8] <- colSums(is.na(Top12SIGenera[1]))
+        my_matrix[a,9] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test
+        my_matrix[a,12] <- mean(subset(Top12SIGenera, Top12SIGenera[c(k)] == combos[1,z], select = j)[,k])
+        my_matrix[a,13] <- mean(subset(Top12SIGenera, Top12SIGenera[c(k)] == combos[2,z], select = j)[,k])
+        a=a+1
+      }
+    }
+  }
+  my_matrix <- as.data.frame(my_matrix)
+  my_matrix[,9] <- as.numeric(as.character(my_matrix[,9]))
+  my_matrix[,10] <- p.adjust(c(my_matrix[,9]), method = 'bonferroni')
+  my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
+  
+  
+  write.table(my_matrix, file = "Top12_SI_Genera.txt", sep = "\t", col.names = T)
+
+*****
+PHYLA
+*****
+
+Phyla <- read.table(file = "LLD_IBD_PhylumComposition.txt", header = TRUE, sep = "\t",row.names = 1)
+Phyla <- Phyla[-c(7)]
+
+my_matrix<-  matrix(nrow = 6 * ncol(Phyla[c(2:ncol(Phyla))]), ncol = 13)
+colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Group1', 'Group2', 'NGroups', 'NSamplesG1', 'NSampleG2', 'NA', 'P-value', 'BonferroniAdjust', 'FDRadjust',  'Mean1', 'Mean2')
+
+
+#__Add correlation analysis data to the matrix 
+a=1 
+#Iterate through taxonomy columns
+for (j in 2:ncol(Phyla)) {
+  #iterate through phenotype columns
+  for (k in 1:1) {
+    #following conditions applied to all factor variables
+    combos <- combn(levels(Phyla[,k]),2)
+    #pairwise.wilcox.test 
+    wilcox <- (pairwise.wilcox.test(Phyla[,j], Phyla[,k], p.adjust.method = 'none'))$p.value
+    #condition applied to all factor variables with more than 2 groups
+    for (z in 1:ncol(combos)) {
+      #for each column in the combiantion matrices fill a row in my_matrix with the taxa name 
+      my_matrix[a,1] <- colnames(Phyla)[j]
+      #for each column in the combination matrices fill a row in my_matrix with the relevant phenotype  
+      my_matrix[a,2] <- colnames(Phyla)[k]
+      #adding the group combinations to my_matrix
+      my_matrix[a,3] <- combos[1,z]
+      my_matrix[a,4] <- combos[2,z]
+      my_matrix[a,5] <- nlevels(Phyla[,k])
+      my_matrix[a,6] <- sum(Phyla[,k]==combos[1,z], na.rm = T) #Number of samples in group1
+      my_matrix[a,7] <- sum(Phyla[,k]==combos[2,z], na.rm = T) #Number of samples in group2
+      my_matrix[a,8] <- colSums(is.na(Phyla[1]))
+      my_matrix[a,9] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test
+      my_matrix[a,12] <- mean(subset(Phyla, Phyla[c(k)] == combos[1,z], select = j)[,k])
+      my_matrix[a,13] <- mean(subset(Phyla, Phyla[c(k)] == combos[2,z], select = j)[,k])
+      a=a+1
+    }
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix[,9] <- as.numeric(as.character(my_matrix[,9]))
+my_matrix[,10] <- p.adjust(c(my_matrix[,9]), method = 'bonferroni')
+my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
+
+
+write.table(my_matrix, file = "TopPhlya.txt", sep = "\t", col.names = T)
+
+
+********
+FAMILIES
+********
+
+####______Top HC Families_________
+
+Top10HCFamilies <- read.table(file = "LLD_IBD_FamilyComposition_top10HC.txt", header = TRUE, sep = "\t",row.names = 1)
+Top10HCFamilies <- Top10HCFamilies[-c(12)]
+
+my_matrix<-  matrix(nrow = 6 * ncol(Top10HCFamilies[c(2:ncol(Top10HCFamilies))]), ncol = 13)
+colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Group1', 'Group2', 'NGroups', 'NSamplesG1', 'NSampleG2', 'NA', 'P-value', 'BonferroniAdjust', 'FDRadjust',  'Mean1', 'Mean2')
+
+
+#__Add correlation analysis data to the matrix 
+a=1 
+#Iterate through taxonomy columns
+for (j in 2:ncol(Top10HCFamilies)) {
+  #iterate through phenotype columns
+  for (k in 1:1) {
+    #following conditions applied to all factor variables
+    combos <- combn(levels(Top10HCFamilies[,k]),2)
+    #pairwise.wilcox.test 
+    wilcox <- (pairwise.wilcox.test(Top10HCFamilies[,j], Top10HCFamilies[,k], p.adjust.method = 'none'))$p.value
+    #condition applied to all factor variables with more than 2 groups
+    for (z in 1:ncol(combos)) {
+      #for each column in the combiantion matrices fill a row in my_matrix with the taxa name 
+      my_matrix[a,1] <- colnames(Top10HCFamilies)[j]
+      #for each column in the combination matrices fill a row in my_matrix with the relevant phenotype  
+      my_matrix[a,2] <- colnames(Top10HCFamilies)[k]
+      #adding the group combinations to my_matrix
+      my_matrix[a,3] <- combos[1,z]
+      my_matrix[a,4] <- combos[2,z]
+      my_matrix[a,5] <- nlevels(Top10HCFamilies[,k])
+      my_matrix[a,6] <- sum(Top10HCFamilies[,k]==combos[1,z], na.rm = T) #Number of samples in group1
+      my_matrix[a,7] <- sum(Top10HCFamilies[,k]==combos[2,z], na.rm = T) #Number of samples in group2
+      my_matrix[a,8] <- colSums(is.na(Top10HCFamilies[1]))
+      my_matrix[a,9] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test
+      my_matrix[a,12] <- mean(subset(Top10HCFamilies, Top10HCFamilies[c(k)] == combos[1,z], select = j)[,k])
+      my_matrix[a,13] <- mean(subset(Top10HCFamilies, Top10HCFamilies[c(k)] == combos[2,z], select = j)[,k])
+      a=a+1
+    }
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix[,9] <- as.numeric(as.character(my_matrix[,9]))
+my_matrix[,10] <- p.adjust(c(my_matrix[,9]), method = 'bonferroni')
+my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
+
+
+write.table(my_matrix, file = "Top10_HC_Families.txt", sep = "\t", col.names = T)
+
+
+####______Top SI Families_________
+
+Top10SIFamilies <- read.table(file = "LLD_IBD_FamilyComposition_top10SI.txt", header = TRUE, sep = "\t",row.names = 1)
+Top10SIFamilies <- Top10SIFamilies[-c(12)]
+
+my_matrix<-  matrix(nrow = 6 * ncol(Top10SIFamilies[c(2:ncol(Top10SIFamilies))]), ncol = 13)
+colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Group1', 'Group2', 'NGroups', 'NSamplesG1', 'NSampleG2', 'NA', 'P-value', 'BonferroniAdjust', 'FDRadjust',  'Mean1', 'Mean2')
+
+
+#__Add correlation analysis data to the matrix 
+a=1 
+#Iterate through taxonomy columns
+for (j in 2:ncol(Top10SIFamilies)) {
+  #iterate through phenotype columns
+  for (k in 1:1) {
+    #following conditions applied to all factor variables
+    combos <- combn(levels(Top10SIFamilies[,k]),2)
+    #pairwise.wilcox.test 
+    wilcox <- (pairwise.wilcox.test(Top10SIFamilies[,j], Top10SIFamilies[,k], p.adjust.method = 'none'))$p.value
+    #condition applied to all factor variables with more than 2 groups
+    for (z in 1:ncol(combos)) {
+      #for each column in the combiantion matrices fill a row in my_matrix with the taxa name 
+      my_matrix[a,1] <- colnames(Top10SIFamilies)[j]
+      #for each column in the combination matrices fill a row in my_matrix with the relevant phenotype  
+      my_matrix[a,2] <- colnames(Top10SIFamilies)[k]
+      #adding the group combinations to my_matrix
+      my_matrix[a,3] <- combos[1,z]
+      my_matrix[a,4] <- combos[2,z]
+      my_matrix[a,5] <- nlevels(Top10SIFamilies[,k])
+      my_matrix[a,6] <- sum(Top10SIFamilies[,k]==combos[1,z], na.rm = T) #Number of samples in group1
+      my_matrix[a,7] <- sum(Top10SIFamilies[,k]==combos[2,z], na.rm = T) #Number of samples in group2
+      my_matrix[a,8] <- colSums(is.na(Top10SIFamilies[1]))
+      my_matrix[a,9] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test
+      my_matrix[a,12] <- mean(subset(Top10SIFamilies, Top10SIFamilies[c(k)] == combos[1,z], select = j)[,k])
+      my_matrix[a,13] <- mean(subset(Top10SIFamilies, Top10SIFamilies[c(k)] == combos[2,z], select = j)[,k])
+      a=a+1
+    }
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix[,9] <- as.numeric(as.character(my_matrix[,9]))
+my_matrix[,10] <- p.adjust(c(my_matrix[,9]), method = 'bonferroni')
+my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
+
+
+write.table(my_matrix, file = "Top10_SI_Families.txt", sep = "\t", col.names = T)
+
+
+*******
+SPECIES
+*******
+
+####### _______ Top HC Species _______
+
+Top10HCSpecies <- read.table(file = "LLD_IBD_SpeciesComposition_top10HC.txt", header = TRUE, sep = "\t",row.names = 1)
+Top10HCSpecies <- Top10HCSpecies[-c(12)]
+
+my_matrix<-  matrix(nrow = 6 * ncol(Top10HCSpecies[c(2:ncol(Top10HCSpecies))]), ncol = 13)
+colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Group1', 'Group2', 'NGroups', 'NSamplesG1', 'NSampleG2', 'NA', 'P-value', 'BonferroniAdjust', 'FDRadjust',  'Mean1', 'Mean2')
+
+
+#__Add correlation analysis data to the matrix 
+a=1 
+#Iterate through taxonomy columns
+for (j in 2:ncol(Top10HCSpecies)) {
+  #iterate through phenotype columns
+  for (k in 1:1) {
+    #following conditions applied to all factor variables
+    combos <- combn(levels(Top10HCSpecies[,k]),2)
+    #pairwise.wilcox.test 
+    wilcox <- (pairwise.wilcox.test(Top10HCSpecies[,j], Top10HCSpecies[,k], p.adjust.method = 'none'))$p.value
+    #condition applied to all factor variables with more than 2 groups
+    for (z in 1:ncol(combos)) {
+      #for each column in the combiantion matrices fill a row in my_matrix with the taxa name 
+      my_matrix[a,1] <- colnames(Top10HCSpecies)[j]
+      #for each column in the combination matrices fill a row in my_matrix with the relevant phenotype  
+      my_matrix[a,2] <- colnames(Top10HCSpecies)[k]
+      #adding the group combinations to my_matrix
+      my_matrix[a,3] <- combos[1,z]
+      my_matrix[a,4] <- combos[2,z]
+      my_matrix[a,5] <- nlevels(Top10HCSpecies[,k])
+      my_matrix[a,6] <- sum(Top10HCSpecies[,k]==combos[1,z], na.rm = T) #Number of samples in group1
+      my_matrix[a,7] <- sum(Top10HCSpecies[,k]==combos[2,z], na.rm = T) #Number of samples in group2
+      my_matrix[a,8] <- colSums(is.na(Top10HCSpecies[1]))
+      my_matrix[a,9] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test
+      my_matrix[a,12] <- mean(subset(Top10HCSpecies, Top10HCSpecies[c(k)] == combos[1,z], select = j)[,k])
+      my_matrix[a,13] <- mean(subset(Top10HCSpecies, Top10HCSpecies[c(k)] == combos[2,z], select = j)[,k])
+      a=a+1
+    }
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix[,9] <- as.numeric(as.character(my_matrix[,9]))
+my_matrix[,10] <- p.adjust(c(my_matrix[,9]), method = 'bonferroni')
+my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
+
+
+write.table(my_matrix, file = "Top10_HC_Species.txt", sep = "\t", col.names = T)
+
+
+####### _______ Top SI Species _______
+
+Top10SISpecies <- read.table(file = "LLD_IBD_SpeciesComposition_top10SI.txt", header = TRUE, sep = "\t",row.names = 1)
+Top10SISpecies <- Top10SISpecies[-c(12)]
+
+my_matrix<-  matrix(nrow = 6 * ncol(Top10SISpecies[c(2:ncol(Top10SISpecies))]), ncol = 13)
+colnames(my_matrix) <- c('Taxonomy', 'Phenotype', 'Group1', 'Group2', 'NGroups', 'NSamplesG1', 'NSampleG2', 'NA', 'P-value', 'BonferroniAdjust', 'FDRadjust',  'Mean1', 'Mean2')
+
+
+#__Add correlation analysis data to the matrix 
+a=1 
+#Iterate through taxonomy columns
+for (j in 2:ncol(Top10SISpecies)) {
+  #iterate through phenotype columns
+  for (k in 1:1) {
+    #following conditions applied to all factor variables
+    combos <- combn(levels(Top10SISpecies[,k]),2)
+    #pairwise.wilcox.test 
+    wilcox <- (pairwise.wilcox.test(Top10SISpecies[,j], Top10SISpecies[,k], p.adjust.method = 'none'))$p.value
+    #condition applied to all factor variables with more than 2 groups
+    for (z in 1:ncol(combos)) {
+      #for each column in the combiantion matrices fill a row in my_matrix with the taxa name 
+      my_matrix[a,1] <- colnames(Top10SISpecies)[j]
+      #for each column in the combination matrices fill a row in my_matrix with the relevant phenotype  
+      my_matrix[a,2] <- colnames(Top10SISpecies)[k]
+      #adding the group combinations to my_matrix
+      my_matrix[a,3] <- combos[1,z]
+      my_matrix[a,4] <- combos[2,z]
+      my_matrix[a,5] <- nlevels(Top10SISpecies[,k])
+      my_matrix[a,6] <- sum(Top10SISpecies[,k]==combos[1,z], na.rm = T) #Number of samples in group1
+      my_matrix[a,7] <- sum(Top10SISpecies[,k]==combos[2,z], na.rm = T) #Number of samples in group2
+      my_matrix[a,8] <- colSums(is.na(Top10SISpecies[1]))
+      my_matrix[a,9] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test
+      my_matrix[a,12] <- mean(subset(Top10SISpecies, Top10SISpecies[c(k)] == combos[1,z], select = j)[,k])
+      my_matrix[a,13] <- mean(subset(Top10SISpecies, Top10SISpecies[c(k)] == combos[2,z], select = j)[,k])
+      a=a+1
+    }
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix[,9] <- as.numeric(as.character(my_matrix[,9]))
+my_matrix[,10] <- p.adjust(c(my_matrix[,9]), method = 'bonferroni')
+my_matrix[,11] <- p.adjust(c(my_matrix[,9]), method = 'fdr')
+
+
+write.table(my_matrix, file = "Top10_SI_Species.txt", sep = "\t", col.names = T)
 
 ```
 
@@ -564,6 +1364,9 @@ LLD_IBD_MetTax15$CombinedIDs <- NULL
 Stoma1 <- LLD_IBD_MetTax15[c(169)]
 
 
+***************
+ALPHA DIVERSITY
+***************
 
 # Alpha diversity (Shannon Index)
 
@@ -589,6 +1392,9 @@ Alpha_Stoma1x <- aggregate(Alpha_Stoma1[, 2], list(Alpha_Stoma1$CurrentStomaOrPo
 colnames(Alpha_Stoma1x) <- c("CurrentStomaOrPouchType", "MeanShannonIndex")
 
 
+**************
+BETA DIVERSITY
+**************
 
 #Beta diversity (PCoA, bray-curtis dissimilarity)
 
@@ -641,8 +1447,96 @@ ggplotly(j)
 ggplotly(k)
 
 
-#Wilcoxon test - comparing mean bray-curtis distances per group
-??
+================================================================================================================================================
+REVISED Manuscript - 17.12.20
+================================================================================================================================================
+
+#Functions
+Linear_model_2
+
+***************
+ALPHA DIVERSITY
+***************
+
+# --- Add all p-values for all possible comparisons ---
+
+my_comparisons=list(c("Resections","IleostomaPouch"),c("No Resections","Resections"),c("HealthyControl","No Resections"),c("No Resections","IleostomaPouch"),c("HealthyControl","Resections"),c("HealthyControl","IleostomaPouch"))
+
+ggplot(Alpha_Stoma1, aes (x=CurrentStomaOrPouchType, y=AlphaDiversity, fill=CurrentStomaOrPouchType)) + geom_violin() + geom_boxplot(width = 0.1, fill = "white") + theme_minimal() + theme(legend.position="none") + theme(axis.text.x = element_text(hjust = 0.5,vjust = 1, size=8,color="black")) + scale_fill_manual(values=c('grey54','slateblue2','gold1','red2')) + stat_compare_means(comparisons = my_comparisons, method = "wilcox.test") + ylab ("Shannon Index") + xlab ("Bowel Phenotype") + scale_x_discrete(labels=c('HealthyControl' = 'general population\n N = 1178', 'No Resections' = 'IBD non-resected intestine\n N = 309', 'Resections' = 'IBD resected intestine\n N = 169', 'IleostomaPouch' = 'IBD small intestine\n N = 57'))
+
+
+# --- Influence of confounders on alpha diversity ---
+
+SIvsColon <- LLD.IBD_MetaSp15.asin[c("DiagnosisCurrent", "NumberOfResectionsAny", "IleocecalValveInSitu", "AgeAtFecalSampling", 
+                                     "Sex", "PPI", "SmokeExposedToSmokeForMoreThanOneHour", "BowelMovementADayDef",
+                                     "P_plant_en","SUMOFKCAL", "BMI", "P_animal_en", "PFReads", "Alc_en" ,"antibiotics_merged",
+                                     "metformin", "beta_blockers", "FecalCalprotectinOver200yesno", "calcium", "vitamin_D", "folic_acid",
+                                     "paracetamol","mesalazines", "vitamin_B12", "oral_steroid", "ferrum", "CurrentStomaOrPouchType",colnames(LLD.IBD_MetaSp15.asin)[165:298])] # See section 6 for "LLD.IBD_MetaSp15.asin" dataframe
+
+#SIvsColon$CurrentStomaOrPouchType <- fct_collapse(SIvsColon$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
+
+### --- Impute missing values ---
+
+SIvsColon$NumberOfResectionsAny <- ifelse(SIvsColon$DiagnosisCurrent == "generalpopulation" & is.na(SIvsColon[2])== TRUE, 0, SIvsColon[,2])
+SIvsColon$NumberOfResectionsAny <- as.numeric(SIvsColon$NumberOfResectionsAny)
+
+SIvsColon$IleocecalValveInSitu <- ifelse(SIvsColon$DiagnosisCurrent == "generalpopulation" & is.na(SIvsColon[3])== TRUE, "yes", as.character(SIvsColon[,3]))
+SIvsColon$IleocecalValveInSitu <- as.factor(SIvsColon$IleocecalValveInSitu)
+
+
+# Impute median for numerical variables & least presumptive for categorical
+for (i in 1:ncol(SIvsColon)) {
+  if(is.numeric(SIvsColon[,i])){
+    #list_na <- colnames(SIvsColon)[apply(SIvsColon, 2, anyNA)]
+    SIvsColon[,i] <- ifelse(is.na(SIvsColon[,i]),
+                            median(SIvsColon[,i], na.rm = TRUE),
+                            as.numeric(SIvsColon[,i]))
+  }
+  if(length(levels(SIvsColon[,i])) == 2){
+    SIvsColon[,i] <- ifelse(is.na(SIvsColon[,i]),
+                            "no",
+                            as.character(SIvsColon[,i]))
+    SIvsColon[,i] <- as.factor(SIvsColon[,i])
+  }
+}
+
+SIvsColon$SmokeExposedToSmokeForMoreThanOneHour <- ifelse(is.na(SIvsColon$SmokeExposedToSmokeForMoreThanOneHour),
+                          "RarelyOrNever",
+                          as.character(SIvsColon[,7]))
+SIvsColon$SmokeExposedToSmokeForMoreThanOneHour <- as.factor(SIvsColon$SmokeExposedToSmokeForMoreThanOneHour)
+
+# --- Linear regression ---
+
+Alpha1 <- as.data.frame(diversity(LLD_IBD_MetTax15[,c(747:880)], index="shannon"))
+colnames(Alpha1)[1] <- 'AlphaDiversity' 
+
+SIvsColon2 <- cbind(Alpha1,SIvsColon)
+
+SIvsColon2$CurrentStomaOrPouchType <- factor(SIvsColon2$CurrentStomaOrPouchType, levels = c("IleostomaPouch","HealthyControl", "No Resections", "Resections"))
+
+SIvsColon2$SmokeExposedToSmokeForMoreThanOneHour <- factor(SIvsColon2$SmokeExposedToSmokeForMoreThanOneHour, levels = c("RarelyOrNever","OncePerWeek", "MoreThanOncePerWeek", "Daily"))
+
+x = SIvsColon2[,-c(2,3,4,24,29:162)]
+my_Lm_sum <- Linear_model_2(x) 
+
+write.table(my_Lm_sum, file = "AlphaDiversity_AfterCovariateCorrection.txt", sep = "\t", col.names = T)
+
+***************
+BETA DIVERSITY
+***************
+
+# Add variance explained percentages to the x and y axis
+
+beta <- vegdist(LLD_IBD_TaxaS1, method="bray")
+my_pcoa <- cmdscale(beta, eig = T)
+Var_expl <- round(my_pcoa$eig/sum(my_pcoa$eig)*100,digits = 1)
+
+
+ggplot(PCoA_values, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) + 
+  labs(y=paste("PCo2 (", Var_expl[2],"%)", sep="") , x=paste("PCo1 (", Var_expl[1],"%)", sep=""), color = "Bowel Phenotype") + geom_point(size = 2) + 
+  scale_color_manual(labels = c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD small intestine'), values=c('grey54','slateblue2', 'gold1', 'red2')) + 
+  theme_classic() + geom_point(data = gd, size = 5, shape=24, fill = c('grey44','slateblue3', 'gold2', 'red3'), color = 'black') 
+
  ```
 
 
