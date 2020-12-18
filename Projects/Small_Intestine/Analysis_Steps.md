@@ -1451,8 +1451,8 @@ ggplotly(k)
 REVISED Manuscript - 17.12.20
 ================================================================================================================================================
 
-#Functions
-Linear_model_2
+#Functions required
+Linear_model_2, point 14
 
 ***************
 ALPHA DIVERSITY
@@ -1525,6 +1525,19 @@ write.table(my_Lm_sum, file = "AlphaDiversity_AfterCovariateCorrection.txt", sep
 BETA DIVERSITY
 ***************
 
+#With centroids
+gd <- PCoA_values %>% 
+  group_by(CurrentStomaOrPouchType) %>% 
+  summarise(V1 = mean(V1),
+            V2  = mean(V2))
+
+
+ggplot(PCoA_values, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) + 
+  labs(y="PCo2", x="PCo1", color = "Bowel Phenotype") + geom_point(size = 2) + 
+  scale_color_manual(labels = c('HealthyControl' = 'general population', 'No Resections' = 'IBD non-resected bowel', 'Resections' = 'IBD resected bowel', 'IleostomaPouch' = 'IBD small intestine'), values=c('grey54','slateblue2', 'gold1', 'red2')) + 
+  theme_classic() + geom_point(data = gd, size = 5, shape=24, fill = c('grey44','slateblue3', 'gold2', 'red3'), color = 'black')
+
+
 # Add variance explained percentages to the x and y axis
 
 beta <- vegdist(LLD_IBD_TaxaS1, method="bray")
@@ -1537,7 +1550,111 @@ ggplot(PCoA_values, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) +
   scale_color_manual(labels = c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD small intestine'), values=c('grey54','slateblue2', 'gold1', 'red2')) + 
   theme_classic() + geom_point(data = gd, size = 5, shape=24, fill = c('grey44','slateblue3', 'gold2', 'red3'), color = 'black') 
 
- ```
+
+## --- IBD-Res stratified according to ileocecal valve status ---
+
+#Import table generated from 'plot_pcoa' function
+PCoA_values <- read.table(file = "../RScripts/pcoa_tableALL.txt", header = TRUE, sep = "\t", quote = "\\") 
+#rownames(PCoA_values) <- PCoA_values$X
+#PCoA_values$X <- NULL
+
+Valve <- LLD_IBD_MetTax15[c(231)] 
+merge1 <- merge(Valve,PCoA_values, by = "row.names")
+merge1$IleocecalValveInSitu[is.na(merge1$IleocecalValveInSitu)] <- "yes"
+
+PCoA_valve <- merge1 %>% 
+  mutate(CurrentStomaOrPouchType = ifelse(IleocecalValveInSitu =="no", gsub('Resections', 'NotInSitu', CurrentStomaOrPouchType), as.character(CurrentStomaOrPouchType)))
+
+PCoA_valve$CurrentStomaOrPouchType <- factor(PCoA_valve$CurrentStomaOrPouchType, levels=c("HealthyControl", "No Resections","Resections","NotInSitu", "IleostomaPouch"))
+rownames(PCoA_valve) <- PCoA_valve$Row.names
+PCoA_valve[,1:2] <- NULL
+
+#With centroids
+gd <- PCoA_valve %>% 
+  group_by(CurrentStomaOrPouchType) %>% 
+  summarise(V1 = mean(V1),
+            V2  = mean(V2))
+
+beta <- vegdist(LLD_IBD_TaxaS1, method="bray")
+my_pcoa <- cmdscale(beta, eig = T)
+Var_expl <- round(my_pcoa$eig/sum(my_pcoa$eig)*100,digits = 1)
+
+ggplot(PCoA_valve, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) + 
+  labs(y=paste("PCo2 (", Var_expl[2],"%)", sep="") , x=paste("PCo1 (", Var_expl[1],"%)", sep=""), color = "Bowel Phenotype") + geom_point(size = 2) + 
+  scale_color_manual(labels = c('HealthyControl' = 'General population', 'No Resections' = 'IBD-NoRes', 'Resections' = 'IBD-Res_InSitu', 'NotInSitu' = 'IBD-Res_NotInSitu', 'IleostomaPouch' = 'IBD small intestine'), values=c('grey54','slateblue2', 'gold1','#FA8072', 'red2')) + 
+  theme_classic() + geom_point(data = gd, size = 5, shape=24, fill = c('grey44','slateblue3', 'gold2','#FA8072', 'red3'), color = 'black')
+
+
+## --- PERMANOVA with covariates --- 
+
+SI_NonSI_taxa <- LLD.IBD_MetaSp15.asin[c(165:ncol(LLD.IBD_MetaSp15.asin))]
+colnames(SIvsColon)[colSums(is.na(SIvsColon)) > 0]
+table(is.na(Test$P_plant_en))
+
+SIvsColon <- LLD.IBD_MetaSp15.asin[c("DiagnosisCurrent", "NumberOfResectionsAny", "IleocecalValveInSitu", "AgeAtFecalSampling", 
+                                       "Sex", "PPI", "SmokeExposedToSmokeForMoreThanOneHour", "BowelMovementADayDef",
+                                       "P_plant_en","SUMOFKCAL", "BMI", "P_animal_en", "PFReads", "Alc_en" ,"antibiotics_merged",
+                                       "metformin", "beta_blockers", "FecalCalprotectinOver200yesno", "calcium", "vitamin_D", "folic_acid",
+                                     "paracetamol","mesalazines", "vitamin_B12", "oral_steroid", "ferrum", "CurrentStomaOrPouchType",colnames(LLD.IBD_MetaSp15.asin)[165:298])]
+
+#SIvsColon$CurrentStomaOrPouchType <- fct_collapse(SIvsColon$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
+
+#Impute missing values 
+
+SIvsColon$NumberOfResectionsAny <- ifelse(SIvsColon$DiagnosisCurrent == "generalpopulation" & is.na(SIvsColon[2])== TRUE, 0, SIvsColon[,2])
+SIvsColon$NumberOfResectionsAny <- as.numeric(SIvsColon$NumberOfResectionsAny)
+
+SIvsColon$IleocecalValveInSitu <- ifelse(SIvsColon$DiagnosisCurrent == "generalpopulation" & is.na(SIvsColon[3])== TRUE, "yes", as.character(SIvsColon[,3]))
+SIvsColon$IleocecalValveInSitu <- as.factor(SIvsColon$IleocecalValveInSitu)
+
+
+table(is.na(SIvsColon$IleocecalValveInSitu ),SIvsColon$DiagnosisCurrent)
+table(SIvsColon$DiagnosisCurrent,SIvsColon$IleocecalValveInSitu)
+table(is.na(SIvsColon$SmokeExposedToSmokeForMoreThanOneHour ),SIvsColon$DiagnosisCurrent)
+table(SIvsColon$DiagnosisCurrent,SIvsColon$SmokeExposedToSmokeForMoreThanOneHour)
+
+
+# Impute median for numerical variables & least presumptive for categorical
+for (i in 1:ncol(SIvsColon)) {
+  if(is.numeric(SIvsColon[,i])){
+    #list_na <- colnames(SIvsColon)[apply(SIvsColon, 2, anyNA)]
+    SIvsColon[,i] <- ifelse(is.na(SIvsColon[,i]),
+                            median(SIvsColon[,i], na.rm = TRUE),
+                            as.numeric(SIvsColon[,i]))
+  }
+  if(length(levels(SIvsColon[,i])) == 2){
+    SIvsColon[,i] <- ifelse(is.na(SIvsColon[,i]),
+                            "no",
+                            as.character(SIvsColon[,i]))
+  }
+}
+
+SIvsColon$SmokeExposedToSmokeForMoreThanOneHour <- ifelse(is.na(SIvsColon$SmokeExposedToSmokeForMoreThanOneHour),
+                                                          "RarelyOrNever",
+                                                          as.character(SIvsColon[,7]))
+
+# PERMANOVA without IBD specific variables
+ad1 <- adonis(formula = SI_NonSI_taxa ~ AgeAtFecalSampling+ 
+               Sex + PPI + SmokeExposedToSmokeForMoreThanOneHour+ BowelMovementADayDef+
+               P_plant_en+SUMOFKCAL+BMI+P_animal_en+PFReads+Alc_en +antibiotics_merged+
+               metformin+beta_blockers+FecalCalprotectinOver200yesno+calcium+vitamin_D+folic_acid+
+               paracetamol+vitamin_B12+oral_steroid+ferrum+CurrentStomaOrPouchType, data = SIvsColon, permutations = 9999, method = "bray")
+aov_table1 <- ad1$aov.tab
+adonis_All_3 <- matrix(ncol = 4, nrow=23) 
+adonis_All_3[,4]=nrow(SIvsColon)
+adonis_All_3[,1]=aov_table1[1:23,1]
+adonis_All_3[,2]=aov_table1[1:23,5]
+adonis_All_3[,3]=aov_table1[1:23,6]
+
+adonis_All_3 <- as.data.frame(adonis_All_3)
+
+colnames(adonis_All_3) <- c("Df", "R2", "Pr(>F)", "Num.samples")
+rownames(adonis_All_3)=rownames(aov_table1)[1:23]
+adonis_All_3$FDR <- p.adjust(c(adonis_All_3[,3]), method = 'fdr')
+
+write.table(adonis_All_3, file = "PERMANOVA_withCovariates.txt", sep = "\t", col.names = T)
+
+```
 
 
 ### 5. Bacterial species abundance vs. number of resections
