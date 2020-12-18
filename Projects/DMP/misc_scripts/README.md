@@ -4,4 +4,5 @@ This folder contains selection of miscellaneous scripts used in data analysis of
 
 ### Scripts
 
-- ROMEIII_classification.md : scheme for assignment of functional gastrointestinal disorders in participants based on ROMEIII criteria
+- ROMEIII_classification.md : script for assignment of functional gastrointestinal disorders in participants based on ROMEIII criteria
+- Diet_consistancy_analysis.R : script for analysis of diet consistency over 5-year time period using sample-concurrent and previously collected diet questionnaires
