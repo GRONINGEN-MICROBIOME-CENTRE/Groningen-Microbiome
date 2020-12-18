@@ -767,3 +767,52 @@ LgRgr.DescriptiveStats <- function(DF, nPheno, colTaxa){
 }
 
 ```
+
+========================================================================================================================================================
+REVISED Manucript functions - 17.12.20
+========================================================================================================================================================
+
+
+### 14. Linear_model_2
+```{r}
+
+Linear_model_2 <- function(x){
+Nlevels <- vector()
+NonFactors <- vector()
+  for (i in 2:ncol(x)) {
+    if(is.factor(x[,i])) {
+      Nlevels <- c(Nlevels, (nlevels(x[,i])-1))
+    }
+    else {
+      NonFactors <- c(NonFactors, colnames(x)[i])
+    }
+    #create matrix 
+    my_matrix<-  matrix(nrow = (length(NonFactors) + sum(Nlevels)), ncol = 9)
+    colnames(my_matrix) <- c('Intercept', 'Phenotype', 'Estimate', 'Std.Error', 't_value','P.value','Adj.r.squared','BonferroniAdjust','FDRAdjust')
+  }
+
+
+  #Add linear model results to the matrix 
+  a=1 
+  #Iterate through taxonomy columns
+  for (j in 1) {
+    my_model <- lm(x[,j] ~ ., data = x[,2:ncol(x)])
+    for(k in 2:nrow(summary(my_model)$coefficients)){
+      my_matrix[a,1] <- colnames(x)[j]
+      my_matrix[a,2] <- rownames(summary(my_model)$coefficients)[k]
+      my_matrix[a,3] <- summary(my_model)$coefficients[k,1]
+      my_matrix[a,4] <- summary(my_model)$coefficients[k,2]
+      my_matrix[a,5] <- summary(my_model)$coefficients[k,3]
+      my_matrix[a,6] <- summary(my_model)$coefficients[k,4]
+      my_matrix[a,7] <- summary(my_model)$adj.r.squared
+      a=a+1
+    }
+  }
+  my_matrix <- as.data.frame(my_matrix)
+  my_matrix[,6] <- as.numeric(as.character(my_matrix[,6]))
+  my_matrix[,8] <- p.adjust(c(my_matrix[,6]), method = 'bonferroni')
+  my_matrix[,9] <- p.adjust(c(my_matrix[,6]), method = 'fdr')
+  return(my_matrix)
+}
+
+```
