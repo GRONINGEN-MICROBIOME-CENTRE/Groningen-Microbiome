@@ -1,0 +1,6 @@
+variance pa pe
+covdef ANTHRO.AGE2 ANTHRO.AGE 2 ^
+covariate ANTHRO.AGE ANTHRO.AGE2 gender ANTHRO.BMI META.DNA.postclean.reads META.POOP.Freq
+model a
+norm off
+traitall
