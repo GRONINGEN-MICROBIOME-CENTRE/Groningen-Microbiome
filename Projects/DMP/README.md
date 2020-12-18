@@ -14,6 +14,7 @@ This github repo describes workflow and codes using in The Dutch Microbiome Proj
 - Microbiome clustering
 - Microbiome-association analyses
 - Miscellaneous scripts
+- Supporting R scripts
 #
 
 ## Microbiome profiling
@@ -33,3 +34,7 @@ POLY workflow and models are included in *heritability_analysis* folder
 ## Miscellaneous scripts
 
 *misc_scripts* folder contains miscellaneous used in data analysis not covered by other groups. For example, scripts for comparison of diet questionnaires over time and assigment of gastrointestinal disorders using ROMEIII criteria
+
+## Supporting R scripts
+
+*r_scripts_library* folder contains R functions used for various tasks (such as generation of supplementary data, plots, data parsing...). These functions were developed by Weersma group for internal use and are provided as-is, without comprehensive documentation
