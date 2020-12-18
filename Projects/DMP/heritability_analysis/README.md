@@ -2,7 +2,7 @@
 
 The folder contains scripts used to execute heritability analysis and POLY model files
 
-### Links to software:
+### Links to software used in heritability analysis:
 
 - POLY: https://people.virginia.edu/~wc9c/poly/input.html
 - pedtools: https://csg.sph.umich.edu/abecasis/pedstats/download/index.html
