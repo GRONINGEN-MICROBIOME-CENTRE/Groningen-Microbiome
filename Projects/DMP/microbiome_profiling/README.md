@@ -1,4 +1,4 @@
-## DMP, microbiome profiling example jobs
+## DMP microbiome profiling, example jobs
 
 This folder shows examples of SLURM jobs used for microbiome profiling of DMP samples (example is for 1 sample, equivalent jobs were executed for all samples):
 
