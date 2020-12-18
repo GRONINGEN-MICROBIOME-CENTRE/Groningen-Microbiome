@@ -10,3 +10,5 @@ and groups of phentypes
 - DMP_do_multivar_adonis.R : script for quantification of variance of microbiome functionality or composition explained by a group of phenotypes
 - DMP_collect_adonis_results.R : script for collection of results produced by DMP_do_univar_adonis_taxa or DMP_do_univar_adonis_PWYs results
 - DMP_check_adonis_results.R : script for identification of failed adonis jobs
+- DMP_variance_explained_plots.R : script for plotting results of multivariate adonis analysis
+- ./group_adonis/ : folder with input files for multivariate adonis plots and output of the script
