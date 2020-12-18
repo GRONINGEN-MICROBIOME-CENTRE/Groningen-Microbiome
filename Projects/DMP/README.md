@@ -13,6 +13,7 @@ This github repo describes workflow and codes using in The Dutch Microbiome Proj
 - Identification of core and keystone microbes 
 - Microbiome clustering
 - Microbiome-association analyses
+- Miscellaneous scripts
 #
 
 ## Microbiome profiling
@@ -22,3 +23,13 @@ Taxonomic composition of metagenomes was profiled by MetaPhlAn2 tool (v2.7.2) us
 
 An example of metagenome processing jobs is provided in *microbiome_profiling* folder
 
+## Heritability analysis
+
+We estimated the heritability of microbiome features using a variance components model implemented in the software POLY (v.0.5.1). We first considered a base model in which variance is partitioned into a polygenic component, Vg, shared between individuals that is proportional to their kinship coefficient, and an environmental component, Ve, that is unique to each individual. Thus, if Y is the measured trait, the variance of Y is Var(Y) =Vg+Ve, and its broad heritability is H2=Vg/(Vg+Ve). Of note, this measure reflects the overall impact of genes on the phenotype, thus including all potential models of action, as opposed to narrow heritability, which only includes additive effects. After fitting this base model, we also considered two refined models that included i) an additional variance component to model a shared environment for people belonging to the same family, Vh, and ii) a covariate with values 0/1 that distinguishes family members currently living in the same house from those who do not. We compared the significance of these two models to the basic model using a likelihood ratio test and found the base model to be the most appropriate fit for all microbiome traits.
+We restricted the analysis of heritability to the relative abundances of the 242 microbial taxa present in at least 250 individuals and focused on 4,745 individuals in 2,756 families in which at least two individuals had available microbiome data. In total, the analysis included 2,756 parent-child pairs, 530 sibling pairs and 815 pairs with second-degree or more distant relationships. All models were adjusted for age, sex, BMI, read depth and stool frequency, and values of relative abundances of taxa were transformed using the centred log-ratio (clr) transformation36. Benjamini-Hochberg correction was used to control the multiple testing false discovery rate (FDR), and results with FDR < 0.1 were considered significant. 
+
+POLY workflow and models are included in *heritability_analysis* folder
+
+## Miscellaneous scripts
+
+*misc_scripts* folder contains miscellaneous used in data analysis not covered by other groups. For example, scripts for comparison of diet questionnaires over time and assigment of gastrointestinal disorders using ROMEIII criteria
