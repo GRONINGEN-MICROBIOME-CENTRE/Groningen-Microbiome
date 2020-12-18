@@ -31,6 +31,20 @@ We restricted the analysis of heritability to the relative abundances of the 242
 
 POLY workflow and models are included in *heritability_analysis* folder
 
+## Analysis of core and keystone microbiome features
+
+To identify core microbial species and pathways, we used a bootstrapping-based selection approach. We randomly sampled 1% to 100% of the samples of the cohort a hundred times and calculated the standard deviation of the presence rate of each microbial species/pathway at different sampling percentages. Microbial features with a presence rate of more than 95% of samples were defined as the core microbiome. 
+To analyse microbiome community structure, we constructed microbial species and pathway co-abundance networks using SparCC tool for network inference. Relative abundances of taxa were converted to estimated read counts by multiplying abundance percentages by total sequenced reads per sample after quality control. For pathway analysis, the read counts (RPKM) from HUMAnN2 were directly used for SparCC. Significant co-abundance was controlled at FDR 0.05 level using 100 permutations. In each permutation, the abundance of each microbial feature was randomly shuffled across samples.
+
+Scripts for identification of core microbiome and keystone feature are in *core_keystone_microbes* folder
+
+
+## Microbiome clustering
+
+To identify microbial clusters and assess the presence of gut enterotypes in our cohort, we performed the partitioning around the medoid method on the relative abundances of microbial species and used the Calinski-Harabasz index to select the optimal number of clusters, as previously published in a study of gut enterotypes. Enrichment of phenotypes in each cluster was assessed by logistic regression in R
+
+Codes used for clustering, plotting of clusters and enrichment analysis are in *microbiome_clustering* folder
+
 ## Miscellaneous scripts
 
 *misc_scripts* folder contains miscellaneous used in data analysis not covered by other groups. For example, scripts for comparison of diet questionnaires over time and assigment of gastrointestinal disorders using ROMEIII criteria
