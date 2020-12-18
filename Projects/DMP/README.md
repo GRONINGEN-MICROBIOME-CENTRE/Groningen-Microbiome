@@ -12,7 +12,8 @@ This github repo describes workflow and codes using in The Dutch Microbiome Proj
 - Heritability analysis
 - Identification of core and keystone microbes 
 - Microbiome clustering
-- Microbiome-association analyses
+- Calculation of microbiome variance explained by phenotypes
+- Microbiome-phenotypes association analyses
 - Miscellaneous scripts
 - Supporting R scripts
 #
@@ -38,12 +39,23 @@ To analyse microbiome community structure, we constructed microbial species and 
 
 Scripts for identification of core microbiome and keystone feature are in *core_keystone_microbes* folder
 
-
 ## Microbiome clustering
 
 To identify microbial clusters and assess the presence of gut enterotypes in our cohort, we performed the partitioning around the medoid method on the relative abundances of microbial species and used the Calinski-Harabasz index to select the optimal number of clusters, as previously published in a study of gut enterotypes. Enrichment of phenotypes in each cluster was assessed by logistic regression in R
 
 Codes used for clustering, plotting of clusters and enrichment analysis are in *microbiome_clustering* folder
+
+## Calculation of microbiome variance explained by phenotypes
+
+The microbiome composition variance explained by phenotypes was calculated by permutational multivariate analysis of variance using distance matrices, implemented in the adonis function for R package vegan (v.2.4-6), using 20,000 permutations and a Bray-Curtis distance matrix calculated using relative abundances of microbial species. A separate analysis was performed to calculate the microbiome functional potential explained by phenotypes using equivalent methodology. The functional dissimilarity matrix was calculated using the Bray-Curtis dissimilarity index calculated on the relative abundances of MetaCyc microbial biochemical pathways.
+
+Scripts used for calculation are in *microbiome_variance*
+
+## Microbiome-phenotypes association analyses
+
+Prior to the association analysis of phenotypes and microbiome features, the microbiome data was transformed using the clr transformation. The geometric mean for clr transformation of relative abundances of taxa was calculated on species-level and applied to higher levels. The associations between phenotypes and microbial features (microbial taxa, MetaCyc functional pathways, CARD and VFDB entities) were calculated using linear regression, adjusting for age, sex and BMI of the individual along with Bristol stool scale of the faecal sample and technical factors (DNA concentration, sequencing read depth, sequencing batch and sampling season). Benjamini-Hochberg correction was used to control for multiple testing with the number of tests equal to the number of tested feature‒phenotype pairs. 
+
+*association_analysis* folder contains scripts used for association analysis
 
 ## Miscellaneous scripts
 
