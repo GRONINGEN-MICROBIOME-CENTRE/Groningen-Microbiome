@@ -14,6 +14,7 @@ This github repo describes workflow and codes using in The Dutch Microbiome Proj
 - Microbiome clustering
 - Calculation of microbiome variance explained by phenotypes
 - Microbiome-phenotypes association analyses
+- Calculation of General Microbiome Health Index (GMHI)
 - Miscellaneous scripts
 - Supporting R scripts
 #
@@ -56,6 +57,18 @@ Scripts used for calculation are in *microbiome_variance*
 Prior to the association analysis of phenotypes and microbiome features, the microbiome data was transformed using the clr transformation. The geometric mean for clr transformation of relative abundances of taxa was calculated on species-level and applied to higher levels. The associations between phenotypes and microbial features (microbial taxa, MetaCyc functional pathways, CARD and VFDB entities) were calculated using linear regression, adjusting for age, sex and BMI of the individual along with Bristol stool scale of the faecal sample and technical factors (DNA concentration, sequencing read depth, sequencing batch and sampling season). Benjamini-Hochberg correction was used to control for multiple testing with the number of tests equal to the number of tested feature‒phenotype pairs. 
 
 *association_analysis* folder contains scripts used for association analysis
+
+## Calculation of microbiome signatures predictive of diseases and health
+
+We calculated the microbial signatures predictive of the 36 most common (Ncases > 100) diseases in our dataset. In addition, we defined a “healthy” phenotype as an absence of any self-reported disease. Using this definition, 2,937 (36%) out of 8,208 individuals were defined as “healthy”. To build prediction models for common diseases, the dataset was randomly split into training (90%) and test (10%) sets. Next, we performed elastic net L1/L2 regularized regression (R package glmnet v.4.0) on the training set, using Shannon diversity, clr-transformed microbial taxa, clr-transformed MetaCyc bacterial pathways and age, sex and BMI as fixed covariates (not penalized in the models). The model for each disease was calculated independently using five-fold cross-validation to select the optimal lambda penalization factor (at L1/L2 mixing parameter alpha fixed at 0.5). The lambda with minimal cross-validation error was used in the downstream analysis. In total, we defined three probabilistic models: a “null” signature that only includes effects of general covariates (age, sex and BMI), a “microbiome” signature that includes all selected microbiome features and a “combined” signature that includes both the effects of microbiome features and general covariates.
+
+*health_disease_prediction* lists scripts used for training and testing of prediction models
+
+## Calculation of General Microbiome Health Index (GMHI)
+
+We calculated the recently developed Gut Microbiome Health Index (GMHI) for DMP data, using the parameters identified in GMHI study (Gupta et al., Nature Comm. 2020) on our data. 
+
+*ghmi* folder contains scripts used for calcuation of GMHI
 
 ## Miscellaneous scripts
 
