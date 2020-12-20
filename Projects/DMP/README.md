@@ -14,6 +14,7 @@ This github repo describes workflow and codes using in The Dutch Microbiome Proj
 - Microbiome clustering
 - Calculation of microbiome variance explained by phenotypes
 - Microbiome-phenotypes association analyses
+- Calculation of microbiome signatures predictive of diseases and health
 - Calculation of General Microbiome Health Index (GMHI)
 - Miscellaneous scripts
 - Supporting R scripts
