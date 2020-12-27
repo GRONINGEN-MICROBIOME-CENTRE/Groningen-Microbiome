@@ -1472,9 +1472,9 @@ l <- ggplot(PCoA_valuesIBD, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) + l
 
 ggplotly(l)
 
-*****************************************
+******************************************************
 Small Intestine Only (i.e. Ileostomy & Ileoanal Pouch)
-*****************************************
+******************************************************
 
 StomaSI <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "IleostomaPouch" , select = CurrentStomaOrPouchType)
 
@@ -3457,9 +3457,9 @@ REVISED Manuscript - 17.12.20
 library(reshape2)
 Prev  #see 'Functions' #see 'Functions' file, point 12.
 
-***************
-Display Results 
-***************
+***************************
+Display Results (Figure 3b) 
+***************************
 
 LogRegr <- read.table("../RScripts/LogisticRegression_SIvsColon1.txt", header = TRUE, sep = "\t", row.names = 1)
 LogRegr <- subset(LogRegr, Phenotype == "CurrentStomaOrPouchType")
