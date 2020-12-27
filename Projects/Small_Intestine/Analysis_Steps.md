@@ -1447,6 +1447,53 @@ ggplotly(j)
 ggplotly(k)
 
 
+***********************************
+IBD Only (i.e. IBD-NoRes & IBD-Res)
+***********************************
+
+StomaIBD <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections" , select = CurrentStomaOrPouchType)
+
+StomaIBD$CurrentStomaOrPouchType <- as.numeric(StomaIBD$CurrentStomaOrPouchType)
+
+IBD_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections" , select = c(165:ncol(LLD.IBD_MetaSp15.asin)))
+
+#Run PCoA function
+plot_pcoa(IBD_taxa,5,StomaIBD) 
+
+#Import table generated from 'plot_pcoa' function
+PCoA_valuesIBD <- read.table(file = "../RScripts/pcoa_tableIBD.txt", header = TRUE, sep = "\t",row.names = 1)
+
+PCoA_valuesIBD$CurrentStomaOrPouchType <- factor(PCoA_valuesIBD$CurrentStomaOrPouchType, levels=c("No Resections", "Resections"))
+
+#Plot PCoA graphs
+#PCoA1 vs PCoA2
+
+l <- ggplot(PCoA_valuesIBD, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) + labs(y="PCoA2", x="PCoA1", color = "Bowel Phenotype") + geom_point(size = 2) + scale_color_manual(labels = c('No Resections' = 'IBD non-resected bowel', 'Resections' = 'IBD resected bowel'), values=c('slateblue2', 'gold1')) + theme_classic() 
+
+ggplotly(l)
+
+*****************************************
+Small Intestine Only (i.e. Ileostomy & Ileoanal Pouch)
+*****************************************
+
+StomaSI <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "IleostomaPouch" , select = CurrentStomaOrPouchType)
+
+StomaSI$CurrentStomaOrPouchType <- as.numeric(StomaSI$CurrentStomaOrPouchType)
+
+SmallIntestine_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "IleostomaPouch" , select = c(165:ncol(LLD.IBD_MetaSp15.asin)))
+
+#Run PCoA function
+plot_pcoa(SmallIntestine_taxa,3,StomaSI) #with 5 PCoA elements - table renamed to pcoa_table5LLD
+
+#Import table generated from 'plot_pcoa' function
+PCoA_valuesSI <- read.table(file = "../RScripts/pcoa_tableSI.txt", header = TRUE, sep = "\t",row.names = 1)
+
+#Plot PCoA graphs
+#PCoA1 vs PCoA2
+
+ggplot(PCoA_valuesSI, aes(x=V1, y=V2)) + labs(y="PCoA2", x="PCoA1") + geom_point(size = 2, colour = "red2") + theme_classic() 
+
+
 ================================================================================================================================================
 REVISED Manuscript - 17.12.20
 ================================================================================================================================================
@@ -1549,6 +1596,56 @@ ggplot(PCoA_values, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) +
   labs(y=paste("PCo2 (", Var_expl[2],"%)", sep="") , x=paste("PCo1 (", Var_expl[1],"%)", sep=""), color = "Bowel Phenotype") + geom_point(size = 2) + 
   scale_color_manual(labels = c('HealthyControl' = 'General Population', 'No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine', 'IleostomaPouch' = 'IBD small intestine'), values=c('grey54','slateblue2', 'gold1', 'red2')) + 
   theme_classic() + geom_point(data = gd, size = 5, shape=24, fill = c('grey44','slateblue3', 'gold2', 'red3'), color = 'black') 
+
+## --- IBD Only ---
+
+PCoA_valuesIBD <- read.table(file = "../RScripts/pcoa_tableIBD.txt", header = TRUE, sep = "\t",row.names = 1)
+PCoA_valuesIBD$CurrentStomaOrPouchType <- factor(PCoA_valuesIBD$CurrentStomaOrPouchType, levels=c("No Resections", "Resections"))
+
+StomaIBD <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections" , select = CurrentStomaOrPouchType)
+StomaIBD$CurrentStomaOrPouchType <- as.numeric(StomaIBD$CurrentStomaOrPouchType)
+IBD_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "Resections" | CurrentStomaOrPouchType == "No Resections" , select = c(165:ncol(LLD.IBD_MetaSp15.asin)))
+
+beta1 <- vegdist(IBD_taxa, method="bray")
+my_pcoa1 <- cmdscale(beta1, eig = T)
+Var_expl1 <- round(my_pcoa1$eig/sum(my_pcoa1$eig)*100,digits = 1)
+
+gd1 <- PCoA_valuesIBD %>% 
+  group_by(CurrentStomaOrPouchType) %>% 
+  summarise(V1 = mean(V1),
+            V2  = mean(V2))
+            
+#Plot PCoA graphs
+#PCo1 vs PCo2
+
+ggplot(PCoA_valuesIBD, aes(x=V1, y=V2, color= CurrentStomaOrPouchType)) + 
+  labs(y=paste("PCo2 (", Var_expl1[2],"%)", sep="") , x=paste("PCo1 (", Var_expl1[1],"%)", sep=""), color = "Bowel Phenotype") + geom_point(size = 2) + 
+  scale_color_manual(labels = c('No Resections' = 'IBD non-resected intestine', 'Resections' = 'IBD resected intestine'), values=c('slateblue2', 'gold1')) + 
+  theme_classic() + geom_point(data = gd1, size = 5, shape=24, fill = c('slateblue3', 'gold2'), color = 'black') 
+
+            
+## --- Small Intestine only ---
+
+StomaSI <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "IleostomaPouch" , select = CurrentStomaOrPouchType)
+StomaSI$CurrentStomaOrPouchType <- as.numeric(StomaSI$CurrentStomaOrPouchType)
+SmallIntestine_taxa <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == "IleostomaPouch" , select = c(165:ncol(LLD.IBD_MetaSp15.asin)))
+
+PCoA_valuesSI <- read.table(file = "../RScripts/pcoa_tableSI.txt", header = TRUE, sep = "\t",row.names = 1)
+
+beta2 <- vegdist(SmallIntestine_taxa, method="bray")
+my_pcoa2 <- cmdscale(beta2, eig = T)
+Var_expl2 <- round(my_pcoa2$eig/sum(my_pcoa2$eig)*100,digits = 1)
+
+gd2 <- PCoA_valuesSI %>% 
+  group_by(CurrentStomaOrPouchType) %>% 
+  summarise(V1 = mean(V1),
+            V2  = mean(V2))
+
+#Plot PCoA graphs
+#PCoA1 vs PCoA2
+
+ggplot(PCoA_valuesSI, aes(x=V1, y=V2)) + labs(y=paste("PCo2 (", Var_expl2[2],"%)", sep="") , x=paste("PCo1 (", Var_expl2[1],"%)", sep="")) + 
+  geom_point(size = 2, colour = "red2") + theme_classic() + geom_point(data = gd2, size = 5, shape=24, fill = c('red2'), color = 'black') 
 
 
 ## --- IBD-Res stratified according to ileocecal valve status ---
@@ -1655,7 +1752,6 @@ adonis_All_3$FDR <- p.adjust(c(adonis_All_3[,3]), method = 'fdr')
 write.table(adonis_All_3, file = "PERMANOVA_withCovariates.txt", sep = "\t", col.names = T)
 
 ```
-
 
 ### 5. Bacterial species abundance vs. number of resections
 
@@ -2107,6 +2203,137 @@ b <- ggplot(sorted_TopTax.asin[1:25,], aes(x = reorder(Taxonomy, -n), y = n)) +
 
 ggplotly(b)
 
+
+*****************************************
+Within SI: ...Ileostomy vs Ileoanal pouch
+*****************************************
+
+LLD.IBD_Final$NumberIndicationabcessOrfistula <- as.numeric(as.character(LLD.IBD_Final$NumberIndicationabcessOrfistula))
+
+#Remove 'correlated/related' variables
+LLD.IBD_Final_x <- LLD.IBD_Final[c(1,2,5:13,15,18,21:31,33,36:43,45,47,49,52:108,110,111,114:134,302,310:317,319,321,323:370,373,377,379,381:385,387,389,403:1054)]
+LLD.IBD_Final_x <- LLD.IBD_Final_x[-c(74,76:78,80:93,96,98,113)]
+
+# Remove bacteria from dataframe with a prevalence < 15%
+LLD.IBD_MetaSp15_x <- Prevalence.filter(LLD.IBD_Final_x, RowSpecies = 165)
+
+#Transform species abundance values
+LLD.IBD_MetaSp15.asin_x <-transform_and_filter_taxa(LLD.IBD_MetaSp15_x[,c(165:298)])
+LLD.IBD_MetaSp15.asin_x <-cbind(LLD.IBD_MetaSp15_x[c(1:164)],LLD.IBD_MetaSp15.asin_x)
+
+Ileo_Pouch <- subset(LLD.IBD_MetaSp15.asin_x, CurrentStomaOrPouchType == 'ileostoma' | CurrentStomaOrPouchType == 'pouch', select = c(76,165:298))
+Ileo_Pouch$CurrentStomaOrPouchType <- fct_drop(Ileo_Pouch$CurrentStomaOrPouchType)
+
+
+#For loop to correlate Resections type with each bacterial species
+
+my_matrix <-  matrix(nrow = ncol(Ileo_Pouch) - 1, ncol = 10)
+colnames(my_matrix) <- c('Taxonomy', 'Group1', 'Group2', 'NGroup1', 'NGroup2', 'P-value', 'BonferroniAdjust', 'FDRadjust', 'MeanGroup1', 'MeanGroup2')
+
+combos <- combn(levels(Ileo_Pouch[,1]),2)
+a=1
+for (i in 2:ncol(Ileo_Pouch)) {
+  wilcox <- (pairwise.wilcox.test(Ileo_Pouch[,i], Ileo_Pouch[,1], p.adjust.method = 'none'))$p.value
+  for (z in 1:ncol(combos)) {
+    my_matrix[a,1] <- colnames(Ileo_Pouch)[i]
+    my_matrix[a,2] <- combos[1,z]
+    my_matrix[a,3] <- combos[2,z]
+    my_matrix[a,4] <- sum(Ileo_Pouch[,1]==combos[1,z], na.rm = T) #Number of samples in group1
+    my_matrix[a,5] <- sum(Ileo_Pouch[,1]==combos[2,z], na.rm = T)
+    my_matrix[a,6] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test coefficient values 
+    my_matrix[a,9] <- mean(subset(Ileo_Pouch, Ileo_Pouch[c(1)] == combos[1,z], select = i)[,1]) #Mean taxonomy relative abundances group 3
+    my_matrix[a,10] <- mean(subset(Ileo_Pouch, Ileo_Pouch[c(1)] == combos[2,z], select = i)[,1]) #Mean taxonomy relative abundances group 2
+    a=a+1
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix$`P-value` <- as.numeric(as.character(my_matrix$`P-value`))
+my_matrix[,7] <- p.adjust(c(my_matrix[,6]), method = 'bonferroni')
+my_matrix[,8] <- p.adjust(c(my_matrix[,6]), method = 'fdr')
+
+my_matrix$Taxonomy <- as.character(gsub("_", " ", my_matrix$Taxonomy))
+
+write.table(my_matrix, file = 'Univariate_Ileostoma_vs_Pouch.txt', sep = "\t",col.names = TRUE)
+
+
+**********************
+Within SI: ...CD vs UC 
+**********************
+
+#Univariate Analysis
+IleostomaPouch <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == 'IleostomaPouch', select = c(15,165:298))
+IleostomaPouch[10,1] <- "UC"  #temporarily change IBDU to UC because by definition should not have small intestinal inflammation 
+IleostomaPouch$DiagnosisCurrent <- fct_drop(IleostomaPouch$DiagnosisCurrent)
+
+#For loop to correlate IBD type with each bacterial species
+
+my_matrix <-  matrix(nrow = ncol(IleostomaPouch) - 1, ncol = 10)
+colnames(my_matrix) <- c('Taxonomy', 'Group1', 'Group2', 'NGroup1', 'NGroup2', 'P-value', 'BonferroniAdjust', 'FDRadjust', 'MeanGroup1', 'MeanGroup2')
+
+combos <- combn(levels(IleostomaPouch[,1]),2)
+a=1
+for (i in 2:ncol(IleostomaPouch)) {
+  wilcox <- (pairwise.wilcox.test(IleostomaPouch[,i], IleostomaPouch[,1], p.adjust.method = 'none'))$p.value
+  for (z in 1:ncol(combos)) {
+    my_matrix[a,1] <- colnames(IleostomaPouch)[i]
+    my_matrix[a,2] <- combos[1,z]
+    my_matrix[a,3] <- combos[2,z]
+    my_matrix[a,4] <- sum(IleostomaPouch[,1]==combos[1,z], na.rm = T) #Number of samples in group1
+    my_matrix[a,5] <- sum(IleostomaPouch[,1]==combos[2,z], na.rm = T)
+    my_matrix[a,6] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test coefficient values 
+    my_matrix[a,9] <- mean(subset(IleostomaPouch, IleostomaPouch[c(1)] == combos[1,z], select = i)[,1]) #Mean taxonomy relative abundances group 3
+    my_matrix[a,10] <- mean(subset(IleostomaPouch, IleostomaPouch[c(1)] == combos[2,z], select = i)[,1]) #Mean taxonomy relative abundances group 2
+    a=a+1
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix$`P-value` <- as.numeric(as.character(my_matrix$`P-value`))
+my_matrix[,7] <- p.adjust(c(my_matrix[,6]), method = 'bonferroni')
+my_matrix[,8] <- p.adjust(c(my_matrix[,6]), method = 'fdr')
+
+my_matrix$Taxonomy <- as.character(gsub("_", " ", my_matrix$Taxonomy))
+
+write.table(my_matrix, file = 'Univariate_CD_vs_UC.txt', sep = "\t",col.names = TRUE)
+
+
+***********************************************
+Within SI: ...Ileal vs Colonic disease location
+***********************************************
+
+IleostomaPouch1 <- subset(LLD.IBD_MetaSp15.asin, CurrentStomaOrPouchType == 'IleostomaPouch', select = c(18,165:298))
+IleostomaPouch1[c(44,54),1] <- "both"  #temporarily change ileum to both  
+IleostomaPouch1$DiseaseLocation <- fct_drop(IleostomaPouch1$DiseaseLocation)
+
+#For loop to correlate disease location with each bacterial species
+
+my_matrix <-  matrix(nrow = ncol(IleostomaPouch1) - 1, ncol = 10)
+colnames(my_matrix) <- c('Taxonomy', 'Group1', 'Group2', 'NGroup1', 'NGroup2', 'P-value', 'BonferroniAdjust', 'FDRadjust', 'MeanGroup1', 'MeanGroup2')
+
+combos <- combn(levels(IleostomaPouch1[,1]),2)
+a=1
+for (i in 2:ncol(IleostomaPouch1)) {
+  wilcox <- (pairwise.wilcox.test(IleostomaPouch1[,i], IleostomaPouch1[,1], p.adjust.method = 'none'))$p.value
+  for (z in 1:ncol(combos)) {
+    my_matrix[a,1] <- colnames(IleostomaPouch1)[i]
+    my_matrix[a,2] <- combos[1,z]
+    my_matrix[a,3] <- combos[2,z]
+    my_matrix[a,4] <- sum(IleostomaPouch1[,1]==combos[1,z], na.rm = T) #Number of samples in group1
+    my_matrix[a,5] <- sum(IleostomaPouch1[,1]==combos[2,z], na.rm = T)
+    my_matrix[a,6] <- wilcox[c(combos[2,z]), c(combos[1,z])] #pairwise.wilcox.test coefficient values 
+    my_matrix[a,9] <- mean(subset(IleostomaPouch1, IleostomaPouch1[c(1)] == combos[1,z], select = i)[,1]) #Mean taxonomy relative abundances group 3
+    my_matrix[a,10] <- mean(subset(IleostomaPouch1, IleostomaPouch1[c(1)] == combos[2,z], select = i)[,1]) #Mean taxonomy relative abundances group 2
+    a=a+1
+  }
+}
+my_matrix <- as.data.frame(my_matrix)
+my_matrix$`P-value` <- as.numeric(as.character(my_matrix$`P-value`))
+my_matrix[,7] <- p.adjust(c(my_matrix[,6]), method = 'bonferroni')
+my_matrix[,8] <- p.adjust(c(my_matrix[,6]), method = 'fdr')
+
+my_matrix$Taxonomy <- as.character(gsub("_", " ", my_matrix$Taxonomy))
+
+write.table(my_matrix, file = 'Univariate_DiseaseLocation_ileumcolon_vs_colon.txt', sep = "\t",col.names = TRUE)
+
 ```
 
 
@@ -2287,6 +2514,57 @@ cols <- c("-3" = "#2171B5", "-2" = "#6BAED6", "-1" = "#C6DBEF", "0" = "white",  
 w <- ggplot(Heatmap_Maaslin, aes(x = variable, y = Feature, fill= value)) + geom_tile(color="gray80") + scale_fill_manual(values = cols) + theme_classic() + theme(axis.text.x = element_text(angle = 55, hjust = 1, size=5))
 
 ggplotly(w)
+
+
+================================================================================================================================================
+REVISED Manuscript - 17.12.20
+================================================================================================================================================
+
+#IBD Non-Resection vs IBD Resection
+# 1. Metadata & Taxa
+Maaslin_MetaTaxa4 <- subset(LLD.IBD_MetaSp15, CurrentStomaOrPouchType == 'No Resections' | CurrentStomaOrPouchType == 'Resections')
+Maaslin_MetaTaxa4 <- Maaslin_MetaTaxa4[c(1,2,3,9,14,15,74,76,96,98,99,102,113,115,119,120,121,127,128,133,135,138,147,148,163,165:298)]
+Maaslin_MetaTaxa4$CurrentStomaOrPouchType <- fct_drop(Maaslin_MetaTaxa4$CurrentStomaOrPouchType)
+
+Maaslin_MetaTaxa4$DiagnosisCurrent <- fct_drop(Maaslin_MetaTaxa4$DiagnosisCurrent)
+
+for (i in 26:159) {
+  Maaslin_MetaTaxa4[,i] <- Maaslin_MetaTaxa4[,i]/100
+} 
+write.table(Maaslin_MetaTaxa4, file = "MaaslinMetaTaxa_WithinIBD_NoResections_vs_Resections.tsv", sep = "\t", quote = F)
+
+#2. Config file
+# Using R, name: MaaslinConfig_ResectionNoStoma_IleostomaPouch.read.config.R
+
+Maaslin(strInputTSV = "MaaslinMetaTaxa_WithinIBD_NoResections_vs_Resections.tsv", strOutputDIR = "Maaslin_NoResections_vs_Resections_Output", strInputConfig = "MaaslinConfig_ResectionNoStoma_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0)
+
+
+## -- Display results --
+## LOLLIPOP PLOT - IBD-Res vs IBD-NoRes (Maaslin)
+
+IBD.NoRes_Res.Maaslin <- read.table(file = "../Maaslin/Maaslin_NoResections_vs_Resections_Output/MaaslinMetaTaxa_WithinIBD_NoResections_vs_Resections-CurrentStomaOrPouchType.txt", header = TRUE, sep = "\t")
+
+IBD.NoRes_Res.Maaslin$Feature <- as.character(gsub("_", " ", IBD.NoRes_Res.Maaslin$Feature))
+
+IBD.NoRes_Res.Maaslin <- FactorVariableHeatmapMaaslin(IBD.NoRes_Res.Maaslin)
+
+colnames(IBD.NoRes_Res.Maaslin)[9] <- 'Significance'
+IBD.NoRes_Res.Maaslin$flag <- ifelse(IBD.NoRes_Res.Maaslin$Significance < 0, "Negative", ifelse(IBD.NoRes_Res.Maaslin$Significance > 0, "Positive", "Zero"))
+
+ggplot(IBD.NoRes_Res.Maaslin, aes(x = Significance, y = Feature, color = flag)) +
+        geom_segment(aes(x = 0, y = Feature, xend = Significance, yend = Feature)) +
+        geom_point() +
+        scale_colour_manual(values = c("blue", "red", "black")) + theme_minimal() + theme (legend.position = "none") + xlab("IBD-Res vs IBD-NoRes") + ylab("Species")
+
+#Significant associations only
+
+IBD.NoRes_Res.Maaslin_signif <- subset(IBD.NoRes_Res.Maaslin, Significance > 0 | Significance < 0)
+
+ggplot(IBD.NoRes_Res.Maaslin_signif, aes(x = Significance, y = Feature, color = flag)) +
+        geom_segment(aes(x = 0, y = Feature, xend = Significance, yend = Feature)) +
+        geom_point() +
+        scale_colour_manual(values = c("blue", "red")) + theme_minimal() + theme (legend.position = "none") + xlab("IBD-Res vs IBD-NoRes") + ylab("Species")
+
 
 ```
 
@@ -2484,7 +2762,7 @@ write.table(adonis_SI_Top_pval, file = 'Adonis_SI_TopPheno1.txt', sep = "\t", co
 
 
 
-#____ SI versus Rest (regular faecal)
+#____ SI versus Rest (IBD & LLD faecal)
 
 SIvsColon <- LLD.IBD_MetSp_Below15[c(76,1,3,165:ncol(LLD.IBD_MetSp_Below15))]
 SIvsColon$CurrentStomaOrPouchType <- fct_collapse(SIvsColon$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
@@ -2894,6 +3172,154 @@ write.table(Maaslin_MetaPwy3b, file = "MaaslinMetaPwy_WithinIBD_ResectionsWithIl
 Maaslin(strInputTSV = "MaaslinMetaPwy_WithinIBD_ResectionsWithIleoCecalValveInSitu&NoStoma_vs_IleostomaPouch.tsv", strOutputDIR = "MaaslinPwy_ResectionsCecalValveInSitu_vs_Ileostoma_Output", strInputConfig = "MaaslinPwyConfig_HC_vs_IleostomaPouch.read.config.R", dMinAbd = 0, dMinSamp = 0, strTransform = 'none')
 
 
+================================================================================================================================================
+REVISED Manuscript - 17.12.20
+================================================================================================================================================
+
+#PACKAGES & FUNCTIONS
+
+install.packages("pheatmap")
+install.packages("dendextend")
+install.packages("circlize")
+install.packages("ape")
+
+# load packages
+library(pheatmap)
+library(dendextend)
+library(circlize)
+library(ape)
+
+
+#IMPORT & PROCESS DATA
+IBD_LLD_MetaPathways <- read.table(file = "IBD_LLD_MetaPathways.txt", header = TRUE, sep = "\t", quote = "\\",row.names = 1) #see PathwayMetaDataIBD&LLD script for details
+
+colnames(IBD_LLD_MetaPathways) <- gsub("^X", "", colnames(IBD_LLD_MetaPathways))
+
+#remove individual with no pathway abundances ...
+which(rowSums(IBD_LLD_MetaPathways[681:1168]) == 0)
+IBD_LLD_MetaPathways <- IBD_LLD_MetaPathways[-c(212,218,379,1554,1671),]
+
+#Merge with the metadata included in the taxa analyses
+IBD_LLD_MetaPathwaysx <- merge(LLD.IBD_MetaSp15[c(1:164)], IBD_LLD_MetaPathways[c(681:1168)], by = "row.names")
+rownames(IBD_LLD_MetaPathwaysx) <- IBD_LLD_MetaPathwaysx$Row.names
+IBD_LLD_MetaPathwaysx$Row.names <- NULL
+
+
+# Remove pathways from dataframe with a prevalence < 15%
+remove_cols <- vector()
+for (i in 165:ncol(IBD_LLD_MetaPathwaysx)) {
+  cname <- colnames(IBD_LLD_MetaPathwaysx)[i]
+  if(colSums(IBD_LLD_MetaPathwaysx[i] != 0) / nrow(IBD_LLD_MetaPathwaysx) *100 < 15){
+    remove_cols <- c(remove_cols, cname) 
+  }
+}
+LLD.IBD_MetaPwy15 <- IBD_LLD_MetaPathwaysx %>% select(-remove_cols)
+print(paste(c("Function removed a total of ",length(remove_cols), "variables"), collapse= ""))
+
+LLD.IBD_MetaPwy15$NumberIndicationabcessOrfistula <- as.numeric(as.character(LLD.IBD_MetaPwy15$NumberIndicationabcessOrfistula))
+
+LLD.IBD_MetaPwy15$CurrentStomaOrPouchType <- factor(LLD.IBD_MetaPwy15$CurrentStomaOrPouchType, levels = c("HealthyControl", "No Resections", "Resections", "IleostomaPouch"))
+
+**********************************
+DENDROGRAM WITH HEATMAP (Figure 4)
+**********************************
+
+#Pathways only (Heatmap Rows)
+Pathways <- LLD.IBD_MetaPwy15[,165:505]
+colnames(Pathways) <- gsub("\\__.*", "",colnames(Pathways)) 
+Pathways$UNINTEGRATED <- NULL
+Pathways$UNMAPPED <- NULL
+Pathways <- as.data.frame(t(Pathways))
+
+#Column annotation (samples by bowel phenotype)                                            
+my_sample_col <- LLD.IBD_MetaPwy15[,c(76:77)]
+my_sample_col$EverHadStomaOrPouch <- NULL
+colnames(my_sample_col)[1] <- "BowelPhenotype"
+my_sample_col$a <- my_sample_col$BowelPhenotype
+my_sample_col$a <- ifelse(my_sample_col$a != "IleostomaPouch", "Other", "IleostomaPouch")
+my_sample_col[,c("b","c")] <- my_sample_col$BowelPhenotype
+my_sample_col$b <- ifelse(my_sample_col$b != "Resections", "Other", "Resections")
+my_sample_col$c <- ifelse(my_sample_col$c != "No Resections", "Other", "No Resections")
+
+my_colour = list(
+  a = c("IleostomaPouch" = 'red2', "Other" = "white"),
+  b = c("Other" = "white","Resections" = 'gold1'),
+  c = c("Other" = "white", "No Resections" = 'slateblue2'))
+
+# Plot Heatmap
+p <- pheatmap(Pathways,clustering_distance_rows = "euclidean", annotation_colors = my_colour, annotation_col = my_sample_col[,2:4], show_colnames = F, fontsize_row = 2, annotation_names_col = F)                                         
+
+Pwy_Order_All <- as.data.frame(rownames(Pathways[p$tree_row[["order"]],]))
+colnames(Pwy_Order_All)[1] <- "Pathway"
+
+#Merge Pwy order with Maaslin results
+Pwy_Order_All$Pathway <- as.character(Pwy_Order_All$Pathway)
+
+HC_IBD.SI.Maaslin.pwy$Feature <- gsub("\\__.*", "",HC_IBD.SI.Maaslin.pwy$Feature)  #See Previous
+merge1 <- merge(Pwy_Order_All, HC_IBD.SI.Maaslin.pwy[,c(2,9)], by.x = "Pathway", by.y = "Feature", all.x = T)
+
+NoResec_SI.Maaslin.pwy$Feature <- gsub("\\__.*", "",NoResec_SI.Maaslin.pwy$Feature) 
+merge2 <- merge(merge1, NoResec_SI.Maaslin.pwy[,c(2,9)], by.x = "Pathway", by.y = "Feature", all.x = T)
+
+Resec_SI.Maaslin.pwy$Feature <- gsub("\\__.*", "",Resec_SI.Maaslin.pwy$Feature) 
+merge3 <- merge(merge2, Resec_SI.Maaslin.pwy[,c(2,9)], by.x = "Pathway", by.y = "Feature", all.x = T)
+
+target <- Pwy_Order_All$Pathway
+Dendrogram_legends <- merge3[match(target, merge3$Pathway),]
+Dendrogram_legends[,2:4][is.na(Dendrogram_legends[,2:4])] <- 0
+
+
+## --- Plot dendrogram with the three comparison tests as a heatmap around the rim ---
+
+col_fun = colorRamp2(breaks= c(-3,-2,-1,0,1,2,3), 
+                     colors = c("#2171B5","#6BAED6","#C6DBEF","#FFFFFF","#FCBBA1", "#FB6A4A", "#CB181D")) 
+
+circos.clear()
+circos.par("start.degree" = 90,cell.padding = c(0, 0, 0, 0), gap.degree = 15) 
+circos.initialize("a", xlim =c(0,339)) 
+circos.track(ylim = c(0, 1), bg.border = NA, track.height = 0.15, 
+             panel.fun = function(x, y) {
+               for(i in seq_len(nrow(Dendrogram_legends))) {
+                 circos.text(i-0.5, 0, Dendrogram_legends$Pathway[i], adj = c(0, 0.5), 
+                             facing = "clockwise", niceFacing = TRUE,
+                             cex = 0.3)                
+               }
+             })
+
+circos.track(ylim = c(0, 3), bg.border = NA,track.height = 0.1, panel.fun = function(x, y) {
+  mm = Dendrogram_legends
+  rownames(mm) <- mm$Pathway
+  mm$Pathway <- NULL
+  mm$Cluster <- NULL
+  colnames(mm)[1:3] <- c("IBD-SI vs GP", "IBD-SI vs IBD-NoRes", "IBD-SI vs IBD-Res")
+  mm2 <- as.matrix(t(mm))
+  dend1 = as.dendrogram(p$tree_row)
+  #changed variable for 1 heatmap setting
+  col_mat = col_fun(mm2)
+  nr = nrow(mm2)
+  nc = ncol(mm2)
+  for(i in 1:nr) {
+    circos.rect(1:nc - 1, rep(nr - i, nc), 
+                1:nc, rep(nr - i + 1, nc), 
+                border = col_mat[i, ], col = col_mat[i, ])
+  }
+  #adding row label
+  circos.text(rep(1, 3), 3:1, 
+              rownames(mm2), 
+              facing = "downward", adj = c(1.2, 1), cex = 0.3) 
+  
+})
+
+#Dendrogram
+dend1 = as.dendrogram(p$tree_row)
+max_height = attr(dend1, "height") 
+circos.track(ylim = c(0, max_height), bg.border = NA, track.height = 0.3, 
+             panel.fun = function(x, y) {
+               circos.dendrogram(dend1, max_height = max_height)
+             })
+
+
+
 ```
 
 
@@ -2995,7 +3421,7 @@ LLD.IBD_MetSp_Below15 <- cbind(LLD.IBD_Finalxx[,c(1:164)], LLD.IBD_Species_Below
 
 
 
-#Logistic regression with Ileostomy/Pouch vs Rest (i.e. SI vs Colon)
+# --- Logistic regression with Ileostomy/Pouch vs Rest (i.e. SI vs Colon) ---
 SIvsColon <- LLD.IBD_MetSp_Below15[c(76,1,3,165:ncol(LLD.IBD_MetSp_Below15))]
 SIvsColon$CurrentStomaOrPouchType <- fct_collapse(SIvsColon$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
 
@@ -3021,6 +3447,63 @@ LgR.decrp <- LgRgr.DescriptiveStats(SIvsColon_only, 1, 2)
 LogisticRegrSIvsColon_only <- cbind(LgR.decrp, LgR[c(3:8)])
 
 write.table(LogisticRegrSIvsColon_only, "LogisticRegression_SIvsColon2.txt", sep = "\t", col.names = T)
+
+================================================================================================================================================
+REVISED Manuscript - 17.12.20
+================================================================================================================================================
+
+#Packages/Functions required:
+
+library(reshape2)
+Prev  #see 'Functions' #see 'Functions' file, point 12.
+
+***************
+Display Results 
+***************
+
+LogRegr <- read.table("../RScripts/LogisticRegression_SIvsColon1.txt", header = TRUE, sep = "\t", row.names = 1)
+LogRegr <- subset(LogRegr, Phenotype == "CurrentStomaOrPouchType")
+LogRegr <- subset(LogRegr, FDRAdjust < 0.05)
+
+SIvsColon_prev <- LLD.IBD_MetSp_Below15[c(76,165:ncol(LLD.IBD_MetSp_Below15))]
+SIvsColon_prev$CurrentStomaOrPouchType <- fct_collapse(SIvsColon_prev$CurrentStomaOrPouchType, IleostomaPouch = c("IleostomaPouch"),Colon = c("Resections","HealthyControl","No Resections"))
+SIvsColon_prev$CurrentStomaOrPouchType <- fct_drop(SIvsColon_prev$CurrentStomaOrPouchType)
+
+a <- LogRegr$Taxonomy
+
+SIvsColon_prev1 <- SIvsColon_prev[colnames(SIvsColon_prev) %in% a]
+SIvsColon_prev1 <- cbind(SIvsColon_prev[,1], SIvsColon_prev1)
+colnames(SIvsColon_prev1)[1] <- "CurrentStomaOrPouchType"
+
+agg = aggregate(SIvsColon_prev1[2:111],
+                by = list(SIvsColon_prev1$CurrentStomaOrPouchType),
+                FUN = Prev)
+                
+melt <- melt(agg, 'Group.1')
+
+melt1 <- melt %>% mutate(value = if_else(Group.1 == "Colon", -value, value))
+melt1$variable <- gsub("_", " ", melt1$variable)
+
+## find the order
+temp_df <-
+  melt1 %>% 
+  filter(Group.1 == "IleostomaPouch") %>% 
+  arrange(value)
+the_order <- temp_df$variable
+
+#Remove species with a prevalence below 10/15%
+temp_df_15 <- subset(temp_df, value > 15)
+the_order <- temp_df_15$variable
+
+melt1 %>%  
+  ggplot(aes(x = variable, y = value, group = Group.1, fill = Group.1)) +
+  geom_bar(stat = "identity", width = 0.4) + #thinner bars
+  coord_flip() + theme_classic()+ scale_x_discrete(limits = the_order) +
+  scale_y_continuous(limits = c(-80, 80),breaks = seq(-100, 100, 10), 
+                     labels = abs(seq(-100, 100, 10))) +
+  labs(x = "Species", y = "Prevalence (%)") +  theme(legend.title = element_blank(),text = element_text(size=7)) + 
+  scale_fill_manual(values=c("#808080", "#D72626"),labels=c("Colon", "Small Intestine"))
+
 
 ```
 
