@@ -816,3 +816,12 @@ NonFactors <- vector()
 }
 
 ```
+
+### 15. Prevalence Function
+```{r}
+
+Prev <- function(x) {sum(x)/length(x)*100
+}
+
+```
+
