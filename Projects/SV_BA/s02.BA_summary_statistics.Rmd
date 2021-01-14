@@ -1,0 +1,399 @@
+---
+title: "BA summary statistics"
+author: "Daoming Wang"
+date: "2020/10/22"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+## 1 Preparation
+### 1.1 Import
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+all_ba    <- read.table("01.cleanData/phen_all/20200801_LLD_300OB_39BA_1437samples.tsv")
+all_basic <- read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
+
+lld_basic <- read.table("01.cleanData/phen_lld/20200801_LLD_basic_1135samples.tsv")
+ob_basic <- read.table("01.cleanData/phen_300OB/20200801_300OB_basic_302samples.tsv")
+```
+
+
+## 2 Basic phenotypes
+
+
+```{r 2,fig.height=6,fig.width=3}
+## Gender
+table(all_basic$Cohort, all_basic$Gender)
+
+all_gender_tbl <- table(all_basic$Cohort,all_basic$Gender) 
+chisq.test(all_gender_tbl) 
+
+#pdf("02.summary/all_gender.pdf", width = 3, height = 3)
+p_gender<-ggplot()+
+  geom_mosaic(data=all_basic,aes(x = product(Cohort), fill=factor(Gender)))+
+  ylab("Gender")+
+  xlab("Cohort")+
+  scale_fill_manual(values=mycolor2_green_blue) +
+  theme_tufte()+
+  theme(axis.ticks.length = unit(0, "cm"), 
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        #axis.text.y = element_text(colour = "white"), 
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))
+#dev.off()
+
+## Age
+mean(lld_basic$Age, na.rm = T)
+se(lld_basic$Age)
+min(lld_basic$Age, na.rm = T)
+max(lld_basic$Age, na.rm = T)
+
+mean(ob_basic$Age, na.rm = T)
+se(ob_basic$Age)
+min(ob_basic$Age, na.rm = T)
+max(ob_basic$Age, na.rm = T)
+
+wilcox.test(all_basic$Age~all_basic$Cohort)
+
+p_age<-ggplot(all_basic,aes(x=Age, color = Cohort, fill = Cohort))+
+  geom_density(alpha = 0.2)+
+  geom_rug(alpha = 0.5,length = unit(0.05, "npc"))+
+  ylab('Density')+
+  xlab('Age (years)')+
+  scale_y_continuous(expand = c(0,0))+
+  scale_color_manual(name=NULL,
+                     breaks=c("LLD", "300OB"),
+                     labels=c("LLD", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  scale_fill_manual(name=NULL,
+                    breaks=c("LLD", "300OB"),
+                    labels=c("LLD", "300OB"),
+                    values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = "none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+## BMI
+mean(lld_basic$BMI, na.rm = T)
+se(lld_basic$BMI)
+min(lld_basic$BMI, na.rm = T)
+max(lld_basic$BMI, na.rm = T)
+
+mean(ob_basic$BMI, na.rm = T)
+se(ob_basic$BMI)
+min(ob_basic$BMI, na.rm = T)
+max(ob_basic$BMI, na.rm = T)
+
+wilcox.test(all_basic$BMI~all_basic$Cohort)
+
+p_bmi<-ggplot(all_basic,aes(x=BMI, color = Cohort, fill = Cohort))+
+  geom_density(alpha = 0.2)+
+  geom_rug(alpha = 0.5,length = unit(0.05, "npc"))+
+  ylab('Density')+
+  xlab('BMI')+
+  scale_y_continuous(expand = c(0,0))+
+  scale_color_manual(name=NULL,
+                     breaks=c("LLD", "300OB"),
+                     labels=c("LLD", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  scale_fill_manual(name=NULL,
+                    breaks=c("LLD", "300OB"),
+                    labels=c("LLD", "300OB"),
+                    values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = "none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+
+## plot
+p_title <- ggdraw() + 
+    draw_label(
+      'Cohort characteristics',
+      fontface = 'bold', x = 0, hjust = 0) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7))
+
+p_demo_grid<-plot_grid(
+    p_title, 
+    plot_grid(p_gender,p_age, p_bmi,
+              rel_widths = c(0.2, 1, 1),align = 'hv',
+              #labels = c("E", "F", "G"),
+              ncol = 1,label_size	= 8,vjust = 0),
+    ncol = 1,
+    # rel_heights values control vertical title margins
+    rel_heights = c(0.1, 1.5)
+  )
+  
+  
+print(p_demo_grid)
+
+if(!dir.exists("02.BA_summary_statistics")){dir.create("02.BA_summary_statistics")}
+pdf("02.BA_summary_statistics/all_basic_phen_diff.pdf", height = 6, width = 3)
+print(p_demo_grid)
+dev.off()
+```
+
+## 3 Bile acids
+
+### 3.1 Composition
+```{r 3.1, fig.height=8,fig.width=14,fig.align='center'}
+## get concentration and proportion profiles
+all_ba_prop.rmna<-all_ba[,c(primary.group_p,second.group_p,urso.group_p)] %>% na.omit
+all_ba_conc.rmna<-all_ba[,c(primary.group,second.group,urso.group)] %>% na.omit
+
+all_ba_sample_order<-rownames(all_ba_prop.rmna[
+  order(rowSums(all_ba_prop.rmna[,c(primary.group_p)]), decreasing = T),
+  ])
+
+all_ba_sample_order<- c(all_ba_sample_order[grep('LLD', all_ba_sample_order)],
+                        all_ba_sample_order[grep('LLD', all_ba_sample_order, invert = T)]) # sample order, sorted by total primary BA proportion
+
+
+## proportion profile
+all_ba_prop.rmna.long<-cbind.data.frame(ID=rownames(all_ba_prop.rmna),all_ba_prop.rmna) %>%
+  gather(., "BA", "Value", c(2:dim(.)[2]))
+
+ba_p_order<-rev(colnames(all_ba_prop.rmna))
+ba_p_color<-c(pal_material("teal")(6)[c(2:4)],
+              pal_material("brown")(6)[c(2:4)],
+              pal_material("amber")(6)[c(2:4)],
+              pal_material("light-blue")(6)[c(2:4)],
+              pal_material("red")(6)[c(2:4)])
+
+all_ba_prop.rmna.long$BA<-factor(all_ba_prop.rmna.long$BA,
+                                 levels = ba_p_order)
+
+
+#pdf("02.summary/LLD_300OB_BA_proportion.pdf",width = 14,height = 4 )
+p_all_ba_prop<-ggplot(all_ba_prop.rmna.long, aes(x=ID, y=Value,group = BA,fill = BA))+
+  geom_bar(width = 1,position = "stack",stat="identity")+
+  scale_x_discrete(limits = all_ba_sample_order)+
+  scale_y_continuous(expand = c(0,0)) +
+  ylab("Proportion")+
+  scale_fill_manual(name = 'BAs',
+                    breaks = ba_p_order,
+                    values = ba_p_color)+
+  theme_bw()+
+  theme(legend.position = "right",
+        legend.justification = c(0, 1),
+        legend.text = element_text(size = 10),
+        plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line = element_line(colour = 'white'), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA),
+        panel.border = element_blank(),
+        axis.line.x = element_line(colour = 'white'),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+#dev.off()
+
+
+## concentration profile
+all_ba_conc.rmna.long<-cbind.data.frame(ID=rownames(all_ba_conc.rmna),all_ba_conc.rmna) %>%
+  gather(., "BA", "Value", c(2:dim(.)[2]))
+
+ba_c_order<-rev(colnames(all_ba_conc.rmna))
+ba_c_color<-c(pal_material("teal")(6)[c(2:4)],
+              pal_material("brown")(6)[c(2:4)],
+              pal_material("amber")(6)[c(2:4)],
+              pal_material("light-blue")(6)[c(2:4)],
+              pal_material("red")(6)[c(2:4)])
+
+all_ba_conc.rmna.long$BA<-factor(all_ba_conc.rmna.long$BA,
+                                 levels = ba_c_order)
+
+
+#pdf("02.summary/LLD_300OB_BA_concentration.pdf",width = 14,height = 4 )
+p_all_ba_conc<-ggplot(all_ba_conc.rmna.long, aes(x=ID, y=Value,group = BA,fill = BA))+
+  geom_bar(width = 1,position = "stack",stat="identity")+
+  scale_x_discrete(limits = all_ba_sample_order)+
+  scale_y_continuous(expand = c(0,0)) +
+  ylab("Concentration (μM)")+
+  scale_fill_manual(name = 'BAs',
+                    breaks = ba_c_order,
+                    values = ba_c_color)+
+  theme_bw()+
+  theme(legend.position = "right",
+        legend.justification = c(0, 1),
+        legend.text = element_text(size = 10),
+        plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line = element_line(colour = 'white'), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_rect(fill = NA),
+        panel.border = element_blank(),
+        axis.line.x = element_line(colour = 'white'),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+#dev.off()
+
+p_composition_bar<-ggarrange(p_all_ba_conc,p_all_ba_prop,
+          labels = c("A", "B"),
+          ncol = 1,align = 'hv')
+
+pdf("02.BA_summary_statistics/LLD_300OB_BA_prop_conc_barplot.pdf", width = 14,height = 8)
+print(p_composition_bar)
+dev.off()
+
+print(p_composition_bar)
+```
+
+### 3.2 Summary statistics
+
+```{r 3.2,fig.height=11,fig.width=11}
+## Mean values
+all_coh_ba<-data.frame(Cohort = all_basic$Cohort, all_ba)
+all_coh_ba.long<-melt(all_coh_ba, id.vars=colnames(all_coh_ba)[c(1)])
+
+all_coh_ba.summ<-summarySE(all_coh_ba.long, measurevar="value", groupvars = c("Cohort","variable"))
+write.table(all_coh_ba.summ, "02.BA_summary_statistics/LLD_300OB_BA_summary.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
+
+all_coh_ba.summ$Cohort<-factor(all_coh_ba.summ$Cohort, levels = c("LLD", "300OB"))
+
+p_all_coh_ba_summ<-ggplot(all_coh_ba.summ, aes(x=variable, y=mea,group = Cohort, fill = Cohort, color = Cohort))+
+  geom_vline(aes(xintercept = variable),size=6,colour="#E4EDF2",alpha=.5)+
+  geom_bar(aes(color = Cohort),stat = 'identity',position = position_dodge(width = 0.9))+
+  geom_linerange(aes(ymin = mea, ymax = mea+se, color = Cohort), position = position_dodge(width = 0.9))+
+  xlab(NULL)+
+  ylab("Value")+
+  scale_size_area(max_size=12)+
+  #scale_x_discrete(limits = infor_sample_n_order)+
+  #scale_y_continuous()+
+  #scale_y_log10()+
+  scale_y_sqrt(expand = c(0,0),
+               breaks = c(0,1,10,25,50,100))+
+  scale_color_manual(name=NULL,
+                     breaks = c("LLD", "300OB"),
+                     labels = c("LLD              ", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  scale_fill_manual(name=NULL,
+                    breaks = c("LLD", "300OB"),
+                    labels = c("LLD              ", "300OB"),
+                    values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(2,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major = element_line(colour = NA,linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+
+
+## Presence rate
+p_all_coh_ba_pre<-ggplot(all_coh_ba.summ, aes(x=variable, y=nonZero_rate,group = Cohort,fill = Cohort, color = Cohort))+
+  geom_vline(aes(xintercept = variable),size=6,colour="#E4EDF2",alpha=.5)+
+  geom_bar(aes(color = Cohort),stat = 'identity',position = position_dodge(width = 0.9))+
+  xlab(NULL)+
+  ylab("Presence rate")+
+  scale_size_area(max_size=12)+
+  scale_y_continuous(expand = c(0,0))+
+  scale_color_manual(name=NULL,
+                     breaks = c("LLD", "300OB"),
+                     labels = c("LLD              ", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  scale_fill_manual(name=NULL,
+                     breaks = c("LLD", "300OB"),
+                     labels = c("LLD              ", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(2,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major = element_line(colour = NA,linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+
+
+p_all_coh_ba<-ggarrange(p_all_coh_ba_summ,p_all_coh_ba_pre,
+          labels = c("A", "B"),
+          ncol = 1,align = 'hv')
+
+
+pdf("02.BA_summary_statistics/LLD_300OB_BA_summ.pdf", height = 11, width = 11) 
+print(p_all_coh_ba)
+dev.off()
+
+print(p_all_coh_ba)
+
+```
+
+### 3.3 Cohort differences
+
+```{r 3.3}
+## Cohort differences
+ba_diff_res<-as.data.frame(matrix(NA, nrow = ncol(all_ba), ncol = 5))
+
+for (i in 1:ncol(all_ba)) {
+  #i <- 1
+  wilcox.res<-wilcox.test(all_ba[,i]~all_basic$Cohort)
+  LLD.mean<-mean(all_ba[all_basic$Cohort=='LLD',i],na.rm = T)
+  OB.mean <-mean(all_ba[all_basic$Cohort=='300OB',i],na.rm = T)
+  Diff<-LLD.mean-OB.mean
+  ba_diff_res[i,]<-c(colnames(all_ba)[i], wilcox.res$p.value, LLD.mean, OB.mean, Diff)
+}
+
+colnames(ba_diff_res)<-c('BA', 'P', 'LLD.mean', 'X300OB.mean', 'Difference')
+ba_diff_res$P<-as.numeric(ba_diff_res$P)
+ba_diff_res$FDR<-p.adjust(ba_diff_res$P, method = 'fdr')
+
+write.table(ba_diff_res, "02.BA_summary_statistics/LLD_300OB_BA_difference.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
+```
+

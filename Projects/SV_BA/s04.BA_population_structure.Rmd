@@ -1,0 +1,293 @@
+---
+title: "BA population structure"
+author: "Daoming Wang"
+date: "2020/10/22"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+## 1 Preparation
+### 1.1 Import
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+# Basic
+all_ba    <- read.table("01.cleanData/phen_all/20200801_LLD_300OB_39BA_1437samples.tsv")
+all_basic <- read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
+```
+
+
+## 2 BA PCoA
+
+```{r 2,fig.height = 5, fig.width = 8}
+all_ba_p <- all_ba[,proportion.group] %>% na.omit
+all_basic_ba_rmna <- all_basic[match(rownames(all_ba_p), rownames(all_basic)),]
+
+all_ba_p_dis<-vegdist(all_ba_p, method = 'canberra', na.rm = T)
+all_ba_p_dis_mds<-cmdscale(all_ba_p_dis, k=5, eig = T)
+all_ba_p_pcoa <- data.frame(all_ba_p_dis_mds$points)
+
+p_ba_p_pcoa<-ggplot(all_ba_p_pcoa,aes(X1,X2, color = all_basic_ba_rmna$Cohort))+
+  geom_point(size = 2,alpha = 0.5)+
+  stat_ellipse(aes(group = all_basic_ba_rmna$Cohort, fill = all_basic_ba_rmna$Cohort, color = all_basic_ba_rmna$Cohort) ,type = "norm",linetype = 2,geom = "polygon",alpha = 0.05,show.legend = F)+
+  xlab(paste("PCo1=",round(all_ba_p_dis_mds$eig[1],digits = 2),"%",sep = ""))+
+  ylab(paste("PCo2=",round(all_ba_p_dis_mds$eig[2],digits = 2),"%",sep = ""))+
+  scale_color_manual(name=NULL, 
+                     breaks = c("LLD", "300OB"),
+                     labels = c("LLD              ", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = 'bottom',
+        legend.title = element_blank(),
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA),
+        panel.background = element_rect(fill = NA))
+p_ba_p_pcoa<-ggExtra::ggMarginal(p_ba_p_pcoa, type = "histogram", groupColour = F, groupFill = TRUE,
+                                 xparams = list(bins = 60, alpha = 0.5,position = 'identity', color = 'white'),
+                                 yparams = list(bins = 60, alpha = 0.5,position = 'identity', color = 'white'))
+
+wilcox.test(all_ba_p_pcoa$X1~all_basic_ba_rmna$Cohort)
+wilcox.test(all_ba_p_pcoa$X2~all_basic_ba_rmna$Cohort)
+
+### Concentration
+all_ba_c <- all_ba[,concentration.group] %>% na.omit
+all_basic_ba_c_rmna <- all_basic[match(rownames(all_ba_c), rownames(all_basic)),]
+
+all_ba_c_dis<-vegdist(all_ba_c, method = 'canberra', na.rm = T)
+all_ba_c_dis_mds<-cmdscale(all_ba_c_dis, k=5, eig = T)
+all_ba_c_ccoa <- data.frame(all_ba_c_dis_mds$points)
+
+p_ba_c_pcoa<-ggplot(all_ba_c_ccoa,aes(X1,X2, color = all_basic_ba_c_rmna$Cohort))+
+  geom_point(size = 2,alpha = 0.5)+
+  stat_ellipse(aes(group = all_basic_ba_c_rmna$Cohort, fill = all_basic_ba_c_rmna$Cohort, color = all_basic_ba_c_rmna$Cohort) ,type = "norm",linetype = 2,geom = "polygon",alpha = 0.05,show.legend = F)+
+  xlab(paste("PCo1=",round(all_ba_c_dis_mds$eig[1],digits = 2),"%",sep = ""))+
+  ylab(paste("PCo2=",round(all_ba_c_dis_mds$eig[2],digits = 2),"%",sep = ""))+
+  scale_color_manual(name=NULL, 
+                     breaks = c("LLD", "300OB"),
+                     labels = c("LLD              ", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = 'bottom',
+        legend.title = element_blank(),
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA),
+        panel.background = element_rect(fill = NA))
+p_ba_c_pcoa<-ggExtra::ggMarginal(p_ba_c_pcoa, type = "histogram", groupColour = F, groupFill = TRUE,
+                                 xparams = list(bins = 60, alpha = 0.5,position = 'identity', color = 'white'),
+                                 yparams = list(bins = 60, alpha = 0.5,position = 'identity', color = 'white'))
+
+wilcox.test(all_ba_c_ccoa$X1~all_basic_ba_c_rmna$Cohort)
+wilcox.test(all_ba_c_ccoa$X2~all_basic_ba_c_rmna$Cohort)
+
+
+
+## plot
+p_title_ba <- ggdraw() + 
+    draw_label(
+      'PCoA',
+      fontface = 'bold', x = 0, hjust = 0) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7))
+
+p_ba_pcoa_grid<-plot_grid(
+    p_title_ba, 
+    plot_grid(p_ba_c_pcoa,p_ba_p_pcoa,
+              rel_widths = c(1, 1),align = 'hv',
+              labels = c("BA concentration", "BA proportion"),
+              ncol = 2,label_size	= 8,vjust = 0),
+    ncol = 1,
+    # rel_heights values control vertical title margins
+    rel_heights = c(0.1, 1)
+  )
+  
+
+if(!dir.exists("04.BA_population_structure")){dir.create("04.BA_population_structure")}
+
+pdf("04.BA_population_structure/BA_PCoA.pdf", height = 5, width = 8)
+print(p_ba_pcoa_grid)
+dev.off()
+
+print(p_ba_pcoa_grid)
+```
+
+## 3 Effects of basic phenotypes
+### 3.1 PERMANOVA
+```{r 3.1, eval=FALSE}
+# BA proportion variance
+all_basic_ba_p_adonis.df<-as.data.frame(matrix(NA, nrow = 3, ncol = 5))
+demo_factors<-c('Gender', "Age", "BMI")
+
+for (i in 1:3) {
+  #i<-1
+  all_basic_ba_p.adonis.i<-adonis(as.dist(all_ba_p_dis)~.,
+                                  data = as.data.frame(all_basic_ba_rmna[,demo_factors[i]]))
+  
+  all_basic_ba_p_adonis.df[i,c(1:3)]<-c(demo_factors[i],
+    all_basic_ba_p.adonis.i$aov.tab$R2[1], 
+    all_basic_ba_p.adonis.i$aov.tab$`Pr(>F)`[1])
+}
+
+all_basic_ba_p.adonis.comb<-adonis(as.dist(all_ba_p_dis)~.,data = all_basic_ba_rmna[,demo_factors])
+all_basic_ba_p.adonis.comb.mat<-all_basic_ba_p.adonis.comb$aov.tab[c(1:3),] %>%
+  .[match(demo_factors, rownames(.)),]
+
+all_basic_ba_p_adonis.df[,4]<-all_basic_ba_p.adonis.comb.mat$R2
+all_basic_ba_p_adonis.df[,5]<-all_basic_ba_p.adonis.comb.mat$`Pr(>F)`
+colnames(all_basic_ba_p_adonis.df)<-c("Factor", 
+                                      "Individual_R2", "Individual_p",
+                                      "Combined_R2", "Combined_p")
+all_basic_ba_p_adonis.df$Cumulative_R2<-cumsum(all_basic_ba_p_adonis.df$Combined_R2)
+write.table(all_basic_ba_p_adonis.df, "04.BA_population_structure/all_basic_ba_p_adonis.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
+save(all_basic_ba_p_adonis.df, file = "04.BA_population_structure/all_basic_ba_p_adonis.df.RData")
+
+
+# BA concentration variance
+all_basic_ba_c_adonis.df<-as.data.frame(matrix(NA, nrow = 3, ncol = 5))
+demo_factors<-c('Gender', "Age", "BMI")
+
+for (i in 1:3) {
+  #i<-1
+  all_basic_ba_c.adonis.i<-adonis(as.dist(all_ba_c_dis)~.,
+                                  data = as.data.frame(all_basic_ba_c_rmna[,demo_factors[i]]))
+  
+  all_basic_ba_c_adonis.df[i,c(1:3)]<-c(demo_factors[i],
+    all_basic_ba_c.adonis.i$aov.tab$R2[1], 
+    all_basic_ba_c.adonis.i$aov.tab$`Pr(>F)`[1])
+}
+
+all_basic_ba_c.adonis.comb<-adonis(as.dist(all_ba_c_dis)~.,data = all_basic_ba_c_rmna[,demo_factors])
+all_basic_ba_c.adonis.comb.mat<-all_basic_ba_c.adonis.comb$aov.tab[c(1:3),] %>%
+  .[match(demo_factors, rownames(.)),]
+
+all_basic_ba_c_adonis.df[,4]<-all_basic_ba_c.adonis.comb.mat$R2
+all_basic_ba_c_adonis.df[,5]<-all_basic_ba_c.adonis.comb.mat$`Pr(>F)`
+colnames(all_basic_ba_c_adonis.df)<-c("Factor", 
+                                      "Individual_R2", "Individual_p",
+                                      "Combined_R2", "Combined_p")
+all_basic_ba_c_adonis.df$Cumulative_R2<-cumsum(all_basic_ba_c_adonis.df$Combined_R2)
+write.table(all_basic_ba_c_adonis.df, "04.BA_population_structure/all_basic_ba_c_adonis.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
+save(all_basic_ba_c_adonis.df, file = "04.BA_population_structure/all_basic_ba_c_adonis.df.RData")
+```
+
+### 3.2 Visualization
+
+```{r 3.2, fig.width = 4, fig.height = 6}
+demo_factors<-c('Gender', "Age", "BMI")
+
+## ProPortion
+load("04.BA_population_structure/all_basic_ba_p_adonis.df.RData")
+knitr::kable(all_basic_ba_p_adonis.df)
+
+all_basic_ba_p_adonis.df.long<-gather(all_basic_ba_p_adonis.df[-4,c(1,2,6)], 'R2', 'Value', -1)
+all_basic_ba_p_adonis.df.long$Value<-as.numeric(all_basic_ba_p_adonis.df.long$Value)
+all_basic_ba_p_adonis.df.long$R2 <- factor(all_basic_ba_p_adonis.df.long$R2, 
+                                              levels = c("Individual_R2", "Cumulative_R2"))
+
+p_all_basic_ba_p_adonis<-ggplot(all_basic_ba_p_adonis.df.long, aes(Factor, Value,group = R2))+
+  geom_bar(aes(fill = R2),position =position_dodge(),stat="identity")+
+  xlab(NULL)+
+  ylab(bquote("R"^2))+
+  scale_x_discrete(limits = demo_factors)+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(name=NULL,
+                      breaks = c("Individual_R2", "Cumulative_R2"),
+                      labels = c(bquote("Univariate R"^2),bquote("Cumulative R"^2) ),
+                      values = mycolor2_green_blue)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(2,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        #axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major = element_line(colour = NA,linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+## Concentration
+
+load("04.BA_population_structure/all_basic_ba_c_adonis.df.RData")
+knitr::kable(all_basic_ba_c_adonis.df)
+
+all_basic_ba_c_adonis.df.long<-gather(all_basic_ba_c_adonis.df[-4,c(1,2,6)], 'R2', 'Value', -1)
+all_basic_ba_c_adonis.df.long$Value<-as.numeric(all_basic_ba_c_adonis.df.long$Value)
+all_basic_ba_c_adonis.df.long$R2 <- factor(all_basic_ba_c_adonis.df.long$R2, 
+                                              levels = c("Individual_R2", "Cumulative_R2"))
+
+p_all_basic_ba_c_adonis<-ggplot(all_basic_ba_c_adonis.df.long, aes(Factor, Value,group = R2))+
+  geom_bar(aes(fill = R2),position =position_dodge(),stat="identity")+
+  xlab(NULL)+
+  ylab(bquote("R"^2))+
+  scale_x_discrete(limits = demo_factors)+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(name=NULL,
+                      breaks = c("Individual_R2", "Cumulative_R2"),
+                      labels = c(bquote("Univariate R"^2),bquote("Cumulative R"^2) ),
+                      values = mycolor2_green_blue)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(2,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        #axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major = element_line(colour = NA,linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+
+p_basic_ba_adonis_grid<-plot_grid(
+  p_all_basic_ba_c_adonis,p_all_basic_ba_p_adonis,
+  align = 'h',
+  #labels = c("H", "I"),
+  ncol = 1)
+
+print(p_basic_ba_adonis_grid)
+
+pdf("04.BA_population_structure/basic_ba_adonis_bar.pdf", width = 4, height = 6)
+print(p_basic_ba_adonis_grid)
+dev.off()
+```
+
+
+

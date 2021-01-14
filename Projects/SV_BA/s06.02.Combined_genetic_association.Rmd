@@ -1,0 +1,511 @@
+---
+title: "Combined genetic association"
+author: "Daoming Wang"
+date: "2020/10/22"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+## 1 Preparation
+### 1.1 Import
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+
+
+### 1.2 Inputs
+
+```{r 1.2, echo=TRUE}
+load("01.cleanData/SV_all/all_msv_dist_std_avg.RData")
+load("01.cleanData/SV_lld/lld_msv_dist_std_avg.RData")
+load("01.cleanData/SV_300OB/ob_msv_dist_std_avg.RData")
+
+all_dsv <- read.table("01.cleanData/SV_all/20200801_LLD_300OB_deletionStructuralVariation_1437samples.tsv",check.names = F)
+all_vsv <- read.table("01.cleanData/SV_all/20200801_LLD_300OB_variableStructuralVariation_1437samples.tsv",check.names = F)
+lld_dsv <- read.table("01.cleanData/SV_lld/20200801_LLD_deletionStructuralVariation_1135samples.tsv",check.names = F)
+lld_vsv <- read.table("01.cleanData/SV_lld/20200801_LLD_variableStructuralVariation_1135samples.tsv",check.names = F)
+ob_dsv  <- read.table("01.cleanData/SV_300OB/20200801_300OB_deletionStructuralVariation_302samples.tsv",check.names = F)
+ob_vsv  <- read.table("01.cleanData/SV_300OB/20200801_300OB_variableStructuralVariation_302samples.tsv",check.names = F)
+
+lld_abun   <- read.table("01.cleanData/mbio_lld/20200801_LLD_metaphlan3_species_1135samples.tsv")
+lld_abun_sv <- read.table("01.cleanData/mbio_lld/20200801_LLD_metaphlan3_species_sv_1135samples.tsv")
+
+all_ba <- read.table("01.cleanData/phen_all/20200801_LLD_300OB_39BA_1437samples.tsv")
+all_basic <- read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
+all_covar <- read.table("01.cleanData/phen_all/20200801_LLD_covar_1437samples.tsv")
+lld_ba <- read.table("01.cleanData/phen_lld/20200801_LLD_39BA_1135samples.tsv")
+lld_basic <- read.table("01.cleanData/phen_lld/20200801_LLD_basic_1135samples.tsv")
+ob_ba <- read.table("01.cleanData/phen_300OB/20200801_300OB_39BA_302samples.tsv")
+ob_basic <- read.table("01.cleanData/phen_300OB/20200801_300OB_basic_302samples.tsv")
+
+```
+
+
+### 1.3 Preprossess
+#### 1.3.1 Get distance matrices
+```{r 1.3}
+# new sv dist
+load("01.cleanData/SV_all/all_shared_sv_dis.RData")
+all_msv_dist_std_avg<-all_shared_sv_dis
+lld_msv_dist_std_avg<-all_shared_sv_dis[rownames(lld_basic),rownames(lld_basic)]
+ob_msv_dist_std_avg<-all_shared_sv_dis[rownames(ob_basic),rownames(ob_basic)]
+
+## abundance-based
+all_msv_dist_std_avg<-all_s_abun_dis
+
+all_msv_dist_std_avg<-all_shared_sv_dis
+lld_msv_dist_std_avg<-all_shared_sv_dis[rownames(lld_basic),rownames(lld_basic)]
+ob_msv_dist_std_avg<-all_shared_sv_dis[rownames(ob_basic),rownames(ob_basic)]
+
+# remove missing values from mastrices
+all_sv_avg_dist_rmna<-dist_rmna(all_msv_dist_std_avg)
+lld_sv_avg_dist_rmna<-dist_rmna(lld_msv_dist_std_avg)
+ob_sv_avg_dist_rmna<-dist_rmna(ob_msv_dist_std_avg)
+
+
+## get corresponding BA profiles and basic information profiles
+covar1 <- c('Gender','Age','BMI','Reads_number')
+covar2 <- c('Gender','Age','BMI','Reads_number','Cohort')
+
+all_basic_ba<-cbind(all_covar[,covar2], all_ba)
+lld_basic_ba<-cbind(lld_basic[,covar1], lld_ba)
+ob_basic_ba<-cbind(ob_basic[,covar1], ob_ba)
+
+all_basic_ba_rmna<-na.omit(all_basic_ba)
+lld_basic_ba_rmna<-na.omit(lld_basic_ba)
+ob_basic_ba_rmna<-na.omit(ob_basic_ba)
+
+## all
+all_sv_ba_rmna_inter<-intersect(rownames(all_sv_avg_dist_rmna), rownames(all_basic_ba_rmna))
+all_sv_avg_dist_rmna_inter <- all_sv_avg_dist_rmna[match(all_sv_ba_rmna_inter, rownames(all_sv_avg_dist_rmna)), match(all_sv_ba_rmna_inter, colnames(all_sv_avg_dist_rmna))]
+all_basic_ba_rmna_inter <- all_basic_ba_rmna[match(all_sv_ba_rmna_inter, rownames(all_basic_ba_rmna)),]
+
+## lld
+lld_sv_ba_rmna_inter<-intersect(rownames(lld_sv_avg_dist_rmna), rownames(lld_basic_ba_rmna))
+lld_sv_avg_dist_rmna_inter <- lld_sv_avg_dist_rmna[match(lld_sv_ba_rmna_inter, rownames(lld_sv_avg_dist_rmna)), match(lld_sv_ba_rmna_inter, colnames(lld_sv_avg_dist_rmna))]
+lld_basic_ba_rmna_inter <- lld_basic_ba_rmna[match(lld_sv_ba_rmna_inter, rownames(lld_basic_ba_rmna)),]
+
+## ob
+ob_sv_ba_rmna_inter<-intersect(rownames(ob_sv_avg_dist_rmna), rownames(ob_basic_ba_rmna))
+ob_sv_avg_dist_rmna_inter <- ob_sv_avg_dist_rmna[match(ob_sv_ba_rmna_inter, rownames(ob_sv_avg_dist_rmna)), match(ob_sv_ba_rmna_inter, colnames(ob_sv_avg_dist_rmna))]
+ob_basic_ba_rmna_inter <- ob_basic_ba_rmna[match(ob_sv_ba_rmna_inter, rownames(ob_basic_ba_rmna)),]
+
+```
+
+#### 1.3.2 Get marker number matrices
+
+```{r 1.3.2,eval=F}
+all_sv<-cbind(all_vsv, all_dsv)
+all_sv_rmna_inter<-all_sv[match(all_sv_ba_rmna_inter,rownames(all_sv)),]
+
+date()
+all_sv_shared_marker_n<-shared_marker_n(all_sv_rmna_inter)
+date()
+
+```
+
+## 2 Make GRM files
+
+```{r 2,eval=F}
+if (!dir.exists("06.Combined_genetic_association")) {dir.create("06.Combined_genetic_association")}
+if(!dir.exists("06.Combined_genetic_association/gcta_input")){dir.create("06.Combined_genetic_association/gcta_input")}
+
+# grm
+all_grm<-make_grm(1-all_sv_avg_dist_rmna_inter,all_sv_shared_marker_n)
+#all_grm.rmna<-na.omit(all_grm)
+write.table(all_grm, "06.Combined_genetic_association/gcta_input/all.sv.grm",
+            sep = "\t",row.names = F,col.names = F,quote = F)
+gzip("06.Combined_genetic_association/gcta_input/all.sv.grm", ext="gz", FUN=gzfile)
+
+all_grm_id<-data.frame(fid=rownames(all_sv_avg_dist_rmna_inter),
+                       iid=rownames(all_sv_avg_dist_rmna_inter))
+write.table(all_grm_id, "06.Combined_genetic_association/gcta_input/all.sv.grm.id",sep = "\t",row.names = F,col.names = F,quote = F)
+
+# cov
+all_cov_gcta.q<-data.frame(fid=rownames(all_basic),
+                           iid=rownames(all_basic),
+                         all_basic[,c(3,5,7)])
+lld_cov_gcta.q<-data.frame(fid=rownames(lld_basic),
+                           iid=rownames(lld_basic),
+                           lld_basic[,c(2,4,6)])
+ob_cov_gcta.q<-data.frame(fid=rownames(ob_basic),
+                           iid=rownames(ob_basic),
+                           ob_basic[,c(2,4,6)])
+
+all_cov_gcta.d<-data.frame(fid=rownames(all_basic),
+                           iid=rownames(all_basic),
+                         all_basic[,c(1:2)])
+lld_cov_gcta.d<-data.frame(fid=rownames(lld_basic),
+                           iid=rownames(lld_basic),
+                           lld_basic[,c(1)])
+ob_cov_gcta.d<-data.frame(fid=rownames(ob_basic),
+                           iid=rownames(ob_basic),
+                           ob_basic[,c(1)])
+
+
+if(!dir.exists("06.Combined_genetic_association/gcta_input")){dir.create("06.Combined_genetic_association/gcta_input")}
+write.table(all_cov_gcta.q, "06.Combined_genetic_association/gcta_input/all_cov_gcta.q.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+write.table(lld_cov_gcta.q, "06.Combined_genetic_association/gcta_input/lld_cov_gcta.q.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+write.table(ob_cov_gcta.q, "06.Combined_genetic_association/gcta_input/ob_cov_gcta.q.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+
+write.table(all_cov_gcta.d, "06.Combined_genetic_association/gcta_input/all_cov_gcta.d.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+write.table(lld_cov_gcta.d, "06.Combined_genetic_association/gcta_input/lld_cov_gcta.d.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+write.table(ob_cov_gcta.d, "06.Combined_genetic_association/gcta_input/ob_cov_gcta.d.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+# ba
+all_grm_id<-data.frame(fid=rownames(all_ba),
+                       iid=rownames(all_ba))
+
+all_ba_gcta<-data.frame(all_grm_id, all_ba)
+lld_ba_gcta<-data.frame(all_grm_id[grep('LLD', all_grm_id$fid),],lld_ba)
+ob_ba_gcta <-data.frame(all_grm_id[grep('LLD', all_grm_id$fid, invert = T),],ob_ba)
+
+if(!dir.exists("06.Combined_genetic_association/gcta_input")){dir.create("06.Combined_genetic_association/gcta_input")}
+write.table(all_ba_gcta, "06.Combined_genetic_association/gcta_input/all_ba_gcta.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+write.table(lld_ba_gcta, "06.Combined_genetic_association/gcta_input/lld_ba_gcta.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+write.table(ob_ba_gcta, "06.Combined_genetic_association/gcta_input/ob_ba_gcta.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+
+# input info
+ba_info_gcta<-data.frame(BA=colnames(all_ba),
+                         order = c(1:ncol(all_ba)))
+write.table(ba_info_gcta, "06.Combined_genetic_association/gcta_input/ba_info_gcta.tsv",
+            sep = "\t", row.names = F, col.names = F, quote = F)
+
+```
+
+## 2 Microbiability
+
+### 2.1 Meta-analysis
+
+```{r 2.1}
+# lld
+lld_gcta_res<-read.table("06.Combined_genetic_association/gcta_output/lld.hsq.mat") %>% t(.) %>% as.data.frame(.)
+colnames(lld_gcta_res)<-c("Phenotype","Vg","Ve", "Vp","Vg.Vp", 
+                    "logL", "logL0", "LRT", "df","Pval", "n",
+                    "Vg_se", "Ve_se", "Vp_se", "Vg.Vp_se")
+lld_gcta_res$Vg.Vp<-as.numeric(as.character(lld_gcta_res$Vg.Vp))
+lld_gcta_res$Vg.Vp_se<-as.numeric(as.character(lld_gcta_res$Vg.Vp_se))
+lld_gcta_res$Pval<-as.numeric(as.character(lld_gcta_res$Pval))
+
+lld_gcta_res<-data.frame(Cohort = rep('LLD', nrow(lld_gcta_res)),
+                         lld_gcta_res)
+
+# ob
+ob_gcta_res<-read.table("06.Combined_genetic_association/gcta_output/ob.hsq.mat") %>% t(.) %>% as.data.frame(.)
+colnames(ob_gcta_res)<-c("Phenotype","Vg","Ve", "Vp","Vg.Vp", 
+                    "logL", "logL0", "LRT", "df","Pval", "n",
+                    "Vg_se", "Ve_se", "Vp_se", "Vg.Vp_se")
+ob_gcta_res$Vg.Vp<-as.numeric(as.character(ob_gcta_res$Vg.Vp))
+ob_gcta_res$Vg.Vp_se<-as.numeric(as.character(ob_gcta_res$Vg.Vp_se))
+ob_gcta_res$Pval<-as.numeric(as.character(ob_gcta_res$Pval))
+
+ob_gcta_res<-data.frame(Cohort = rep('300OB', nrow(ob_gcta_res)),
+                         ob_gcta_res)
+
+
+# merge
+gcta_res<-cbind(lld_gcta_res, ob_gcta_res)[,-c(1,17,18)]
+
+colnames(gcta_res)<-c("BA",
+                      paste("LLD.",colnames(gcta_res)[2:15],sep = ""),
+                      paste("X300OB.",colnames(gcta_res)[2:15],sep = ""))
+
+
+all_gcta_res <- batch_res <- apply(
+      gcta_res,
+      1,
+      my_meta_lm,
+      study_name = c("LLD", "300OB"),
+      beta_col = c(5,19),
+      se_col = c(15,29)
+    )
+all_gcta_res <- matrix(unlist(all_gcta_res), ncol = 5, byrow = T)
+colnames(all_gcta_res) <- c('Meta.beta', 'Meta.SE', "Meta.p", "Meta.I2", "Meta.hetero.p")
+gcta_res<-cbind(gcta_res, all_gcta_res)
+    
+
+write.table(gcta_res, "06.Combined_genetic_association/BA_microbiability.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
+
+
+```
+
+
+### 2.2 Visualization
+
+```{r 2.2}
+
+gcta_plot<-data.frame(Cohort = c(rep("LLD",nrow(gcta_res)),
+                                 rep("300OB",nrow(gcta_res)),
+                                 rep("Meta-analysis",nrow(gcta_res))),
+                      BA = rep(gcta_res[,1],3),
+                      Microbiability = c(gcta_res[,5],gcta_res[,19],gcta_res[,30]),
+                      SE = c(gcta_res[,15],gcta_res[,29],gcta_res[,31]),
+                      p = c(gcta_res[,10],gcta_res[,24],gcta_res[,32])
+                      )
+
+ba_order<-gcta_res$BA[order(gcta_res$Meta.beta, decreasing = T)]
+
+pdf("06.Combined_genetic_association/BA_microbiability.pdf", height = 5, width = 11)
+ggplot(gcta_plot, aes(x=BA, y=Microbiability,group = Cohort))+
+  geom_vline(aes(xintercept = BA),size=6,colour="#E4EDF2",alpha=.5)+
+  geom_point(aes(color = Cohort),position = position_dodge(width = 0.9))+
+  #geom_bar(aes(color = Cohort, fill = Cohort),stat = 'identity',position = position_dodge(width = 0.9))+
+  geom_linerange(aes(ymin = Microbiability-SE,ymax = Microbiability+SE, color = Cohort), position = position_dodge(width = 0.9))+
+  xlab(NULL)+
+  ylab("Microbiability")+
+  scale_size_area(max_size=12)+
+  scale_x_discrete(limits = ba_order)+
+  scale_y_continuous(expand = c(0,0))+
+  scale_color_manual(name=NULL,
+                      breaks = c("Meta-analysis","LLD", "300OB"),
+                      labels = c("Meta-analysis","LLD", "300OB"),
+                      values = mycolor3_red_blue_yellow)+
+    scale_fill_manual(name=NULL,
+                      breaks = c("Meta-analysis","LLD", "300OB"),
+                      labels = c("Meta-analysis","LLD", "300OB"),
+                      values = mycolor3_red_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(2,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major.y = element_line(colour = 'grey50',linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+dev.off()
+
+```
+
+## 3 Genetic variance explained by BAs
+
+### 3.1 db-RDA
+
+#### 3.1.1 LLD
+```{r 3.1.1}
+covar1 <- c('Gender','Age','BMI','Reads_number')
+
+lld_basic_ba<-cbind(lld_basic[,covar1], lld_ba)
+
+#lld_msv_dist_std<-lapply(lld_msv_dist, myfun<-function(x){x/max(x,na.rm = T)})
+#lld_msv_avg_dist<-mergeDist(lld_msv_dist_std)
+lld_msv_avg_dist_rmna<-dist_rmna(lld_msv_dist_std_avg)
+lld_basic_ba_rmna<-na.omit(lld_basic_ba)
+
+lld_sb_ba_rmna_inter<-intersect(rownames(lld_msv_avg_dist_rmna), rownames(lld_basic_ba_rmna))
+
+lld_msv_avg_dist_rmna_inter <- lld_msv_avg_dist_rmna[match(lld_sb_ba_rmna_inter, rownames(lld_msv_avg_dist_rmna)), match(lld_sb_ba_rmna_inter, colnames(lld_msv_avg_dist_rmna))]
+lld_basic_ba_rmna_inter <- lld_basic_ba_rmna[match(lld_sb_ba_rmna_inter, rownames(lld_basic_ba_rmna)),]
+
+lld_msv_ba_dbrda<-dbrda(as.dist(lld_msv_avg_dist_rmna_inter) ~ Condition(Gender) + Condition(Age)+ Condition(BMI) + Condition(Reads_number) +  CA + GCA + TCA + CDCA + GCDCA + TCDCA + UDCA + DCA + GDCA + TDCA + LCA + GLCA + TLCA + GUDCA + TUDCA  + CA_p + GCA_p + TCA_p + CDCA_p + GCDCA_p + TCDCA_p + UDCA_p + DCA_p + GDCA_p + TDCA_p + LCA_p + GLCA_p + TLCA_p + GUDCA_p + TUDCA_p + Total_primary_BAs + Total_secondary_BAs + Total_BAs + Secondary_primary_ratio + CA_CDCA_ratio + Unconjugated_conjugated_ratio + CA_dehydro_deconju_ratio + Taurine_glycine_ratio + C4,data = lld_basic_ba_rmna_inter)
+
+
+
+p_lld_msv_ba_dbrda<-ggord(lld_msv_ba_dbrda,all_basic$Cohort[match(rownames(lld_basic_ba_rmna_inter), rownames(all_basic))],#fill="#FED766",
+                         veccol = 'grey50',alpha_el = 0.05,alpha = 0.5,#color = "#FED766",
+                         txt = 3,size = 1.5,ext = 1.03,repel = T,labcol = '#e63946',ellipse = FALSE)+
+  scale_color_manual(name=NULL, 
+                    breaks = c("LLD", "300OB"),
+                    labels = c("LLD              ", "300OB"),
+                    values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = 'top',
+        legend.title = element_blank(),
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA),
+        panel.background = element_rect(fill = NA))
+
+print(p_lld_msv_ba_dbrda)
+
+if(!dir.exists("06.Combined_genetic_association/")){dir.create("06.Combined_genetic_association/")}
+pdf("06.Combined_genetic_association/lld_msv_ba_dbrda.pdf", width = 7,height = 7)
+print(p_lld_msv_ba_dbrda)
+dev.off()
+
+lld_msv_ba_dbrda.anova<-anova(lld_msv_ba_dbrda, by="terms")
+beep("fanfare")
+
+
+
+lld_msv_ba_dbrda.anova.df<-data.frame(BAs=rownames(lld_msv_ba_dbrda.anova),
+                                     R2=lld_msv_ba_dbrda.anova$SumOfSqs/sum(lld_msv_ba_dbrda.anova$SumOfSqs),
+                                     p = lld_msv_ba_dbrda.anova$`Pr(>F)`)[-nrow(lld_msv_ba_dbrda.anova),]
+
+
+
+write.table(lld_msv_ba_dbrda.anova.df,"06.Combined_genetic_association/lld_msv_ba_dbrda.anova.tsv",
+            col.names = T,row.names = F,quote = F,sep = "\t")
+if(!dir.exists("06.Combined_genetic_association/RData")){dir.create("06.Combined_genetic_association/RData")}
+save(lld_msv_ba_dbrda.anova.df,file = "06.Combined_genetic_association/RData/lld_msv_ba_dbrda.anova.df.RData")
+load("06.Combined_genetic_association/RData/lld_msv_ba_dbrda.anova.df.RData")
+
+p_lld_msv_ba_dbrda.anova<-ggplot(lld_msv_ba_dbrda.anova.df,aes(x=reorder(BAs,R2), y=R2,fill = R2))+
+  geom_bar(stat="identity")+
+  xlab(NULL)+
+  ylab('R-square')+
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_discrete(expand = c(0.05,0.05))+
+  coord_flip()+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.ticks = element_line(linetype = "blank"),
+        axis.ticks.x = element_line(linetype = "solid"),
+        axis.line.x =  element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = 'none',
+        #axis.text.y.left = element_text(colour = text_color),
+        panel.grid.major = element_line(colour = NA), 
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))+
+  scale_fill_distiller(palette = "Spectral")
+
+print(p_lld_msv_ba_dbrda.anova)
+
+pdf("06.Combined_genetic_association/lld_msv_ba_dbrda_anova.pdf", width = 3,height = 6)
+print(p_lld_msv_ba_dbrda.anova)
+dev.off()
+
+
+
+```
+
+
+#### 3.1.2 300OB
+```{r 3.1.2}
+covar1 <- c('Gender','Age','BMI','Reads_number')
+
+ob_basic_ba<-cbind(ob_basic[,covar1], ob_ba)
+
+#ob_msv_dist_std<-lapply(ob_msv_dist, myfun<-function(x){x/max(x,na.rm = T)})
+#ob_msv_avg_dist<-mergeDist(ob_msv_dist_std)
+ob_msv_avg_dist_rmna<-dist_rmna(ob_msv_dist_std_avg)
+ob_basic_ba_rmna<-na.omit(ob_basic_ba)
+
+ob_sb_ba_rmna_inter<-intersect(rownames(ob_msv_avg_dist_rmna), rownames(ob_basic_ba_rmna))
+
+ob_msv_avg_dist_rmna_inter <- ob_msv_avg_dist_rmna[match(ob_sb_ba_rmna_inter, rownames(ob_msv_avg_dist_rmna)), match(ob_sb_ba_rmna_inter, colnames(ob_msv_avg_dist_rmna))]
+ob_basic_ba_rmna_inter <- ob_basic_ba_rmna[match(ob_sb_ba_rmna_inter, rownames(ob_basic_ba_rmna)),]
+
+ob_msv_ba_dbrda<-dbrda(as.dist(ob_msv_avg_dist_rmna_inter) ~ Condition(Gender) + Condition(Age)+ Condition(BMI) + Condition(Reads_number) +  CA + GCA + TCA + CDCA + GCDCA + TCDCA + UDCA + DCA + GDCA + TDCA + LCA + GLCA + TLCA + GUDCA + TUDCA  + CA_p + GCA_p + TCA_p + CDCA_p + GCDCA_p + TCDCA_p + UDCA_p + DCA_p + GDCA_p + TDCA_p + LCA_p + GLCA_p + TLCA_p + GUDCA_p + TUDCA_p + Total_primary_BAs + Total_secondary_BAs + Total_BAs + Secondary_primary_ratio + CA_CDCA_ratio + Unconjugated_conjugated_ratio + CA_dehydro_deconju_ratio + Taurine_glycine_ratio + C4,data = ob_basic_ba_rmna_inter)
+
+
+
+p_ob_msv_ba_dbrda<-ggord(ob_msv_ba_dbrda,all_basic$Cohort[match(rownames(ob_basic_ba_rmna_inter), rownames(all_basic))],#fill="#FED766",
+                         veccol = 'grey50',alpha_el = 0.05,alpha = 0.5,#color = "#FED766",
+                         txt = 3,size = 1.5,ext = 1.03,repel = T,labcol = '#e63946',ellipse = FALSE)+
+  scale_color_manual(name=NULL, 
+                    breaks = c("ob", "300OB"),
+                    labels = c("ob              ", "300OB"),
+                    values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = 'top',
+        legend.title = element_blank(),
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA),
+        panel.background = element_rect(fill = NA))
+
+print(p_ob_msv_ba_dbrda)
+
+if(!dir.exists("06.Combined_genetic_association/")){dir.create("06.Combined_genetic_association/")}
+pdf("06.Combined_genetic_association/ob_msv_ba_dbrda.pdf", width = 7,height = 7)
+print(p_ob_msv_ba_dbrda)
+dev.off()
+
+ob_msv_ba_dbrda.anova<-anova(ob_msv_ba_dbrda, by="terms")
+beep("fanfare")
+
+
+
+ob_msv_ba_dbrda.anova.df<-data.frame(BAs=rownames(ob_msv_ba_dbrda.anova),
+                                     R2=ob_msv_ba_dbrda.anova$SumOfSqs/sum(ob_msv_ba_dbrda.anova$SumOfSqs),
+                                     p = ob_msv_ba_dbrda.anova$`Pr(>F)`)[-nrow(ob_msv_ba_dbrda.anova),]
+
+
+
+write.table(ob_msv_ba_dbrda.anova.df,"06.Combined_genetic_association/ob_msv_ba_dbrda.anova.tsv",
+            col.names = T,row.names = F,quote = F,sep = "\t")
+if(!dir.exists("06.Combined_genetic_association/RData")){dir.create("06.Combined_genetic_association/RData")}
+save(ob_msv_ba_dbrda.anova.df,file = "06.Combined_genetic_association/RData/ob_msv_ba_dbrda.anova.df.RData")
+load("06.Combined_genetic_association/RData/ob_msv_ba_dbrda.anova.df.RData")
+
+p_ob_msv_ba_dbrda.anova<-ggplot(ob_msv_ba_dbrda.anova.df,aes(x=reorder(BAs,R2), y=R2,fill = R2))+
+  geom_bar(stat="identity")+
+  xlab(NULL)+
+  ylab('R-square')+
+  scale_y_continuous(expand = c(0,0)) +
+  scale_x_discrete(expand = c(0.05,0.05))+
+  coord_flip()+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.ticks = element_line(linetype = "blank"),
+        axis.ticks.x = element_line(linetype = "solid"),
+        axis.line.x =  element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = 'none',
+        #axis.text.y.left = element_text(colour = text_color),
+        panel.grid.major = element_line(colour = NA), 
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))+
+  scale_fill_distiller(palette = "Spectral")
+
+print(p_ob_msv_ba_dbrda.anova)
+
+pdf("06.Combined_genetic_association/ob_msv_ba_dbrda_anova.pdf", width = 3,height = 6)
+print(p_ob_msv_ba_dbrda.anova)
+dev.off()
+
+
+
+```
+
+#### 3.1.3 Merge
+
+```{r 3.1.3}
+msv_ba_dbrda.anova.df<-inner_join(lld_msv_ba_dbrda.anova.df, ob_msv_ba_dbrda.anova.df, by = "BAs")
+
+colnames(msv_ba_dbrda.anova.df)<-c("BA", "LLD.R2", "LLD.P", "X300OB.R2", "X300OB.P")
+
+msv_ba_dbrda.anova.df$SigReplicated<-rep("No",nrow(msv_ba_dbrda.anova.df))
+
+msv_ba_dbrda.anova.df$SigReplicated[msv_ba_dbrda.anova.df$LLD.P<0.05 & msv_ba_dbrda.anova.df$X300OB.P<0.05]<-"Yes"
+
+```
