@@ -1,0 +1,481 @@
+---
+title: "Within species diversity"
+author: "Daoming Wang"
+date: "2020/8/24"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+## 1 Preparation
+
+### 1.1 Import
+
+Import packages and functions.
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+info    <- read.table("01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv",
+                      sep = "\t", header = T, stringsAsFactors = F)
+
+all_ba <- read.table("01.cleanData/phen_all/20200801_LLD_300OB_39BA_1437samples.tsv")
+all_basic <- read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
+all_dsv <- read.table("01.cleanData/SV_all/20200801_LLD_300OB_deletionStructuralVariation_1437samples.tsv",check.names = F)
+all_vsv <- read.table("01.cleanData/SV_all/20200801_LLD_300OB_variableStructuralVariation_1437samples.tsv",check.names = F)
+```
+
+## 2 Clustering analysis
+
+```{r 2, eval=FALSE}
+load("08.Subspecies/all_msv_dist_std.RData")
+
+all_msv_wsd_res <- lapply(all_msv_dist_std, my_cluster, ps.cutoff = 0.55)
+beepr::beep("mario")
+save(all_msv_wsd_res,file = "RData/all_msv_wsd_res_ps0.55.RData")
+
+## Optimum cluster number
+load("08.Subspecies/all_msv_wsd_res_ps0.55.RData")
+cluster_n <- as.data.frame(matrix(NA, nrow = nrow(info), ncol = 13))
+for (i in c(1:nrow(info))) {
+  #i<-1
+  all_msv_wsd_res[[i]]$clu_n$mean.pred
+  cluster_n[i,]<-c(info$Short_name[i], all_msv_wsd_res[[i]]$clu_n$optimalk, max(all_msv_wsd_res[[i]]$clu_n$mean.pred[-1], na.rm = T),all_msv_wsd_res[[i]]$clu_n$mean.pred)
+}
+colnames(cluster_n)<-c("Short_name", "Optimum_cluster_n", "Maximum_prediction_strength",
+                       "PS_n_1", "PS_n_2", "PS_n_3", "PS_n_4", "PS_n_5",
+                       "PS_n_6", "PS_n_7", "PS_n_8", "PS_n_9", "PS_n_10")
+if(!dir.exists("08.Subspecies")){dir.create("08.Subspecies")}
+
+write.table(cluster_n,"08.Subspecies/all_cluster_n.tsv", 
+            col.names = T, row.names = F, sep = "\t", quote = F)
+
+## Get PCs
+msv_pc<-as.data.frame(matrix(NA, nrow = nrow(all_ba), ncol = 5*nrow(info)))
+rownames(msv_pc)<-rownames(all_ba)
+colname_suf<-c("_PC1", "_PC2", "_PC3", "_PC4", "_PC5")
+for (i in c(1:nrow(info))) {
+  #i <- 1
+  msv_pc[match(rownames(all_msv_wsd_res[[i]]$pcoa), rownames(msv_pc)),c((5*(i-1)+1):(5*i))] <- all_msv_wsd_res[[i]]$pcoa
+  colnames(msv_pc)[c((5*(i-1)+1):(5*i))]<-paste(info$Short_name[i],colname_suf, sep = "")
+}
+write.table(msv_pc, "05.within_species_diversity/all_msv_pc.tsv",sep = "\t", quote = F)
+
+## Get cluster profile
+all_msv_cluster <- as.data.frame(matrix(NA, nrow = nrow(all_ba), ncol = nrow(info)))
+rownames(all_msv_cluster)<-rownames(all_ba)
+colnames(all_msv_cluster)<-info$Short_name
+
+for (i in 1:nrow(info)) {
+  #i <- 1
+  all_msv_cluster[match(rownames(all_msv_wsd_res[[i]]$tsne_df), rownames(all_msv_cluster)),i] <- all_msv_wsd_res[[i]]$tsne_df$Cluster
+}
+
+write.table(all_msv_cluster, "08.Subspecies/all_msv_cluster.tsv",sep = "\t", quote = F)
+
+
+## PCoA plot panel
+## cohort
+pcoa_plot.list<-list()
+
+for (i in 1:nrow(info)) {
+  #i<-1
+  
+  pcoa<-all_msv_wsd_res[[i]]$pcoa
+  pcoa$Cohort<-all_basic$Cohort[match(rownames(pcoa), rownames(all_basic))]
+  p_pcoa<-ggplot(pcoa,aes(X1,X2,fill = Cohort, color = Cohort))+
+  geom_point(size = 2,alpha = 0.5)+
+  ggtitle(info$Short_name[i])+
+  xlab(paste("PCo1=",round(all_msv_wsd_res[[i]]$pcoa_res$eig[1],digits = 2),"%",sep = ""))+
+  ylab(paste("PCo2=",round(all_msv_wsd_res[[i]]$pcoa_res$eig[2],digits = 2),"%",sep = ""))+
+  scale_color_manual(name=NULL, 
+                     breaks = c("LLD", "300OB"),
+                     labels = c("LLD              ", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  scale_fill_manual(name=NULL, 
+                     breaks = c("LLD", "300OB"),
+                     labels = c("LLD              ", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  theme(plot.title = element_text(size=10, face="italic"),
+        plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = 'none',
+        legend.title = element_blank(),
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA),
+        panel.background = element_rect(fill = NA))
+  p_pcoa<-ggExtra::ggMarginal(p_pcoa, type = "histogram", groupColour = F, groupFill = TRUE,
+                            xparams = list(bins = 50, alpha = 0.5,position = 'identity', color = 'white'),
+                            yparams = list(bins = 50, alpha = 0.5,position = 'identity', color = 'white'))
+
+
+  pcoa_plot.list[[i]]<-p_pcoa
+}
+
+pdf("08.Subspecies/all_pcoa_cohort.pdf",width = 18,height = 18)
+plot_grid(plotlist=pcoa_plot.list)
+dev.off()
+
+
+## cluster
+pcoa_plot.list<-list()
+
+for (i in 1:nrow(info)) {
+  #i<-1
+  
+  pcoa<-all_msv_wsd_res[[i]]$pcoa
+  p_pcoa<-ggplot(pcoa,aes(X1,X2,fill = as.factor(all_msv_wsd_res[[i]]$tsne_df$Cluster), color = all_msv_wsd_res[[i]]$tsne_df$Cluster))+
+    geom_point(size = 2,alpha = 0.5)+
+    ggtitle(info$Short_name[i])+
+    xlab(paste("PCo1=",round(all_msv_wsd_res[[i]]$pcoa_res$eig[1],digits = 2),"%",sep = ""))+
+    ylab(paste("PCo2=",round(all_msv_wsd_res[[i]]$pcoa_res$eig[2],digits = 2),"%",sep = ""))+
+    theme(plot.title = element_text(size=10, face="italic"),
+          plot.subtitle = element_text(vjust = 1), 
+          plot.caption = element_text(vjust = 1), 
+          axis.line.x =  element_line(),
+          axis.line.y = element_line(),
+          legend.position = 'none',
+          legend.title = element_blank(),
+          legend.key = element_rect(fill = NA), 
+          panel.grid.major = element_line(colour = NA),
+          panel.grid.minor = element_line(colour = NA),
+          panel.background = element_rect(fill = NA))+ 
+    scale_color_npg()
+    p_pcoa<-ggExtra::ggMarginal(p_pcoa, type = "histogram", groupColour = F, groupFill = TRUE,
+                                xparams = list(bins = 50, alpha = 0.5,position = 'identity', color = 'white'),
+                               yparams = list(bins = 50, alpha = 0.5,position = 'identity', color = 'white'))
+  pcoa_plot.list[[i]]<-p_pcoa
+}
+
+pdf("05.within_species_diversity/all_pcoa.pdf",width = 18,height = 18)
+plot_grid(plotlist=pcoa_plot.list)
+dev.off()
+
+
+## tsne plot panel
+tsne_plot.list<-list()
+
+for (i in c(1:nrow(info))) {
+  #i<-1
+  tsne_df<-all_msv_wsd_res[[i]]$tsne_df
+  p_msv_tsne <- ggplot(tsne_df, aes(x = X, y = Y)) +
+    stat_ellipse(aes(group = Cluster, fill = Cluster, color = Cluster) ,
+                 type = "norm",linetype = 2, geom = "polygon", alpha = 0.05)+
+    geom_point(aes(color = Cluster), alpha = 0.5, size = 0.8)+
+    ggtitle(info$Short_name[i])+
+    scale_color_npg()+
+    scale_fill_npg()+
+    theme_void()+
+    theme(legend.position = 'none',
+          plot.title = element_text(size=5, face="italic"))
+  tsne_plot.list[[i]] <- p_msv_tsne
+}
+
+pdf("05.within_species_diversity/all_tsne_clusters.pdf")
+plot_grid(plotlist=tsne_plot.list)
+dev.off()
+```
+
+## 3 BAs and within-species diversity
+
+### 3.1 Associations between BAs and clusters
+
+```{r 3.1}
+all_msv_cluster_sub<-all_msv_cluster[,cluster_n$Optimum_cluster_n>1]
+
+all_cluster_ba.res <-permKW_btw_mats(all_ba, all_msv_cluster_sub)
+save(all_cluster_ba.res, file = "RData/all_cluster_ba.res.RData")
+
+load("RData/all_cluster_ba.res.RData")
+all_cluster_ba_res.edge<-all_cluster_ba.res$table
+
+write.table(all_cluster_ba_res.edge, "05.within_species_diversity/all_cluster_ba_res.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+
+all_cluster_ba_res.edge.sig<-all_cluster_ba_res.edge[all_cluster_ba_res.edge$p<0.05 & all_cluster_ba_res.edge $perm.fdr < 0.05,]
+write.table(all_cluster_ba_res.edge.sig, "05.within_species_diversity/all_cluster_ba_res.sig.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+
+
+## circos plot
+all_cluster_ba_res.edge.sig<-subset(all_cluster_ba_res.edge,
+                                   all_cluster_ba_res.edge$p < 0.05 &
+                                     all_cluster_ba_res.edge$perm.fdr < 0.05 )
+
+all_cluster_ba_res.edge.sig$Phenotype<-as.character(all_cluster_ba_res.edge.sig$Phenotype)
+all_cluster_ba_res.edge.sig$Taxa<-as.character(all_cluster_ba_res.edge.sig$Taxa)
+
+all_cluster_ba_res.edge.sig.ba  <- all_cluster_ba_res.edge.sig$Phenotype %>%
+  as.character(.) %>%
+  .[!duplicated(.)]
+
+spe_ba_count<-NULL
+for (pheno in all_cluster_ba_res.edge.sig.ba) {
+  #pheno <-"C4"
+  spe_ba_df<-all_cluster_ba_res.edge.sig[all_cluster_ba_res.edge.sig$Phenotype==pheno,]$Taxa %>%
+    table %>%
+    as.data.frame
+  colnames(spe_ba_df)<-c("Species", "Count")
+  spe_ba_df<-data.frame(BA = rep(pheno,nrow(spe_ba_df)), spe_ba_df)
+  spe_ba_count<-rbind(spe_ba_count,spe_ba_df)
+}
+
+spe_ba_count <- spe_ba_count[order(spe_ba_count$Count),]
+
+spe_ba_count_species_order<-spe_ba_count %>% group_by(Species) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+spe_ba_count_ba_order<-spe_ba_count %>% group_by(BA) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+
+spe_ba_count<-spe_ba_count[order(match(spe_ba_count$BA, spe_ba_count_ba_order$BA),decreasing = T),]
+#spe_ba_count<-spe_ba_count[order(match(spe_ba_count$Species, spe_ba_count_species_order$Species),decreasing = T),]
+
+
+spe_ba_count_species_order_str<-as.character(spe_ba_count_species_order$Species)
+spe_ba_count_ba_order_str<-as.character(spe_ba_count_ba_order$BA)
+
+
+
+pdf("05.within_species_diversity/cluster_ba.circos.pdf", width = 14, height = 14)
+circos.par(start.degree = 0)
+chordDiagram(spe_ba_count,annotationTrack = "grid",
+             grid.col =  c(wes_palette("Darjeeling1", length(spe_ba_count_ba_order_str), type = "continuous"),rep('grey',length(spe_ba_count_species_order_str))),
+             order = c(rev(spe_ba_count_ba_order_str),rev(spe_ba_count_species_order_str)),
+             big.gap = 10,
+             preAllocateTracks = list(track.margin = c(0, uh(70, "mm")), 
+                                      track.height = max(strwidth(unlist(dimnames(spe_ba_count)))))
+             )
+circos.track(track.index = 1, panel.fun = function(x, y) {
+  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
+}, bg.border = NA) # here set bg.border to NA is important
+
+dev.off()
+circos.clear()
+
+```
+
+### 3.2 Associations between BAs and PCs
+
+```{r 3.2}
+covar2 <- c('Gender','Age','Cohort')
+
+all_basic_covar <- all_basic
+all_basic_covar$Cohort<-as.factor(all_basic_covar$Cohort) %>% as.numeric
+all_basic_covar$Cohort <- all_basic_covar$Cohort-1
+
+all_pc_ba.res <-lm_btw_mats(all_ba, msv_pc, all_basic_covar, covar2, y_mat = 0)
+beepr::beep('mario')
+save(all_pc_ba.res, file = "RData/all_pc_ba.res.RData")
+
+load("RData/all_pc_ba.res.RData")
+all_pc_ba.res.edge<-all_pc_ba.res$table
+
+```
+
+
+
+## 4 Examples
+
+### 4.1
+
+```{r 4.1}
+tsne_df<-all_msv_wsd_res[[match('B.wexlerae', info$Short_name)]]$tsne_df
+tsne_df<-data.frame(tsne_df,
+                    BA=all_ba[match(rownames(tsne_df), rownames(all_ba)),match('CA_p', colnames(all_ba))])
+
+
+ggplot(tsne_df, aes(x = X, y = Y)) +
+    #stat_ellipse(aes(group = Cluster, fill = Cluster, color = Cluster) ,
+    #             type = "norm",linetype = 2, geom = "polygon", alpha = 0.05)+
+    geom_point(aes(color = BA), alpha = 0.5)+
+    ggtitle(info$Short_name[i])+
+    scale_color_gradientn(colours = c(wes_palette("Darjeeling1", nrow(tsne_df), type = "continuous")))+
+    #scale_fill_npg()+
+    theme_void()+
+    theme(legend.position = 'none',
+          plot.title = element_text(face="italic"))
+
+
+
+
+j<-match('R.gnavus', info$Short_name)
+pcoa<-all_msv_wsd_res[[j]]$pcoa
+pcoa<-data.frame(pcoa,
+                 BA=all_ba[match(rownames(pcoa), rownames(all_ba)),match('C4', colnames(all_ba))])
+
+
+
+ggplot(pcoa,aes(X1,X2,fill = as.factor(all_msv_wsd_res[[j]]$tsne_df$Cluster), color = BA ))+
+    geom_point(alpha = 0.5)+
+    ggtitle(info$Short_name[j])+
+    xlab(paste("PCo1=",round(all_msv_wsd_res[[j]]$pcoa_res$eig[1],digits = 2),"%",sep = ""))+
+    ylab(paste("PCo2=",round(all_msv_wsd_res[[j]]$pcoa_res$eig[2],digits = 2),"%",sep = ""))+
+  scale_color_gradientn(colours = c(wes_palette("Zissou1", 100, type = "continuous")))+
+    theme(plot.title = element_text(face="italic"),
+          plot.subtitle = element_text(vjust = 1), 
+          plot.caption = element_text(vjust = 1), 
+          axis.line.x =  element_line(),
+          axis.line.y = element_line(),
+          legend.position = 'right',
+          legend.title = element_blank(),
+          legend.key = element_rect(fill = NA), 
+          panel.grid.major = element_line(colour = NA),
+          panel.grid.minor = element_line(colour = NA),
+          panel.background = element_rect(fill = NA))
+
+plot(pcoa$X2,pcoa$BA)
+
+```
+
+### 4.2 Cohort difference
+
+```{r 4.2}
+all_msv_cluster<-read.table("05.within_species_diversity/all_msv_cluster.tsv",sep = "\t")
+cluster_n<-read.table("05.within_species_diversity/all_cluster_n.tsv",
+                      sep = "\t", header = T)
+
+all_msv_cluster_2<-all_msv_cluster[,cluster_n$Optimum_cluster_n>=2]
+
+all_msv_cluster_2_cohort_diff<-as.data.frame(matrix(NA,nrow = ncol(all_msv_cluster_2), ncol = 2))
+
+for (i in 1:ncol(all_msv_cluster_2)) {
+  #i<-1
+  chisq_res<-chisq.test(table(all_msv_cluster_2[,i], all_basic$Cohort))
+  all_msv_cluster_2_cohort_diff[i,]<-c(colnames(all_msv_cluster_2)[i], chisq_res$p.value)
+}
+
+colnames(all_msv_cluster_2_cohort_diff) <- c('Species', 'P')
+all_msv_cluster_2_cohort_diff$P<-as.numeric(all_msv_cluster_2_cohort_diff$P)
+all_msv_cluster_2_cohort_diff$FDR<-p.adjust(all_msv_cluster_2_cohort_diff$P, method = 'fdr')
+
+write.table(all_msv_cluster_2_cohort_diff, "05.within_species_diversity/all_msv_cluster_2_cohort_diff.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
+
+
+## 
+all__tbl <- table(all_basic$Cohort,all_basic$Gender) 
+chisq.test(all_gender_tbl) 
+
+#pdf("02.summary/all_gender.pdf", width = 3, height = 3)
+
+all_basic_cluster<-cbind(all_basic, all_msv_cluster)
+
+p_p.cori<-ggplot()+
+  geom_mosaic(data=all_basic_cluster[!is.na(all_basic_cluster$P.copri),],aes(x = product(Cohort), fill=factor(P.copri)))+
+  ylab("Cluster")+
+  xlab("Cohort")+
+  #scale_fill_manual(values=mycolor2_green_blue) +
+  theme_tufte()+
+  theme(axis.ticks.length = unit(0, "cm"), 
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        #axis.text.y = element_text(colour = "white"), 
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))+
+  scale_fill_npg()
+
+p_S.vestibularis<-ggplot()+
+  geom_mosaic(data=all_basic_cluster[!is.na(all_basic_cluster$S.vestibularis),],aes(x = product(Cohort), fill=factor(S.vestibularis)))+
+  ylab("Cluster")+
+  xlab("Cohort")+
+  #scale_fill_manual(values=mycolor2_green_blue) +
+  theme_tufte()+
+  theme(axis.ticks.length = unit(0, "cm"), 
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        #axis.text.y = element_text(colour = "white"), 
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))+
+  scale_fill_npg()
+
+p_P.merdae<-ggplot()+
+  geom_mosaic(data=all_basic_cluster[!is.na(all_basic_cluster$P.merdae),],aes(x = product(Cohort), fill=factor(P.merdae)))+
+  ylab("Cluster")+
+  xlab("Cohort")+
+  #scale_fill_manual(values=mycolor2_green_blue) +
+  theme_tufte()+
+  theme(axis.ticks.length = unit(0, "cm"), 
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        #axis.text.y = element_text(colour = "white"), 
+        legend.position = "none",
+        plot.title = element_text(hjust = 0.5))+
+  scale_fill_npg()
+
+
+p_title <- ggdraw() + 
+    draw_label(
+      'Subspecies and cohort',
+      fontface = 'bold', x = 0, hjust = 0) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7))
+
+p_demo_grid<-plot_grid(
+    p_title, 
+    plot_grid(p_p.cori,p_S.vestibularis, p_P.merdae,
+              rel_widths = c(1, 1, 1),align = 'hv',
+              labels = c("A", "B", "C"),
+              ncol = 3,label_size	= 8,vjust = 0),
+    ncol = 1,
+    # rel_heights values control vertical title margins
+    rel_heights = c(0.1, 1)
+  )
+
+
+print(p_demo_grid)
+
+if(!dir.exists("05.within_species_diversity/")){dir.create("05.within_species_diversity")}
+pdf("05.within_species_diversity/all_cluster_diff.pdf", height = 3, width = 7)
+print(p_demo_grid)
+dev.off()
+  
+```
+
+## 5 SV enrichmennt
+
+```{r 5}
+all_msv_cluster_sub<-read.table("08.Subspecies/all_msv_cluster.tsv")
+
+cluster_i<-all_msv_cluster_sub[,1]
+vsv_i<-all_vsv[,grep('rectale', colnames(all_vsv))]
+
+cluster_sv_df<-as.data.frame(matrix(NA, nrow = ncol(vsv_i), ncol = 5))
+for (j in 1:ncol(vsv_i)) {
+  #j<-1
+  kru_res.j<-kruskal.test(vsv_i[,j]~cluster_i)
+  mean_1<-mean(vsv_i[cluster_i==1,j],na.rm = T)
+  mean_2<-mean(vsv_i[cluster_i==2,j],na.rm = T)
+  delta_1_2<-mean_2-mean_1
+  cluster_sv_df[j,c(1:5)]<-c(colnames(vsv_i)[j], mean_1, mean_2, delta_1_2, kru_res.j$p.value)
+}
+
+colnames(cluster_sv_df)<-c("SV", "Mean_1", "Mean_2", "Delta", "P-value")
+cluster_sv_df$`P-value`<-as.numeric(cluster_sv_df$`P-value`)
+
+
+wilcox.test(all_basic$BMI~all_msv_cluster_sub[,1])
+
+```

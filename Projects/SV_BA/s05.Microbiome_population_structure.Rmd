@@ -1,0 +1,175 @@
+---
+title: "Microbiome population structure"
+author: "Daoming Wang"
+date: "2020/10/22"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+## 1 Preparation
+### 1.1 Import
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+load("01.cleanData/SV_all/all_msv_dist_std_avg.RData")
+
+all_abun   <- read.table("01.cleanData/mbio_all/20200801_LLD_300OB_metaphlan3_species_1437samples.tsv")
+all_abun_sv <- read.table("01.cleanData/mbio_all/20200801_LLD_300OB_metaphlan3_species_sv_1437samples.tsv")
+# Basic
+all_basic <- read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
+all_ba<-read.table("01.cleanData/phen_all/20200801_LLD_300OB_39BA_1437samples.tsv")
+```
+
+## 2 SV PCoA
+
+```{r 2}
+## based on shared sv
+load("01.cleanData/SV_all/all_shared_sv_dis.RData")
+all_msv_dist_std_avg<-all_shared_sv_dis
+
+##
+
+all_msv_dist_std_avg_rmna<-dist_rmna(all_msv_dist_std_avg)
+all_basic_sv_rmna <- all_basic[match(rownames(all_msv_dist_std_avg_rmna), rownames(all_basic)),]
+
+all_sv_avg_dist_mds<-cmdscale(all_msv_dist_std_avg_rmna, k=5, eig = T)
+all_sv_avg_dist_pcoa <- data.frame(all_sv_avg_dist_mds$points)
+
+p_all_sv_pcoa<-ggplot(all_sv_avg_dist_pcoa,aes(X1,X2, color = all_basic_sv_rmna$Cohort))+
+  geom_point(size = 2,alpha = 0.5)+
+  stat_ellipse(aes(group = all_basic_sv_rmna$Cohort, fill = all_basic_sv_rmna$Cohort, color = all_basic_sv_rmna$Cohort) ,type = "norm",linetype = 2,geom = "polygon",alpha = 0.05,show.legend = F)+
+  xlab(paste("PCo1=",round(all_sv_avg_dist_mds$eig[1],digits = 2),"%",sep = ""))+
+  ylab(paste("PCo2=",round(all_sv_avg_dist_mds$eig[2],digits = 2),"%",sep = ""))+
+  scale_color_manual(name=NULL, 
+                    breaks = c("LLD", "300OB"),
+                    labels = c("LLD              ", "300OB"),
+                    values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = 'bottom',
+        legend.title = element_blank(),
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA),
+        panel.background = element_rect(fill = NA))
+p_all_sv_pcoa<-ggExtra::ggMarginal(p_all_sv_pcoa, type = "histogram", groupColour = F, groupFill = TRUE,
+                                 xparams = list(bins = 60, alpha = 0.5,position = 'identity', color = 'white'),
+                                 yparams = list(bins = 60, alpha = 0.5,position = 'identity', color = 'white'))
+
+
+wilcox.test(all_sv_avg_dist_pcoa$X1~all_basic_sv_rmna$Cohort)
+wilcox.test(all_sv_avg_dist_pcoa$X2~all_basic_sv_rmna$Cohort)
+
+if(!dir.exists("05.Microbiome_population_structure")){dir.create("05.Microbiome_population_structure")}
+
+pdf("05.Microbiome_population_structure/all_SV_PCoA.pdf", width = 4.5, height = 5)
+print(p_all_sv_pcoa)
+dev.off()
+```
+
+## 3 Effect of basic phenotypes
+
+### 3.1 PERMANOVA 
+
+```{r 3.1, eval=FALSE}
+all_basic_sv_p_adonis.df<-as.data.frame(matrix(NA, nrow = 4, ncol = 5))
+demo_factors<-c('Gender', "Age", "BMI", "Reads_number")
+
+for (i in 1:4) {
+  #i<-1
+  all_basic_sv_p.adonis.i<-adonis(as.dist(all_msv_dist_std_avg_rmna)~.,
+                                  data = as.data.frame(all_basic_sv_rmna[,demo_factors[i]]))
+  
+  all_basic_sv_p_adonis.df[i,c(1:3)]<-c(demo_factors[i],
+    all_basic_sv_p.adonis.i$aov.tab$R2[1], 
+    all_basic_sv_p.adonis.i$aov.tab$`Pr(>F)`[1])
+}
+
+all_basic_sv_p.adonis.comb<-adonis(as.dist(all_msv_dist_std_avg_rmna)~.,data = all_basic_sv_rmna[,demo_factors])
+all_basic_sv_p.adonis.comb.mat<-all_basic_sv_p.adonis.comb$aov.tab[c(1:4),] %>%
+  .[match(demo_factors, rownames(.)),]
+
+all_basic_sv_p_adonis.df[,4]<-all_basic_sv_p.adonis.comb.mat$R2
+all_basic_sv_p_adonis.df[,5]<-all_basic_sv_p.adonis.comb.mat$`Pr(>F)`
+colnames(all_basic_sv_p_adonis.df)<-c("Factor", 
+                                      "Individual_R2", "Individual_p",
+                                      "Combined_R2", "Combined_p")
+all_basic_sv_p_adonis.df$Cumulative_R2<-cumsum(all_basic_sv_p_adonis.df$Combined_R2)
+#all_basic_sv_p_adonis.df<-all_basic_sv_p_adonis.df[,-6]
+write.table(all_basic_sv_p_adonis.df, "05.Microbiome_population_structure/all_basic_sv_p_adonis.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
+save(all_basic_sv_p_adonis.df, file = "05.Microbiome_population_structure/all_basic_sv_p_adonis.df.RData")
+
+```
+
+### 3.2 Visulization
+
+```{r 3.2, fig.width = 4, fig.height = 3}
+demo_factors<-c('Gender', "Age", "BMI", "Reads_number")
+
+## ProPortion
+load("05.Microbiome_population_structure/all_basic_sv_p_adonis.df.RData")
+knitr::kable(all_basic_sv_p_adonis.df)
+
+all_basic_sv_p_adonis.df.long<-gather(all_basic_sv_p_adonis.df[-5, c(1,2,6)], 'R2', 'Value', -1)
+all_basic_sv_p_adonis.df.long$Value<-as.numeric(all_basic_sv_p_adonis.df.long$Value)
+all_basic_sv_p_adonis.df.long$R2 <- factor(all_basic_sv_p_adonis.df.long$R2, 
+                                              levels = c("Individual_R2", "Cumulative_R2"))
+
+p_all_basic_sv_p_adonis<-ggplot(all_basic_sv_p_adonis.df.long, aes(Factor, Value,group = R2))+
+  geom_bar(aes(fill = R2),position =position_dodge(),stat="identity")+
+  xlab(NULL)+
+  ylab(bquote("R"^2))+
+  scale_x_discrete(limits = demo_factors[-5])+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(name=NULL,
+                      breaks = c("Individual_R2", "Cumulative_R2"),
+                      labels = c(bquote("Univariate R"^2),bquote("Cumulative R"^2) ),
+                      values = mycolor2_green_blue)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(2,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major = element_line(colour = NA,linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+pdf("05.Microbiome_population_structure/basic_sv_adonis_bar.pdf", width = 4, height = 3.5)
+print(p_all_basic_sv_p_adonis)
+dev.off()
+
+print(p_all_basic_sv_p_adonis)
+
+```
+

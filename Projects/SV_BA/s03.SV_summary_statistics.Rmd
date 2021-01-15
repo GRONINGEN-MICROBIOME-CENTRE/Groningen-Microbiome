@@ -1,0 +1,320 @@
+---
+title: "SV summary statistics"
+author: "Daoming Wang"
+date: "2020/10/22"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+## 1 Preparation
+### 1.1 Import
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+# SV
+all_dsv <- read.table("01.cleanData/SV_all/20200801_LLD_300OB_deletionStructuralVariation_1437samples.tsv",check.names = F)
+all_vsv <- read.table("01.cleanData/SV_all/20200801_LLD_300OB_variableStructuralVariation_1437samples.tsv",check.names = F)
+info    <- read.table("01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv",
+                      sep = "\t", header = T, stringsAsFactors = F)
+
+# abundance
+all_abun_sv<-read.table("01.cleanData/mbio_all/20200801_LLD_300OB_metaphlan3_species_sv_1437samples.tsv",check.names = F)
+
+# Basic
+all_basic <- read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
+
+```
+## 2 SV summary
+
+### 2.1 Species number
+Number of species with SVs
+
+```{r 2.1, fig.width=3.5, fig.height=3.5}
+if(!dir.exists("03.SV_summary_statistics")){dir.create("03.SV_summary_statistics")}
+
+dsgv_species_n<-sum(info$Deletion_SVs_number>0)
+vsgv_species_n<-sum(info$Variable_SVs_number>0)
+total_species_n<-sum(info$Variable_SVs_number>0 | info$Deletion_SVs_number>0)
+
+species_n<-data.frame(item = rep("Informative species number", 3),
+                      categories = c("SVs","Deletion SVs", "Variable SVs"),
+                      value = c(total_species_n,dsgv_species_n, vsgv_species_n))
+species_n$categories <- factor(species_n$categories, levels = species_n$categories)
+species_n$categories <- factor(species_n$categories,levels(species_n$categories)[c(2,3,1)])
+
+p_species_n<-ggplot(species_n, aes(x=categories, y=value,label = value))+
+  geom_bar(aes(fill = categories),stat = 'identity')+
+  geom_text(position = position_stack(vjust = 0.5), color = "white")+
+  xlab(NULL)+
+  ylab("Number of Informative species")+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(name=NULL,
+                    breaks=c("Deletion SVs", "Variable SVs", "SVs"),
+                    labels=c("Deletion SVs", "Variable SVs", "SVs"),
+                    values = mycolor3)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.key = element_rect(fill = NA), 
+        legend.position = "none",
+        panel.grid.major = element_line(colour = "gray90",linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+
+
+pdf("03.SV_summary_statistics/20200801_LLD_300OB_Informative_species_number.pdf", height = 3.5, width = 3.5)
+print(p_species_n)
+dev.off()
+
+print(p_species_n)
+```
+
+### 2.1 SV number
+#### 2.1.1 SV total number
+
+```{r 2.1.1, fig.width=6, fig.height=6}
+dsgv_n<-sum(info$Deletion_SVs_number)
+vsgv_n<-sum(info$Variable_SVs_number)
+sgv_n<-dsgv_n+vsgv_n
+
+sv_n<-data.frame(items = rep("SVs number", 2),
+                      categories = c("Deletion SV", "Variable SV"),
+                      value = c(dsgv_n, vsgv_n))
+p_pie<-my_pie(sv_n, 'SVs number',mycol = rev(mycolor2_green_blue))
+
+pdf("03.SV_summary_statistics/20200801_LLD_300OB_Total_SVs_number.pdf",height = 6, width = 6)
+print(p_pie)
+dev.off()
+
+print(p_pie)
+```
+
+#### 2.1.2 SV number per species
+
+```{r 2.1.2, fig.width=11, fig.height=6}
+species_sgv_n_order<- info$Short_name[order(info$SVs_number, decreasing = T)]
+
+species_sgv_n_long<-gather(info[,c(10,12,13)], "type", "number", c(2:3))
+
+p_sv_species<-ggplot(species_sgv_n_long, aes(x=Short_name, y=number, group = type, fill = type))+
+  geom_bar(position = "stack",stat="identity")+
+  xlab(NULL)+
+  ylab("Number of SVs")+
+  scale_x_discrete(limits = species_sgv_n_order)+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(name=NULL,
+                      breaks = c("Deletion_SVs_number", "Variable_SVs_number"),
+                      labels = c("Deletion SVs              ", "Variable SVs"),
+                      values = mycolor2_green_blue)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(0,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major = element_line(colour = NA,linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+pdf("03.SV_summary_statistics/20200801_LLD_300OB_SVs_number_species.pdf", height = 6, width = 11)
+print(p_sv_species)
+dev.off()
+
+print(p_sv_species)
+```
+
+### 2.2 Sample size per species
+
+```{r 2.2, fig.width=11, fig.height=6}
+infor_sample_n_order<- info$Short_name[order(info$Total_samples_number, decreasing = T)]
+infor_sample_n <- info[,c(10,15,16)]
+
+infor_sample_n.long <- gather(infor_sample_n,'Cohort', 'Sample_size', c(2:3))
+
+p_sample_n<-ggplot(infor_sample_n.long, aes(x=Short_name, y=Sample_size,group = Cohort))+
+  geom_bar(aes(fill = Cohort),position = "stack",stat="identity")+
+  xlab(NULL)+
+  ylab("Number of samples")+
+  scale_x_discrete(limits = infor_sample_n_order)+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(name=NULL,
+                      breaks = c("LLD_sample_number", "X300OB_sample_number"),
+                      labels = c("LLD              ", "300OB"),
+                      values = mycolor2_blue_yellow)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        plot.margin=unit(c(2,1,1,3),"cm"),
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        legend.text = element_text(size = 10),
+        panel.grid.major = element_line(colour = NA,linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+pdf("03.SV_summary_statistics/20200801_LLD_300OB_Samples_number_species.pdf", height = 6, width = 11) 
+print(p_sample_n)
+dev.off()
+
+print(p_sample_n)
+```
+
+
+### 2.3 SV number factors
+
+Show relationships between SV numbers and genome size and sample size.
+
+```{r 2.3, fig.width=4, fig.height=5}
+species_sample_n<-info[,c(1,18,17,12:14)]
+
+length_sv_n_cor<-cor.test(species_sample_n$Length/1000, species_sample_n$SVs_number)
+text_r<-paste("r=",round(length_sv_n_cor$estimate,digits = 3),"\np=",format(length_sv_n_cor$p.value,digits = 3),sep = "")
+
+
+p_scatter_pie<-ggplot()+
+  geom_smooth(data=species_sample_n ,aes(x=Length/10000, y=SVs_number),method = "lm", color = "white", alpha = 0.2,size = 0.5)+
+  geom_scatterpie(data=species_sample_n ,aes(x=Length/10000, y=SVs_number,r=Total_samples_number/50),
+                  cols=c("Deletion_SVs_number","Variable_SVs_number"),color=NA, alpha = 0.75)+
+  coord_equal()+
+  annotate("text", -Inf, Inf, label = c(text_r),hjust = -0.1, vjust = 1)+
+  xlab("Genome size (10 kbp)")+
+  ylab("Number of SVs")+
+  scale_x_continuous(expand = c(0,0))+
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_manual(name   = NULL,
+                      breaks = c("Deletion_SVs_number", "Variable_SVs_number"),
+                      labels = c("Deletion SVs              ", "Variable SVs"),
+                      values = mycolor2_green_blue)+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position="top",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = "gray90",linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+
+pdf("03.SV_summary_statistics/20200801_LLD_300OB_Sample_n_SVs_n_scatter_pie.pdf", height = 5, width = 4)
+print(p_scatter_pie)
+dev.off()
+
+print(p_scatter_pie)
+```
+
+### 3 Species abundance
+
+```{r 3, fig.width = 3, fig.height = 3}
+
+
+sv_species_total_abun<-data.frame(id = rownames(all_abun_sv),
+                                  Total_abundance=rowSums(all_abun_sv))
+
+mean(sv_species_total_abun$Total_abundance,na.rm = T)
+se(sv_species_total_abun$Total_abundance)
+min(sv_species_total_abun$Total_abundance,na.rm = T)
+max(sv_species_total_abun$Total_abundance,na.rm = T)
+
+
+p_sv_abun_density<-ggplot(sv_species_total_abun,aes(x=Total_abundance), color = "#2EC4B6")+
+  geom_density(alpha = 0.2, color = "#2EC4B6", fill = "#2EC4B6", alpha = 0.5)+
+  geom_rug(color = "#2EC4B6",alpha = 0.5,length = unit(0.05, "npc"))+
+  geom_vline(xintercept  = mean(sv_species_total_abun$Total_abundance,na.rm = T), linetype = "dashed",color = "#ee6352")+
+  ylab('Density')+
+  xlab('Abundance')+
+  scale_y_continuous(expand = c(0,0))+
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position = "none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = NA),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+pdf("03.SV_summary_statistics/sv_abun_density.pdf", width = 3, height = 2)
+print(p_sv_abun_density)
+dev.off()
+
+print(p_sv_abun_density)
+
+```
+
+## 4 SV correlation
+
+```{r 4}
+all_vsv_M_plot.list<-list()
+all_dsv_M_plot.list<-list()
+
+for (i in c(1:nrow(info))){
+  #i<-1
+  
+  file_name<-str_replace_all(info$organism[i], "\\/", "\\.")
+  spe_name<-str_replace_all(info$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
+  
+  
+  vsv_i<-all_vsv[,grep(spe_name,colnames(all_vsv))]
+  dsv_i<-all_dsv[,grep(spe_name,colnames(all_dsv))]
+  
+  if(info$organism[i]=="Bifidobacterium adolescentis"){
+    p_vsv_M_i<-ggplot() + theme_void()
+    
+  }else{
+      p_vsv_M_i<- ggcorr(vsv_i,method = c("pairwise"), alpha = 0)+
+    ggtitle(info$Short_name[i])+
+    theme(legend.position = "none",
+          plot.title = element_text(size = 4))
+    
+  }
+
+  p_dsv_M_i<- ggcorr(dsv_i,method = c("pairwise"), alpha = 0)+
+    ggtitle(info$Short_name[i])+
+    theme(legend.position = "none",
+          plot.title = element_text(size = 4))
+  
+  all_vsv_M_plot.list[[i]] <- p_vsv_M_i
+  all_dsv_M_plot.list[[i]] <- p_dsv_M_i
+}
+
+pdf("03.SV_summary_statistics/vsv_correlation.pdf")
+plot_grid(plotlist=all_vsv_M_plot.list)
+dev.off()
+
+pdf("03.SV_summary_statistics/dsv_correlation.pdf")
+plot_grid(plotlist=all_dsv_M_plot.list)
+dev.off()
+```
+
