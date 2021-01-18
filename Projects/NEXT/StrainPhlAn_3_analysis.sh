@@ -1,4 +1,5 @@
 Author: Trishla Sinha, January 2021 (based on codes by A. Vich Vila and Lianmin Chen) 
+## In progress 
 
 #!/bin/bash
 
@@ -23,6 +24,7 @@ for i in *_1.fq.gz; do
 	echo "mkdir ./$sid/"  >> "$sid".sh
 	echo "mkdir ./$sid/clean_reads/"  >> "$sid".sh
 	echo "mkdir ./$sid/test_new/"  >> "$sid".sh
+	echo "mkdir ./$sid/consensus_markers"  >> "$sid".sh
 	
 	# Defining path to directory 
 	echo "export PATH=\$PATH:/groups/umcg-gastrocol/tmp03/metagenomic_tools/metaphlan_3/MetaPhlAn-3.0/metaphlan" >> "$sid".sh
