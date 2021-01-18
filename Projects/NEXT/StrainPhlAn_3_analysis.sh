@@ -1,4 +1,4 @@
-Author: Trishla Sinha, January 2021
+Author: Trishla Sinha, January 2021 (based on codes by A. Vich Vila and Lianmin Chen) 
 
 #!/bin/bash
 
