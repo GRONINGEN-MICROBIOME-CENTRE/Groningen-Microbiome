@@ -93,18 +93,27 @@ dismat_combin=function(x,y){
   return(list(data.frame(tmp)))
 }
 
-###2.3 phenotypic associations to microbiome
-##2.3.1 joint association: continous microbiome ~ all pheno
-#input 'data' is a data.frame with 'microbe'(e.g., abundance of a species), 'pheno'(e.g., glucose levels),'age', 'sex', 'time'(i.e., baseline or follow-up) and 'id'(e.g., sample id)
-library(nlme)
-lme=summary(lme(microbe~pheno+age+sex,random =list(~1|time,~1|id) ,data))
-##2.3.2 joint association: binary microbiome ~ all pheno
-#input 'data' is a data.frame with 'microbe'(e.g., abundance of a species), 'pheno'(e.g., glucose levels),'age', 'sex', 'time'(i.e., baseline or follow-up) and 'id'(e.g., sample id)
+###2.3 microbial associations to phenotypes and metabolites
+##2.3.1 joint association: continous y ~ all x
+#input 'data' is a data.frame with 'microbe'(e.g., abundance of a species), 'metabolites', 'pheno'(e.g., glucose levels),'age', 'sex', 'time'(i.e., baseline or follow-up) and 'id'(e.g., sample id)
 library(lme4)
-lme=summary(glmer(microbe~pheno+age+sex+(1|time)+(1|id), data, family = binomial))$coefficients
-##2.3.3 delta association: continous microbiome ~ all pheno
-#input 'data' is a data.frame with 'microbe'(e.g., delta abundance of a species), 'pheno'(e.g., delta glucose levels),'age' and 'sex'
-lm=summary(lm(microbe~pheno+age+sex,data))
-##2.3.4 delta association: binary microbiome ~ all pheno
-#input 'data' is a data.frame with 'microbe'(e.g., delta abundance of a species), 'pheno'(e.g., delta glucose levels),'age' and 'sex'
-lm=summary(glm(microbe~pheno+age+sex,family=binomial(link='logit'),data))
+library(lmerTest)
+association=summary(lmer(y~x+age+sex+(1|time)+(1|id),data))
+##2.3.2 joint association: binary y ~ all x
+#input 'data' is a data.frame with 'microbe'(e.g., abundance of a species), 'metabolites', 'pheno'(e.g., glucose levels),'age', 'sex', 'time'(i.e., baseline or follow-up) and 'id'(e.g., sample id)
+library(sjstats)
+library(lme4)
+association=summary(glmer(y~x+age+sex+(1|time)+(1|id),data,family = binomial))$coefficients
+##2.3.3 delta association: continous y ~ all x
+#input 'data' is a data.frame with 'microbe'(e.g., delta abundance of a species), 'metabolites', 'pheno'(e.g., delta glucose levels),'age' and 'sex'
+association=summary(lm(y~x+age+sex,data))
+##2.3.4 delta association: binary y ~ all x
+#input 'data' is a data.frame with 'microbe'(e.g., delta abundance of a species), 'metabolites', 'pheno'(e.g., delta glucose levels),'age' and 'sex'
+association=summary(glm(y~x+age+sex,family=binomial(link='logit'),data))
+
+###2.4 mediation analysis: microbial impacts on host phenotypes through metabolites
+library(lme4)
+library(mediation)
+model.m=lmer(meta~microbe+age+sex+(1|time),data)
+model.y=lmer(pheno~microbe+meta+age+sex+(1|time),data)
+summary=summary(mediate(model.m ,model.y,treat = "microbe", mediator = "meta",boot = F,sims = 1000))
