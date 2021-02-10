@@ -1,6 +1,6 @@
 Author: Arnau Vich Vila, March 2020
 
-Update: Trishla Sinha, August, 2020: few changes to script to adapt to new data, introduced new directories and loading of few additional modules 
+Update: Trishla Sinha, August, 2020: few changes to script to adapt to new data, introduced new directories and loading of few additional modules. For use on the Boxy cluster 
 
 
 #!/bin/bash
