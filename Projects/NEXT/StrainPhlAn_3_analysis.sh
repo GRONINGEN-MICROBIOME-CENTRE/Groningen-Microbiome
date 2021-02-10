@@ -1,4 +1,5 @@
-Author: Trishla Sinha, January 2021 (based on codes by A. Vich Vila and Lianmin Chen) 
+Author: Trishla Sinha, Febuary 2021
+
 ## In progress 
 
 #!/bin/bash
