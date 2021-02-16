@@ -1,0 +1,95 @@
+
+### In Progress 
+
+# Strainphlan 3.0 analysis for Lifelines NEXT pilot 
+
+Adapted from Biobakery (StrainPhlAn 3.0)  by Ranko Gascesa, Trishla Sinha (2021) 
+
+# Step 1: After creating consensus-marker files which are the input for StrainPhlAn (.pkl) run the following code: 
+
+doMarkerComparisonLLNext.sh species name
+#This will create .tre files that can be used for multiple sequence alignment 
+
+#doMarkerComparisonLLNext.sh consists of: 
+
+#!/bin/bash
+
+#SBATCH --mem=32gb
+#SBATCH --time=0-07:59:00
+#SBATCH --cpus-per-task=8
+#SBATCH --open-mode=truncate
+
+# NOTES:
+# > $1 is clade name
+module purge
+ml Anaconda3/5.3.0
+# load conda env
+source activate /groups/umcg-dag3/tmp01/rgacesa_tools/conda/envs/dag3pipe_v3_conda
+
+strainphlan -s /groups/umcg-dag3/tmp01/NEXT_pilot_results/strainphlan3/*.pkl --output_dir ./${1} --clade ${1} --marker_in_n_samples 50 --sample_with_n_markers 20 --nprocs 8
+doMarkerComparisonLLNext.sh (END)
+
+#Step 2: MSA 
+
+
+# Step 3: Make distance matrix from MSA file 
+
+#!/bin/bash
+echo 'maker of distance matrix from multiple alignment'
+echo ' feed it with .aln file (multiple alignment)'
+echo 'NOTE: make sure conda is loaded'
+distmat -sequence ${1} -nucmethod 2 -outfile ${1/.fasta/.dmat}
+
+
+# Step 4: Cleaning the distance matrix from MSA file 
+
+run on R: parseDMat_LLNext.R
+
+
+#parseDMat_LLNext.R consists of: 
+
+library(optparse)
+# CL PARSER
+help_description <- ""
+args <- OptionParser(usage = "%prog clade.distmat.txt metadata.txt ordination.png",
+                      add_help_option = TRUE, prog='strainphlan_ordination.R',
+                      description=help_description )
+args_list <- parse_args(args, positional_arguments=TRUE)
+
+# read in the file, skipping the first 8 rows and filling in empty columns, using the tab as sep, and stripping extra white space
+inFile <- args_list$args[1]
+data <- read.table( inFile, skip = 8, fill = TRUE, sep="\t", strip.white = T)
+
+# remove the first column of the data as it is blank
+data[1] <- NULL
+
+# get the header as the last column of the data as a character vector
+header <- lapply(data[,ncol(data)], as.character)
+
+# remove the last column from the data as it has been stored as a header
+data[ncol(data)] <- NULL
+
+# remove the current last column from the data as it is blank
+data[ncol(data)] <- NULL
+
+# split header by space and digit to get the sample names
+samples <- unlist(header)
+# fix metaphlan just by taking only first 3 thingies after _ split
+ss <- c()
+sNR <- 0
+for (s in samples) {
+   sNR <- sNR + 1
+   ssplit = strsplit(s,' ')
+   ss <- c(ss,ssplit[[1]][1])
+}
+
+
+
+
+
+
+
+
+
+
+
