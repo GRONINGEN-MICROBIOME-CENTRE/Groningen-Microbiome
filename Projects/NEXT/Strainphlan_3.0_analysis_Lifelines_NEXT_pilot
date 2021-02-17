@@ -1,14 +1,15 @@
-
 ### In Progress 
 
 # Strainphlan 3.0 analysis for Lifelines NEXT pilot 
 
-Adapted from Biobakery (StrainPhlAn 3.0)  by Ranko Gascesa, Trishla Sinha (2021) 
+Adapted from Biobakery (StrainPhlAn 3.0) by Ranko Gascesa, Trishla Sinha (2021) 
 
 # Step 1: After creating consensus-marker files which are the input for StrainPhlAn (.pkl) run the following code: 
 
-doMarkerComparisonLLNext.sh species name
-#This will create .tre files that can be used for multiple sequence alignment 
+sbatch ./doMarkerComparisonLLNext.sh species name
+
+#This will create .tre files and .aln files for each of the species you feed it in. 
+# Note: due to a bug in Strainphlan 3.0 this only works with bacterial species whose names are not longer than 50 characters. If a bacteria is too long then this causes an incompatibility with Blast
 
 #doMarkerComparisonLLNext.sh consists of: 
 
@@ -29,10 +30,8 @@ source activate /groups/umcg-dag3/tmp01/rgacesa_tools/conda/envs/dag3pipe_v3_con
 strainphlan -s /groups/umcg-dag3/tmp01/NEXT_pilot_results/strainphlan3/*.pkl --output_dir ./${1} --clade ${1} --marker_in_n_samples 50 --sample_with_n_markers 20 --nprocs 8
 doMarkerComparisonLLNext.sh (END)
 
-#Step 2: MSA 
 
-
-# Step 3: Make distance matrix from MSA file 
+# Step 2: Make distance matrix from MSA file 
 
 #!/bin/bash
 echo 'maker of distance matrix from multiple alignment'
@@ -41,7 +40,7 @@ echo 'NOTE: make sure conda is loaded'
 distmat -sequence ${1} -nucmethod 2 -outfile ${1/.fasta/.dmat}
 
 
-# Step 4: Cleaning the distance matrix from MSA file 
+# Step 3: Cleaning the distance matrix from MSA file 
 
 run on R: parseDMat_LLNext.R
 
