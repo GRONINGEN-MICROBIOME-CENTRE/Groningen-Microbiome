@@ -28,9 +28,9 @@ ml Anaconda3/5.3.0
 # load conda env
 source activate /groups/umcg-dag3/tmp01/rgacesa_tools/conda/envs/dag3pipe_v3_conda
 
+mkdir ${1}
 strainphlan -s /groups/umcg-dag3/tmp01/NEXT_pilot_results/strainphlan3/*.pkl --output_dir ./${1} --clade ${1} --marker_in_n_samples 50 --sample_with_n_markers 20 --nprocs 8
 doMarkerComparisonLLNext.sh (END)
-
 
 # Step 2: Make distance matrix from MSA file 
 
