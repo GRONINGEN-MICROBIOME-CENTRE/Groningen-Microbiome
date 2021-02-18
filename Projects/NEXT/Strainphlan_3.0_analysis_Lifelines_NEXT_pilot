@@ -1,14 +1,15 @@
 ### In Progress 
 
-# Strainphlan 3.0 analysis for Lifelines NEXT pilot 
+# Strainphlan 3.0 analysis for Lifelines NEXT pilot on Gearshift 
 
 Adapted from Biobakery (StrainPhlAn 3.0) by Ranko Gascesa, Trishla Sinha (2021) 
+#Note: this step makes use of Ranko's conda environment
 
 # Step 1: After creating consensus-marker files which are the input for StrainPhlAn (.pkl) run the following code: 
 
 sbatch ./doMarkerComparisonLLNext.sh species name
 
-#This will create .tre files and .aln files for each of the species you feed it in. 
+#This will perform MSA and create .tre files and .aln files for each of the species you feed it in. 
 # Note: due to a bug in Strainphlan 3.0 this only works with bacterial species whose names are not longer than 50 characters. If a bacteria is too long then this causes an incompatibility with Blast
 
 #doMarkerComparisonLLNext.sh consists of: 
