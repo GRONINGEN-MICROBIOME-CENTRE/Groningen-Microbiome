@@ -14,6 +14,7 @@ Example: sbatch ./doMarkerComparisonLLNext.sh s__Bifidobacterium_bifidum
 
 #This will perform MSA and create .tre files and .aln files for each of the species you feed it in. 
 # Note: due to a bug in Strainphlan 3.0 this only works with bacterial species whose names are not longer than 50 characters. If a bacteria is too long then this causes an incompatibility with Blast
+# MSA was performed on consensus marker presence in at least in 50 samples 
 
 #doMarkerComparisonLLNext.sh consists of: 
 
