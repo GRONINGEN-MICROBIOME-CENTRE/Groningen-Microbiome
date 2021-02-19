@@ -36,13 +36,17 @@ mkdir ${1}
 strainphlan -s /groups/umcg-dag3/tmp01/NEXT_pilot_results/strainphlan3/*.pkl --output_dir ./${1} --clade ${1} --marker_in_n_samples 50 --sample_with_n_markers 20 --nprocs 8
 doMarkerComparisonLLNext.sh (END)
 
-# Step 2: Make distance matrix from MSA file 
+# Step 2: Make distance matrix from MSA file
+
+bash./makeDistMat.sh ./species_directory/species.aln
+#Example: 
+#bash ./makeDistMat.sh ./s__Alistipes_shahii/s__Alistipes_shahii.StrainPhlAn3_concatenated.aln
 
 #!/bin/bash
 echo 'maker of distance matrix from multiple alignment'
 echo ' feed it with .aln file (multiple alignment)'
 echo 'NOTE: make sure conda is loaded'
-distmat -sequence ${1} -nucmethod 2 -outfile ${1/.fasta/.dmat}
+distmat -sequence ${1} -nucmethod 2 -outfile ${1/.aln/.dmat}
 
 
 # Step 3: Cleaning the distance matrix from MSA file 
