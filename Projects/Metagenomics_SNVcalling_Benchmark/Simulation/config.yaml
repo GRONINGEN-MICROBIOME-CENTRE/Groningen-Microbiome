@@ -1,0 +1,12 @@
+Directory : Simulation_10000K #Simulation_2500K
+Ref_list : Samples_path_uniref.txt #Samples_path_multiref.txt #Samples_path.txt
+fastq : NA #If simulated, no need to provide, if not simmulated: PATH_FQ1,PATH_FQ2
+simulation : True
+tools : all #bcftools,freebayes,mutect2,haplotypecaller,instrain,varscan #all
+design : multiref #uniref
+############################
+####Simulation parameter####
+############################
+Read_number : 10000000 #2500000
+Number_mutations : 1%
+abundance_file : NA #/groups/umcg-lld/tmp04/umcg-sandreusanchez/Pipelines/SNV_calling/PIPELINE/Test_snake/Simulation/FQ/simulated_abundance.txt #NA

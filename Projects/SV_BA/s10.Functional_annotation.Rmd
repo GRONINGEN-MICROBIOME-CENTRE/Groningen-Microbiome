@@ -1,0 +1,112 @@
+---
+title: "Functional annotation"
+author: "Daoming Wang"
+date: "2020/10/22"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+## 1 Preparation
+
+### 1.1 Import
+
+Import packages and functions.
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+B.wex_scaf<-read.csv("00.rawData/Single_bacteria/Blautia wexlerae DSM 19850/sequence_data_export.txt",
+                     sep = "\t",header = T,stringsAsFactors = F, check.names = F)
+B.wex<-read.csv("00.rawData/Single_bacteria/Blautia wexlerae DSM 19850/Blautia wexlerae DSM 19850.txt",
+                sep = "\t",header = T, stringsAsFactors = F, check.names = F)
+
+C.com_scaf<-read.csv("00.rawData/Single_bacteria/Coprococcus comes ATCC 27758/sequence_data_export.txt",
+                     sep = "\t",header = T,stringsAsFactors = F, check.names = F)
+C.com<-read.csv("00.rawData/Single_bacteria/Coprococcus comes ATCC 27758/Coprococcus comes ATCC 27758.txt",
+                sep = "\t",header = T, stringsAsFactors = F, check.names = F)
+
+E.ven_scaf<-read.csv("00.rawData/Single_bacteria/Eubacterium ventriosum ATCC 27560/sequence_data_export.txt",
+                     sep = "\t",header = T,stringsAsFactors = F, check.names = F)
+E.ven<-read.csv("00.rawData/Single_bacteria/Eubacterium ventriosum ATCC 27560/Eubacterium ventriosum ATCC 27560.txt",
+                sep = "\t",header = T, stringsAsFactors = F, check.names = F)
+
+B.mas_scaf<-read.csv("00.rawData/Single_bacteria/Bacteroides massiliensis B84634 = Timone 84634 = DSM 17679 = JCM 13223/sequence_data_export.txt",
+                     sep = "\t",header = T,stringsAsFactors = F, check.names = F)
+B.mas<-read.csv("00.rawData/Single_bacteria/Bacteroides massiliensis B84634 = Timone 84634 = DSM 17679 = JCM 13223/Bacteroides massiliensis B84634 Timone 84634 DSM 17679 JCM 13223 dm.txt",
+                sep = "\t",header = T, stringsAsFactors = F, check.names = F)
+
+E.hal_scaf<-read.csv("00.rawData/Single_bacteria/Bacteroides massiliensis B84634 = Timone 84634 = DSM 17679 = JCM 13223/sequence_data_export.txt",
+                     sep = "\t",header = T,stringsAsFactors = F, check.names = F)
+E.hal<-read.csv("00.rawData/Single_bacteria/Bacteroides massiliensis B84634 = Timone 84634 = DSM 17679 = JCM 13223/Bacteroides massiliensis B84634 Timone 84634 DSM 17679 JCM 13223 dm.txt",
+                sep = "\t",header = T, stringsAsFactors = F, check.names = F)
+
+B.xyl_scaf<-read.csv("00.rawData/Single_bacteria/Bacteroides xylanisolvens XB1A/sequence_data_export.txt",
+                     sep = "\t",header = T,stringsAsFactors = F, check.names = F)
+B.xyl<-read.csv("00.rawData/Single_bacteria/Bacteroides xylanisolvens XB1A/Bacteroides xylanisolvens XB1A dm.txt",
+                sep = "\t",header = T, stringsAsFactors = F, check.names = F)
+
+```
+
+### 2 Get bile acid genes
+
+```{r 2}
+B.wex_gene<-reCalcuPos(B.wex, B.wex_scaf)
+
+ba_gene_keyword<-c("Bile acid","Choloylglycine","sulfatase")
+
+B.wex_gene_ba<-B.wex_gene[grep(paste(ba_gene_keyword,collapse="|"), B.wex_gene$function., ignore.case = T),]
+
+if(!dir.exists("10.Functional_annotation")){dir.create("10.Functional_annotation")}
+write.table(B.wex_gene, "10.Functional_annotation/B.wex_gene.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+write.table(B.wex_gene_ba, "10.Functional_annotation/B.wex_gene_ba.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+
+##
+C.com_gene<-reCalcuPos(C.com, C.com_scaf)
+E.ven_gene<-reCalcuPos(E.ven, E.ven_scaf)
+B.mas_gene<-reCalcuPos(B.mas, B.mas_scaf)
+E.hal_gene<-reCalcuPos(E.hal, E.hal_scaf)
+B.xyl_gene<-reCalcuPos(B.xyl, B.xyl_scaf)
+
+write.table(C.com_gene, "10.Functional_annotation/C.com_gene.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+write.table(E.ven_gene, "10.Functional_annotation/E.ven_gene.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+write.table(B.mas_gene, "10.Functional_annotation/B.mas_gene.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+write.table(E.hal_gene, "10.Functional_annotation/E.hal_gene.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+write.table(B.xyl_gene, "10.Functional_annotation/B.xyl_gene.tsv",
+            col.names = T, row.names = F, sep = "\t", quote = F)
+
+
+```
+
+
+
+
+

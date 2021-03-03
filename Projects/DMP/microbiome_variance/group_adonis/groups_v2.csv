@@ -1,0 +1,16 @@
+RD,Group
+adonis_Anthropometrics.RData,Anthropometrics
+adonis_Diet.RData,Diet
+adonis_Diseases.Cancer.RData,Diseases.Cancer
+adonis_Diseases.Hemato.Cardio.Metabolic.RData,Diseases.Hemato.Cardio.Metabolic
+adonis_Diseases.MDL.RData,Diseases.MDL
+adonis_Diseases.Mental.Neuro.RData,Diseases.Mental.Neuro
+adonis_Diseases.Other.RData,Diseases.Other
+adonis_Exposome.Current.RData,Exposome.Current
+adonis_Exposome.Earlylife.RData,Exposome.Earlylife
+adonis_Geography.and.Socioeconomics.RData,Geography.and.Socioeconomics
+adonis_Medical.General.RData,Medical.General
+adonis_Medical.measurements.RData,Medical.measurements
+adonis_Medication.Use.RData,Medication.Use
+adonis_Metadata.RData,Metadata
+adonis_Diseases.All.RData,Diseases.All
