@@ -4,7 +4,9 @@ Scripts for LASSO regression with cross-validation steps
 
 
 *Creator: Sergio Andreu Sánchez*
+
 *Adapted by: Arnau Vich*
+
 *Date: 2020-201*
 
 
@@ -13,16 +15,19 @@ Description
 ---
 
 This script uses L1-regularization (LASSO) (as implemented in the *gmlnet* library) to estimate the proportion of metabolite variability that can be explained by different models
+
 For each metabolites and each of the models it performs a 5-fold cross-validation step to determine the best set of predictiors with an extra 10-fold cv to fine-tune the lambda parameter.
 
 Input files
 
 Input: Dataframe with samples in rows and phenotypes/data layer in columns as well all metabolites to be tested
+
 Summary: List of metabolites that should match the column names in the Input files
 
 Output files
 
 Output[[1]]: percentage of variation explained per each model & metabolite
+
 Output[[2]]: betas of each phenotype in each model-metabolites relation   
 
 
