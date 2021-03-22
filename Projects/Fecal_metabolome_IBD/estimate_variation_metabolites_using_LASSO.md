@@ -41,6 +41,7 @@ library (dplyr)
 library(glmnet)
 library(glmnetUtils)
 library(doParallel)
+library(caret)
 registerDoParallel(5)
 
 ```
@@ -56,9 +57,9 @@ my_cnt=read.table("./CNT_with_enzyme.txt", header=T)
 
 metabolites=colnames(input_cc)[597:ncol(input_cc)]
 
-Metabolite_iteration_v3(Input=my_all, Summary=metabolites) -> CC_model_enzymes
-Metabolite_iteration_v3(Input=my_ibd, Summary=metabolites) -> IBD_model_enzymes
-Metabolite_iteration_v3(Input=my_cnt, Summary=metabolites) -> CNT_model_enzymes
+Metabolite_iteration_v4(input_cc,metabolites, Summary = phenotypes_pvals, mode="cc")-> CC_models
+Metabolite_iteration_v4(input_ibd,metabolites, Summary = phenotypes_pvals, mode="ibd")-> IBD_model
+Metabolite_iteration_v4(input_cnt,metabolites, Summary = phenotypes_pvals, mode="cc")-> CNT_models 
 
 ```
 
@@ -120,24 +121,44 @@ Fit_lasso_cv = function(Dependent, Regressors,my_folds=5){
 }
 
 
-Metabolite_iteration_v3 = function(Input, Summary){
+Metabolite_iteration_v4 = function(Input, Metabolites,Summary, mode="cc", fdr=0.1){
 
+  fdr=fdr
+  #cc,ibd or cnt
+  mode=mode
   #List of all metabolites to iterate 
-  Metabolites <- Summary
+  Metabolites <- Metabolites
+  #Dataframe with 6 columns: metabolite, phenotype, p-value controls, fdr controls, p-value IBD, fdr IBD 
+  Summary<-Summary
   #Divide phenotypes in categories
   Microbes <- colnames(Input)[grepl("sp_",colnames(Input))]
   Diet <- colnames(Input)[grepl("diet_",colnames(Input))]
   Covariates <- c("LC.COLUMN","clinical_BowelMovementADayDef","metabolon_Month_in_freezer","host_Age","host_BMI","host_Sex", "Amount_sample_gram", "host_SmokeCurrentSmoker") #Possibly include others?
   Medication <- colnames(Input)[grepl("med_",colnames(Input))]
-  #IBD <- c("IBD")
-  #IBD=colnames(Input)[grepl("clinical_",colnames(Input))]
   Shannon=c("richness_Shannon_Index")
   genetics=colnames(Input)[grepl("enzyme_",colnames(Input))]
   #biomarkers=c("clinical_HBD2", "clinical_ChrA", "clinical_Calprot200")
   biomarkers=c("HBD2", "ChrA", "Calprot200")
-  IBD=setdiff(colnames(Input), c(Metabolites,Microbes,Diet,Covariates, Medication, Shannon,genetics,biomarkers)) 
-  #Other <- setdiff(colnames(Input), c(Diet,Microbes,Covariates, Medication, IBD, Metabolites)) #whatever was tested and is not already in diet/microbes
-  
+ 
+  #Filter phenotypes based on individual phenotype-metabolite associations, for case_control (cc) we select overlapping phenotypes with at least significance in one of cohorts
+  if (mode=="cc"){
+      #for case control
+      IBD <- c("IBD")
+      Selected_phenotypes=subset(Summary, Summary$FDR_IBD < fdr | Summary$FDR_control < fdr)
+      Selected_phenotypes=Selected_phenotypes[complete.cases(Selected_phenotypes$FDR_control) & complete.cases(Selected_phenotypes$FDR_IBD),]
+    } else if (mode=="ibd"){
+      #disease specific phenotypes  
+      IBD=setdiff(colnames(Input), c(Metabolites,Microbes,Diet,Covariates, Medication, Shannon,genetics,biomarkers))
+      Selected_phenotypes=subset(Summary, Summary$FDR_IBD < fdr) 
+      Selected_phenotypes$FDR_control=NULL
+      Selected_phenotypes$pvalue_control=NULL
+    } else {
+      IBD=setdiff(colnames(Input), c(Metabolites,Microbes,Diet,Covariates, Medication, Shannon,genetics,biomarkers))
+      Selected_phenotypes=subset(Summary, Summary$FDR_control < fdr) 
+      Selected_phenotypes$FDR_IBD=NULL
+      Selected_phenotypes$pvalue_IBD=NULL
+  }
+ 
   #Output dataframe
   Variability_explained = tibble()
   #Name of the models
@@ -148,35 +169,36 @@ Metabolite_iteration_v3 = function(Input, Summary){
   hmm=0
   All_model_info ={}
     for (Metabolite in Metabolites){
-    #foreach(i=1:length(Metabolites), .combine=rbind) %dopar% {
     #Metabolite=Metabolites[i]
     Logit = F
     hmm=hmm+1
     tested=paste(hmm,length(Metabolites), sep="/")
-    #Get the metabolite of interest and their associations 
-    #Variables_col  -> Selected_phenotypes
-    Selected_phenotypes=c(Microbes, Diet, Medication, IBD, Shannon, genetics, biomarkers)
     print(paste(tested,Metabolite, sep=" "))
-    #From the Input after transforming it to numeric select the Metabolite (dependent), phenotypes assocaited and Covariates. Remove all records with NA.
-    Input %>% select(one_of(c(Metabolite, Selected_phenotypes,Covariates ))) %>% drop_na() -> Input_model
+    Selected_phenotypes %>% filter(metabolite == Metabolite)  -> Selected_phenotypes2
+    if (dim(Selected_phenotypes2)[1] == 0 ){ next }
+    
+    if (mode=="cc"){
+      Input %>% select(one_of(c(Metabolite, unique(Selected_phenotypes2$phenotype),IBD,Covariates ))) %>% drop_na() -> Input_model
+      }else{
+      Input %>% select(one_of(c(Metabolite, unique(Selected_phenotypes2$phenotype),Covariates ))) %>% drop_na() -> Input_model
+    }
     #Make a vector out of dependent
     Dependent <- as.vector(as_vector(Input_model[,1]))
     #If dependent is a character, then do logistic
     if (class(Dependent[0]) == "character"){ Logit = T}
     #Prepare the different inputs for each model
+    Variables_null <- select(Input_model, one_of(Covariates))
     Variables_complete <- Input_model[,2:dim(Input_model)[2]]
-    #Variables_clinical  <- select(Input_model, one_of(c(Clinical, Covariates)))
-    Variables_IBD  <- select(Input_model, one_of(c(Covariates, IBD)))
     Variables_microbiome <- select(Input_model, one_of(c(Microbes, Covariates)))
     Variables_diet <- select(Input_model, one_of(c(Diet, Covariates)))
     Variables_medication <- select(Input_model, one_of(c(Medication, Covariates)))
-    Variables_null <- select(Input_model, one_of(Covariates))
-    
+    Variables_IBD  <- select(Input_model, one_of(c(Covariates, IBD)))
     Variables_Shannon <- select(Input_model, one_of(c(Shannon, Covariates)))
     Variables_genetics <- select(Input_model, one_of(c(genetics, Covariates)))
     Variables_biomarkers <- select(Input_model, one_of(c(biomarkers, Covariates)))
     
     Models <- list( Variables_null, Variables_complete,Variables_microbiome, Variables_diet,Variables_medication, Variables_IBD, Variables_Shannon, Variables_genetics, Variables_biomarkers)
+    
     #Vector of R2s for output 1
     Variability_model = c()
     #Data.frame of variables for output 2
@@ -210,5 +232,6 @@ Metabolite_iteration_v3 = function(Input, Summary){
   }
   return(list(Variability_explained, All_model_info))
 }
+
 
 ```
