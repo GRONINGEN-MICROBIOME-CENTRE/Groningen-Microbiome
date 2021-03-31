@@ -246,11 +246,7 @@ for ( i in 1:141) {
 
 associations_mgc_wIBD=my_univariate_results
 
-
-associations_bgc_wIBD$FDR=p.adjust(associations_bgc_wIBD$`Pr(>|t|)`,method = "BH")
-associations_bgc_wIBD$Bonferroni=p.adjust(associations_bgc_wIBD$`Pr(>|t|)`,method = "bonferroni")
-
-write.table(associations_bgc_wIBD, "~/Desktop/Metabolomics_v2/3.Preliminary_results/7.Biosynthetic_gene_clusters_and_enzyme_comissions/within_IBD_associations_BGC_quantitative.txt", sep = "\t", quote = F)
+write.table(associations_mgc_wIBD, "~/Desktop/Metabolomics_v2/3.Preliminary_results/7.Biosynthetic_gene_clusters_and_enzyme_comissions/within_IBD_associations_MGC_quantitative.txt", sep = "\t", quote = F)
 
 
 ##########################################################
@@ -301,71 +297,9 @@ for ( i in 1:141) {
 }
 
 associations_mgc_CNT=my_univariate_results
-#associations_controls=subset(associations_controls, associations_controls$phenotype!="BioMK_ChromograninA")
-associations_bgc_CNT$FDR=p.adjust(associations_bgc_CNT$`Pr(>|t|)`,method = "BH")
-associations_bgc_CNT$Bonferroni=p.adjust(associations_bgc_CNT$`Pr(>|t|)`,method = "bonferroni")
 
-write.table(associations_bgc_CNT, "~/Desktop/Metabolomics_v2/3.Preliminary_results/7.Biosynthetic_gene_clusters_and_enzyme_comissions/Controls_associations_BGC_quantitative.txt", sep = "\t", quote = F)
+write.table(associations_mgc_CNT, "~/Desktop/Metabolomics_v2/3.Preliminary_results/7.Biosynthetic_gene_clusters_and_enzyme_comissions/Controls_associations_MGC_quantitative.txt", sep = "\t", quote = F)
 
-
-
-################################################################
-### TEST within IBD BGC - Metabolite associations prevalence ###
-################################################################
-
-regressors=ibd_test_phenos2[,c(1,2,3,4,6,7,8,34)]
-mtb=ibd_test_phenos2[,c(345:ncol(ibd_test_phenos2))]
-
-#colnames(bcg_fil_trans2)=make.names(colnames(bcg_fil_trans2))
-
-ibd_test_phenos2=merge(regressors,bcg_fil_trans2, by="row.names")
-rownames(ibd_test_phenos2)=ibd_test_phenos2$Row.names
-ibd_test_phenos2$Row.names=NULL
-
-ibd_test_phenos2=merge(ibd_test_phenos2,mtb, by="row.names")
-rownames(ibd_test_phenos2)=ibd_test_phenos2$Row.names
-ibd_test_phenos2$Row.names=NULL
-
-
-#ibd_test_phenos2=read.table("~/Desktop/Metabolomics_for_cluster/2.Input/intermed/controls_BGC_prev2.txt", sep = "\t", header = T, row.names = 1)
-
-ibd_test_phenos2$clinical_BowelMovementADayDef.1=NULL
-
-flag=1
-for ( i in 1:323) {
-  my_pheno=colnames(ibd_test_phenos2)[i]
-  if (my_pheno=="run_day_cat" | my_pheno=="clinical_BowelMovementADayDef" | my_pheno=="LC.COLUMN"| my_pheno=="Amount_sample_gram"| my_pheno=="metabolon_Month_in_freezer" | my_pheno=="host_Sex" | my_pheno=="host_Age" | my_pheno=="host_BMI") {
-    print (paste("Skipping phenotype:",my_pheno))
-  } else {
-    print (paste("Testing:",my_pheno))
-    for (a in 324:ncol(ibd_test_phenos2)){
-      my_trait=colnames(ibd_test_phenos2)[a]
-      my_uni_test=ibd_test_phenos2[,c("host_Sex","host_Age","run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","clinical_BowelMovementADayDef", "host_BMI",my_pheno,my_trait)]
-      my_preds=c("host_Sex","host_Age","host_BMI", "run_day_cat","LC.COLUMN","Amount_sample_gram","metabolon_Month_in_freezer","clinical_BowelMovementADayDef",my_pheno)
-      my_f=as.formula(paste(my_trait, paste(my_preds, collapse = " + "), sep = " ~ "))
-      my_uni_test[,10]=as.numeric(as.character(my_uni_test[,10]))
-      my_samples=nrow(my_uni_test)
-      #my_lm=summary(lm(my_f,data = my_uni_test ))
-      my_lm=summary(glm(my_f, family = binomial(link="logit"), data =my_uni_test))
-      my_lm_coef=as.data.frame(my_lm$coefficients)
-      my_lm_pheno=try(my_lm_coef[grep(my_pheno, rownames(my_lm_coef)), ])
-      my_lm_pheno$metabolite=my_trait
-      my_lm_pheno$phenotype=my_pheno
-      my_lm_pheno$factor=rownames(my_lm_pheno)
-      if (flag!=1){
-        my_univariate_results=rbind(my_univariate_results,my_lm_pheno)
-      }else{
-        my_univariate_results=my_lm_pheno
-        flag=5
-      }
-    }
-  }
-}
-
-associations_BGC_ibd_prev=my_univariate_results
-associations_BGC_ibd_prev$FDR=p.adjust(associations_BGC_ibd_prev$`Pr(>|z|)`,method = "BH")
-associations_BGC_ibd_prev$Bonferroni=p.adjust(associations_BGC_ibd_prev$`Pr(>|z|)`,method = "bonferroni")
-write.table(associations_BGC_ibd_prev, "~/Desktop/Metabolomics_v2/3.Preliminary_results/7.Biosynthetic_gene_clusters_and_enzyme_comissions/IBD_associations_BGC_prevalence.txt", sep = "\t", quote = F)
 
 ```
 

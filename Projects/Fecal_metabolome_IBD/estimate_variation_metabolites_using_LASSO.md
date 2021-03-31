@@ -54,12 +54,16 @@ Load data and run functions (load functions below)
 my_all <- read.delim("./input_enzymes.txt", row.names=1)
 my_ibd=read.table("./IBD_with_enzyme.txt", header=T)
 my_cnt=read.table("./CNT_with_enzyme.txt", header=T)
+phenotypes_pvals=read.table("./phenotypes_pvals.txt", header = T, sep = "\t")
 
-metabolites=colnames(input_cc)[597:ncol(input_cc)]
+#Make sure that the phenotype column is a character not a factor (it can give some issues without returning error)
+phenotypes_pvals$phenotypes=as.character(phenotypes_pvals)
+metabolites=colnames(my_all)[1912:ncol(my_all)]
+
 
 Metabolite_iteration_v4(input_cc,metabolites, Summary = phenotypes_pvals, mode="cc")-> CC_models
 Metabolite_iteration_v4(input_ibd,metabolites, Summary = phenotypes_pvals, mode="ibd")-> IBD_model
-Metabolite_iteration_v4(input_cnt,metabolites, Summary = phenotypes_pvals, mode="cc")-> CNT_models 
+Metabolite_iteration_v4(input_cnt,metabolites, Summary = phenotypes_pvals, mode="cnt")-> CNT_models 
 
 ```
 
