@@ -65,12 +65,12 @@ train.x = as.matrix(data.pred[train.set,])
 test.x = as.matrix(data.pred[-train.set,])
 
 # clinical parameters (age, sex, BMI)
-clin.train.x = train.x;clin.train.x[,5:ncol(clin.train.x)] = 0
-clin.test.x = test.x;clin.test.x[,5:ncol(clin.test.x)] = 0
+clin.train.x = train.x;clin.train.x[,4:ncol(clin.train.x)] = 0
+clin.test.x = test.x;clin.test.x[,4:ncol(clin.test.x)] = 0
 
 # microbiome factors (taxa and pathways)
-microb.train.x = train.x;microb.train.x[,1:4] = 0
-microb.test.x = test.x;microb.test.x[,1:4] = 0
+microb.train.x = train.x;microb.train.x[,1:3] = 0
+microb.test.x = test.x;microb.test.x[,1:3] = 0
 
 # outcome
 train.y = pheno_disease[train.set,]
