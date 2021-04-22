@@ -41,15 +41,16 @@ do_clr_externalWeighting = function(interest_matrix, core_matrix){
 # ===========================
 
 # load all necessary data
-covar = read.table("Association.analysis.input/covariates.txt")
-taxa = read.table("Association.analysis.input/taxa.txt")
+covar = read.table("Mock_data/covariates.txt")
+Ncovar = ncol(covar)
+
+taxa = read.table("Mock_data/taxa.txt")
 shannon.div = diversity(taxa[,grep("[.]s__",colnames(taxa))],index = "shannon")
-pathways = read.table("Association.analysis.input/pathways_metacyc.txt")
-load("Association.analysis.input/phenos.RData")
-dis2 = read.table("diseases.final.txt",as.is = T)
+pathways = read.table("Mock_data/pathways.txt")
 
 # select diseases
-pheno_disease = pheno[,dis2[,1]]
+pheno_disease = read.table("Mock_data/diseases.txt")
+Ndisease = ncol(pheno_disease) - 1 # the last disease is 'no disease' phenotype
 
 # transform data using CLR
 taxa_transformed = do_clr_externalWeighting(taxa,taxa[,grep("[.]s__",colnames(taxa))])
@@ -59,18 +60,18 @@ pathways_transformed = pathways_transformed[,colSums(pathways>0)>nrow(pathways) 
 
 ## split data into training and test sets
 set.seed(12348)
-data.pred = data.frame(covar[,1:2],BMI = pheno[,1],shannon = shannon.div,taxa_transformed,pathways_transformed)
+data.pred = data.frame(covar,shannon = shannon.div,taxa_transformed,pathways_transformed)
 train.set = sample(1:nrow(data.pred),size = round(0.9 * nrow(data.pred)))
 train.x = as.matrix(data.pred[train.set,])
 test.x = as.matrix(data.pred[-train.set,])
 
 # clinical parameters (age, sex, BMI)
-clin.train.x = train.x;clin.train.x[,4:ncol(clin.train.x)] = 0
-clin.test.x = test.x;clin.test.x[,4:ncol(clin.test.x)] = 0
+clin.train.x = train.x;clin.train.x[,(Ncovar+1):ncol(clin.train.x)] = 0
+clin.test.x = test.x;clin.test.x[,(Ncovar+1):ncol(clin.test.x)] = 0
 
 # microbiome factors (taxa and pathways)
-microb.train.x = train.x;microb.train.x[,1:3] = 0
-microb.test.x = test.x;microb.test.x[,1:3] = 0
+microb.train.x = train.x;microb.train.x[,1:Ncovar] = 0
+microb.test.x = test.x;microb.test.x[,1:Ncovar] = 0
 
 # outcome
 train.y = pheno_disease[train.set,]
@@ -137,21 +138,21 @@ names(aucs.test) = c("microbes.min","microbes.1se","clin.min","clin.1se","full.m
 library(doSNOW)
 cl = makeCluster(8)
 registerDoSNOW(cl)
-disease_pred_models = foreach(i = 1:36) %dopar% {
+disease_pred_models = foreach(i = 1:Ndisease) %dopar% {
   complete.x = train.x[!is.na(train.y[,i]),]
   complete.y = train.y[!is.na(train.y[,i]),]
   cv1 = glmnet::cv.glmnet(complete.x,complete.y[,i],alpha = 0.5,nfolds = 5, family = "binomial")
   
 }
 
-disease_preds_microbes_train = do.call(cbind,lapply(disease_pred_models,function(x){s =train.x;s[,1:3] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
-disease_preds_clin_train = do.call(cbind,lapply(disease_pred_models,function(x){s =train.x;s[,4:608] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
+disease_preds_microbes_train = do.call(cbind,lapply(disease_pred_models,function(x){s =train.x;s[,1:Ncovar] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
+disease_preds_clin_train = do.call(cbind,lapply(disease_pred_models,function(x){s =train.x;s[,(Ncovar+1):ncol(train.x)] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
 disease_preds_full_train = do.call(cbind,lapply(disease_pred_models,function(x){s =train.x;predict(x,newx = s,s = "lambda.min")[,1]}))
-disease_preds_microbes_test = do.call(cbind,lapply(disease_pred_models,function(x){s =test.x;s[,1:3] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
-disease_preds_clin_test = do.call(cbind,lapply(disease_pred_models,function(x){s =test.x;s[,4:608] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
+disease_preds_microbes_test = do.call(cbind,lapply(disease_pred_models,function(x){s =test.x;s[,1:Ncovar] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
+disease_preds_clin_test = do.call(cbind,lapply(disease_pred_models,function(x){s =test.x;s[,(Ncovar+1):ncol(train.x)] = 0;predict(x,newx = s,s = "lambda.min")[,1]}))
 disease_preds_full_test = do.call(cbind,lapply(disease_pred_models,function(x){s =test.x;predict(x,newx = s,s = "lambda.min")[,1]}))
 
-disease_aucs = foreach(i = 1:36,.combine = rbind)%do%{
+disease_aucs = foreach(i = 1:Ndisease,.combine = rbind)%do%{
   data.frame(train.microbes = auc(train.y[,i],disease_preds_microbes_train[,i]),
              train.clin = auc(train.y[,i],disease_preds_clin_train[,i]),
              train.full = auc(train.y[,i],disease_preds_full_train[,i]),
@@ -160,9 +161,9 @@ disease_aucs = foreach(i = 1:36,.combine = rbind)%do%{
              test.full = auc(test.y[,i],disease_preds_full_test[,i])
   )
              
-};rownames(disease_aucs) = colnames(pheno_disease)[1:36]
+};rownames(disease_aucs) = colnames(pheno_disease)[1:Ndisease]
 
-aucs_byHealth_lambdaMin = foreach(i = 1:36,.combine = rbind)%do%{
+aucs_byHealth_lambdaMin = foreach(i = 1:Ndisease,.combine = rbind)%do%{
   data.frame(train.microbes = auc(train.y[,i],predictions.train[,1]),
              train.clin = auc(train.y[,i],predictions.train[,3]),
              train.full = auc(train.y[,i],predictions.train[,5]),
@@ -171,9 +172,9 @@ aucs_byHealth_lambdaMin = foreach(i = 1:36,.combine = rbind)%do%{
              test.full = auc(test.y[,i],predictions.test[,5])
   )
   
-};rownames(aucs_byHealth_lambdaMin) = colnames(pheno_disease)[1:36]
+};rownames(aucs_byHealth_lambdaMin) = colnames(pheno_disease)[1:Ndisease]
 
-aucs_byHealth_lambda1se = foreach(i = 1:36,.combine = rbind)%do%{
+aucs_byHealth_lambda1se = foreach(i = 1:Ndisease,.combine = rbind)%do%{
   data.frame(train.microbes = auc(train.y[,i],predictions.train[,2]),
              train.clin = auc(train.y[,i],predictions.train[,4]),
              train.full = auc(train.y[,i],predictions.train[,6]),
@@ -182,4 +183,4 @@ aucs_byHealth_lambda1se = foreach(i = 1:36,.combine = rbind)%do%{
              test.full = auc(test.y[,i],predictions.test[,6])
   )
   
-};rownames(aucs_byHealth_lambda1se) = colnames(pheno_disease)[1:36]
+};rownames(aucs_byHealth_lambda1se) = colnames(pheno_disease)[1:Ndisease]
