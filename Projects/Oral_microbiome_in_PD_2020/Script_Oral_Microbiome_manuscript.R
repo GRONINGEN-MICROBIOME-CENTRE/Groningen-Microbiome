@@ -1,6 +1,6 @@
-setwd("~/Resilio Sync/Transfer/Collaborations/Nijmegen/Final_version/")
+setwd("~/../Resilio Sync/Transfer/Collaborations/Nijmegen/Final_version/")
 source(file = "Functions_Oral_Microbiome_manuscript.R")
-source("~/Resilio Sync/Transfer/Collaborations/Debby/PPI/Data/ancom_scripts/ancom_v2.1.R")
+source("~/../Resilio Sync/Transfer/Collaborations/Debby/PPI/Data/ancom_scripts/ancom_v2.1.R")
 
 set.seed(2020)
 
@@ -22,7 +22,7 @@ for (i in seq(1:length(list_split))){
 }
 matrix_taxonomy %>% mutate(ID = Taxon) -> matrix_taxonomy
 #Species <  Genus < Family < Order < Class < Phylum
-matrix_taxonomy %>% filter(grepl("s__",ID)) -> species_matrix ; matrix_taxonomy %>% filter(grepl("g__",ID)) -> genus_matrix ; matrix_taxonomy %>% filter(grepl("f__",ID)) -> family_matrix ; matrix_taxonomy %>% filter(grepl("o__",ID)) -> order_matrix ; matrix_taxonomy %>% filter(grepl("c__",ID)) -> class_matrix ;  matrix_taxonomy %>% filter(grepl("p__",ID)) -> phylum_matrix
+matrix_taxonomy %>% filter(grepl("t__",ID)) -> strain_matrix ; matrix_taxonomy %>% filter(grepl("s__",ID)) -> species_matrix ; matrix_taxonomy %>% filter(grepl("g__",ID)) -> genus_matrix ; matrix_taxonomy %>% filter(grepl("f__",ID)) -> family_matrix ; matrix_taxonomy %>% filter(grepl("o__",ID)) -> order_matrix ; matrix_taxonomy %>% filter(grepl("c__",ID)) -> class_matrix ;  matrix_taxonomy %>% filter(grepl("p__",ID)) -> phylum_matrix
 #######################
 ###Metadatada##########
 #######################
@@ -67,14 +67,6 @@ distribution_taxonomy()
 ################
 ###FUNCTIONS####
 ################
-mixed_model = function(Taxonomy, sample_metadata){
-  library(nlme)
-  sample_metadata %>% mutate(Taxonomy = Taxonomy) -> Input_model
-  
-  summary(lme(Taxonomy ~ Source * Group , random=~ 1|ID_patient, Input_model )) -> Model 
-  as.data.frame(Model$tTable)["Group",] -> Result
-  return(Result)
-}
 Do_ancom = function(Taxonomy, sample_metadata){
   Results_ancom_final = tibble()
   for (GROUP_n in 1:length(unique(sample_metadata$Tissue_n_group))){
@@ -127,8 +119,10 @@ Analysis_of_taxonomic_level = function(Taxa_matrix, Directory, sample_metadata){
   print("Alpha and Beta diversity analysis")
   #Alpha and Beta diversity
   Diversity_analysis(Taxa_matrix2,sample_metadata) -> Figures_diversity
-  Figures_diversity[[5]] %>% ggplot(aes(x=Pheno, y=R2, fill=Tissue, col=Pvalue<0.05)) + geom_bar(stat="identity",position = "dodge") + coord_flip() + 
-    theme_bw() +  scale_fill_manual(values = wesanderson::wes_palette("Royal1")) + scale_color_manual(values = c("white","black"))
+  Figures_diversity[[5]] %>% ggplot(aes(x=Pheno, y=R2, fill=Tissue, col=Pvalue<0.05)) + geom_bar(stat="identity",position = "dodge") + coord_flip() + ylab("Phenotype")+ 
+    theme_bw() +  scale_fill_manual(values = wesanderson::wes_palette("Royal1")) + scale_color_manual(values = c("white","black")) -> Var_explained
+  SAVE(PLOT = Var_explained, NAME = "manuscript/Plots/PERMANOVA_R2.pdf")
+  
   #No differences in diversity betwen saliva/pocket or healthy/sick
   print("Filtering taxa")
   #Differential abundance
@@ -139,11 +133,6 @@ Analysis_of_taxonomic_level = function(Taxa_matrix, Directory, sample_metadata){
   sample_metadata %>% filter(StudieID %in% Taxa_matrix2$ID) -> sample_metadata
   Taxa_matrix2 %>% arrange(ID) -> Taxa_matrix2 
   
-  ###### Mixed
-  print("fitting mixed model")
-  apply(compositional_transformation(select(Taxa_matrix2,-ID)),2,FUN= function(x){ as_tibble(mixed_model(x, sample_metadata)) -> y ; c(y$`p-value`, y$Value) }) %>% t() %>% as_tibble() %>%
-    mutate(Bug=colnames(select(Taxa_matrix2, -ID))) %>% `colnames<-`(c("Pval", "Beta", "Bug")) -> results_mixed
-  
   
   ####################ANCOM
   print("Using ANCOM function")
@@ -152,7 +141,7 @@ Analysis_of_taxonomic_level = function(Taxa_matrix, Directory, sample_metadata){
   Do_ancom(Taxa_matrix2, sample_metadata) -> Results_ancom_final
   Results_ancom_final %>% filter(TEST == "0 pocket-1 pocket") %>% filter(detected_0.6 == T) -> DA_pocket_s
   Results_ancom_final %>% filter(TEST == "0 saliva-1 saliva") %>% filter(detected_0.6 == T) -> DA_saliva_s
-  return(list(Taxa_matrix2, Results_ancom_final,results_mixed))
+  return(list(Taxa_matrix2, Results_ancom_final))
   
   
 }
@@ -187,7 +176,7 @@ Correlate_with_phenotypes = function(Ancom_results, sample_metadata, abundance_m
       Age = sample_metadata$`Age (years)`
       dependent = sample_metadata%>% select(Dependent) %>% as_vector() %>% as.vector()
       Data = tibble(Regressor = Regressor, Dependent = dependent, Age = Age)
-      summary(lm(dependent ~Regressor + Age)) -> Model
+      summary(lm(scale(dependent)[,1] ~ scale(Regressor)[,1] + Age)) -> Model
       Result = tibble(Beta = Model$coefficients[2], Pval=Model$coefficients[11], Biomarker=Dependent, Taxa =Species)
       rbind(Result, Final_result) -> Final_result
     }
@@ -206,15 +195,35 @@ ggsave(filename = NAME, PLOT,
 ######################
 ######################
 
+#############
+###Strain####
+#############
+M = tibble()
+for (ID in strain_matrix$ID){
+  S = str_split(ID, "\\|")[[1]]
+  strain = S[length(S)]
+  Species = S[length(S)-1]
+  M = rbind(M, tibble(strain, Species))
+}
+M %>% group_by(Species) %>% summarise(N = n()) %>% arrange(desc(N)) %>% filter(N>1) -> Multiple_Strain
+Analysis_of_taxonomic_level(strain_matrix, Directory = "Straub_results", sample_metadata = sample_metadata) -> strain_results
+strains_matrix2 <- strain_results[[1]] ; ancom_strains <- strain_results[[2]]
+lapply(ancom_strains$taxa_id , FUN = function(x){ str_split(x, "\\|")[[1]][7] } )  %>% as_vector() -> Spc
+ancom_strains %>% mutate(S = Spc)  %>% filter(S %in% Multiple_Strain$Species) %>% arrange(TEST)
+
+ancom_strains %>% filter(TEST == "0 pocket-1 pocket") %>% filter(detected_0.6==T) -> pocket_strains
+ancom_strains %>% filter(TEST == "0 saliva-1 saliva") %>% filter(detected_0.6==T) -> saliva_strains
+
+
 ###################
 #######Species#####
 ###################
 
 Analysis_of_taxonomic_level(species_matrix, Directory = "Species_results", sample_metadata = sample_metadata) -> species_results
-species_matrix2 <- species_results[[1]] ; ancom_species <- species_results[[2]] ; mixed_species <- species_results[[3]]
+species_matrix2 <- species_results[[1]] ; ancom_species <- species_results[[2]]
 
 ancom_species %>% filter(TEST == "0 pocket-1 pocket") %>% filter(detected_0.6==T) -> pocket_species
-
+write_tsv(path="manuscript/Supplement/Species_ancom.tsv",x = ancom_species)
 
 
 if ("0 pocket-1 pocket" %in% ancom_species$TEST){ ancom_species %>% mutate(TEST = ifelse(TEST == "0 pocket-1 pocket","1 pocket-0 pocket", ifelse(TEST == "0 saliva-1 saliva","1 saliva-0 saliva" ,TEST))) -> ancom_species}
@@ -224,14 +233,28 @@ ancom_species %>% filter(detected_0.6 == T) %>% arrange(desc(W))
 #####################################################
 ###########Systemic inflammation markers#############
 #####################################################
+Do_heatmap = function(DF, OUT, size=0.7){
+  DF %>% mutate(log10Pval = -log10(Pval)) %>% select(Biomarker, Taxa, log10Pval) %>% spread(Taxa, log10Pval) %>%filter(! is.na(Biomarker)) %>% as.data.frame() %>% column_to_rownames(var = "Biomarker") -> wide_results
+  DF %>% select(Biomarker, Taxa, Beta) %>% spread(Taxa, Beta) %>% filter(! is.na(Biomarker)) %>% as.data.frame() %>% column_to_rownames(var = "Biomarker") -> wide_results2
+  
+  qvals <- matrix("", nrow=nrow(wide_results), ncol=ncol(wide_results))
+  qvals[wide_results > -log10(0.05)]= "*"
+  
+  my_palette = colorRampPalette(c("steelblue3","white","red"))(n = 101)
+  pdf(file=OUT,height = 10,width = 5)
+  gplots::heatmap.2(as.matrix(wide_results2), scale="none",dendrogram="both",cellnote = qvals, cexRow = 0.7,cexCol = size,trace="none",key = T,notecol="black", col=my_palette, keysize=2,notecex=2.0, 
+                    distfun=function(x) dist(x, method="euclidean"),Colv=T, hclustfun=function(x) hclust(x, method="ward.D2"),margins=c(10,10)) -> Fig_pheno
+  dev.off()
+}
+
 Correlate_with_phenotypes(dplyr::filter(ancom_species, TEST == "1 pocket-0 pocket"), sample_metadata, mutate(compositional_transformation(select(species_matrix2, -ID)), ID = species_matrix2$ID), tissue ="pocket") -> Inflammation_pocket
 Correlate_with_phenotypes(dplyr::filter(ancom_species, TEST == "1 saliva-0 saliva"), sample_metadata, mutate(compositional_transformation(select(species_matrix2, -ID)), ID = species_matrix2$ID), tissue ="saliva") -> Inflammation_saliva
+mutate(Inflammation_pocket, Tissue="pocket") -> Inflammation_pocket
+mutate(Inflammation_pocket, Tissue="saliva") -> Inflammation_saliva
+write_tsv(path="manuscript/Supplement/Species_Inflammation.tsv",x = rbind(Inflammation_pocket,Inflammation_saliva))
 
-Correlate_with_phenotypes(mutate(dplyr::filter(ancom_species, TEST == "1 pocket-0 pocket"), detected_0.6=T) , sample_metadata, mutate(compositional_transformation(select(species_matrix2, -ID)), ID = species_matrix2$ID), tissue ="pocket") -> Inflammation_pocket_all
-Correlate_with_phenotypes(mutate(dplyr::filter(ancom_species, TEST == "1 saliva-0 saliva"), detected_0.6=T) , sample_metadata, mutate(compositional_transformation(select(species_matrix2, -ID)), ID = species_matrix2$ID), tissue ="saliva") -> Inflammation_saliva_all
-
-write_csv(arrange(Inflammation_pocket, Pval), path = "Species_results/Corelation_Inflammation_markes_pocket_targeted.csv") ; write_csv(arrange(Inflammation_saliva,Pval), path = "Species_results/Corelation_Inflammation_markers_saliva_targeted.csv")
-write_csv(arrange(Inflammation_pocket_all, Pval), path = "Species_results/Corelation_Inflammation_markes_pocket_all.csv") ; write_csv(arrange(Inflammation_saliva_all,Pval), path = "Species_results/Corelation_Inflammation_markers_saliva_all.csv")
+Do_heatmap(DF = Inflammation_pocket ,OUT= "manuscript/Supplement/Figures/Pocket_species.pdf")
+Do_heatmap(DF = Inflammation_saliva ,OUT= "manuscript/Supplement/Figures/Saliva_species.pdf")
 
 Inflammation_pocket_all %>% mutate(FDR = p.adjust(Pval, "fdr")) %>% ggplot(aes(x=Beta, y=-log10(Pval), col=FDR<0.05)) + geom_point() + facet_wrap(~Biomarker, scales = "free") + theme_bw()
 
@@ -299,7 +322,7 @@ transformed_species_matrix %>% mutate(Group=sample_metadata_2$Group,Source=sampl
 wilcox.test(Red_complex ~ Group, filter(transformed_species_matrix, Source=="pocket"))
 wilcox.test(Red_complex ~ Group, filter(transformed_species_matrix, Source=="saliva"))
 transformed_species_matrix %>% ggplot(aes(x=factor(Source), y= Red_complex, col=factor(Group))) + geom_boxplot(outlier.shape = NA) + geom_sina()  + theme_bw() +
-  scale_color_manual(values = wes_palette("Royal1"),labels =c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance Red complex") -> Fig_Redcomplex
+  scale_color_manual(values = wes_palette("Royal1"),labels =c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance Red complex") -> Fig_Redcomplex
 
 ancom_species %>% mutate(taxa_id = as.character(taxa_id)) -> ancom_species
 rbind(ancom_species,c("Red_complex", 200, T, T, T, T, 5, "0 pocket-1 pocket"),c("Red_complex", 200, T, T, T, T, 5, "0 saliva-1 saliva")) -> ancom_species2
@@ -316,7 +339,7 @@ wilcox.test(ClusterB ~ Group, filter(transformed_species_matrix, Source=="pocket
 wilcox.test(ClusterB ~ Group, filter(transformed_species_matrix, Source=="saliva"))
 #transformed_species_matrix %>% ggplot(aes(x=factor(Group), y= ClusterB)) + geom_boxplot() + facet_wrap(~Source) + theme_bw()
 transformed_species_matrix %>% ggplot(aes(x=factor(Source), y= ClusterB, col=factor(Group))) + geom_boxplot(outlier.shape = NA) + geom_sina()  + theme_bw() +
-  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance bacteria atherosclerosis plaque") -> Fig_atherosclerosis
+  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance bacteria atherosclerotic plaque") -> Fig_atherosclerosis
 
 rbind(ancom_species,c("ClusterB", 200, T, T, T, T, 5, "0 pocket-1 pocket"),c("ClusterB", 200, T, T, T, T, 5, "0 saliva-1 saliva")) -> ancom_species2
 
@@ -325,7 +348,9 @@ Correlate_with_phenotypes(dplyr::filter(ancom_species2, TEST == "0 saliva-1 sali
 
 
 (Fig_Redcomplex + labs(title = "A")) + (Fig_atherosclerosis+labs(title = "B")+ theme(legend.position = "none")) + plot_layout(guides = "collect",ncol = 1) -> Combined_complexes
-SAVE(PLOT = Combined_complexes, NAME = "manuscript/Plots/combined_complexes_abundance.png")
+SAVE(PLOT = Combined_complexes, NAME = "manuscript/Plots/combined_complexes_abundance.pdf")
+SAVE(PLOT = Combined_complexes, NAME = "manuscript/Plots/combined_complexes_abundance.pdf")
+
 
 #Check if they correlate with systemic inflammation markers
 Correlate_with_phenotypes(tibble(taxa_id = c("ClusterB", "Red_complex"), detected_0.6 =c(T,T)), abundance_matrix = transformed_species_matrix, sample_metadata = sample_metadata , tissue="pocket") -> Association_Clusters_inflammation
@@ -348,8 +373,9 @@ transformed_species_matrix %>% mutate(Group=sample_metadata_2$Group,Source=sampl
 wilcox.test(ClusterA ~ Group, filter(transformed_species_matrix, Source=="pocket"))
 wilcox.test(ClusterA ~ Group, filter(transformed_species_matrix, Source=="saliva"))
 transformed_species_matrix %>% ggplot(aes(x=factor(Source), y= ClusterA, col=factor(Group))) + geom_boxplot(outlier.shape = NA) + geom_sina()  + theme_bw() +
-  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance bacteria atherosclerosis plaque") -> Fig_atherosclerosis
+  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance bacteria Cluster A") -> Fig_clusterA
 
+#Cluster B (severe PD):
 
 transformed_species_matrix %>% mutate(ClusterB_ade = Red_complex + s__Filifactor_alocis + s__Treponema_denticola+
                                         s__Treponema_lecithinolyticum+s__Treponema_maltophilum+s__Treponema_medium+
@@ -360,10 +386,16 @@ transformed_species_matrix %>% mutate(Group=sample_metadata_2$Group,Source=sampl
 wilcox.test(ClusterB_ade ~ Group, filter(transformed_species_matrix, Source=="pocket"))
 wilcox.test(ClusterB_ade ~ Group, filter(transformed_species_matrix, Source=="saliva"))
 transformed_species_matrix %>% ggplot(aes(x=factor(Source), y= ClusterB_ade, col=factor(Group))) + geom_boxplot(outlier.shape = NA) + geom_sina()  + theme_bw() +
-  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance cluster B") -> Fig_atherosclerosis
+  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance bacteria Cluster B") -> Fig_clusterB
+
+
+(Fig_clusterA + labs(title = "A")) + (Fig_clusterB+labs(title = "B")+ theme(legend.position = "none")) + plot_layout(guides = "collect",ncol = 1) -> Combined_complexes2
+SAVE(PLOT = Combined_complexes2, NAME = "manuscript/Plots/combined_complexes_abundance_AB_S.png")
+SAVE(PLOT = Combined_complexes2, NAME = "manuscript/Plots/combined_complexes_abundance_AB_S.pdf")
+
+
 
 rbind(ancom_species,c("ClusterB_ade", 200, T, T, T, T, 5, "0 pocket-1 pocket"),c("ClusterB_ade", 200, T, T, T, T, 5, "0 saliva-1 saliva")) -> ancom_species2
-
 
 
 Correlate_with_phenotypes(tibble(taxa_id = c("ClusterB_ade"), detected_0.6 =c(T,T)), abundance_matrix = transformed_species_matrix, sample_metadata = sample_metadata , tissue="pocket") -> Association_Clusters_inflammation
@@ -377,7 +409,7 @@ transformed_species_matrix %>% mutate(Koren = s__Veillonella_atypica +s__Veillon
 transformed_species_matrix %>% arrange(ID) -> transformed_species_matrix ; sample_metadata %>% filter(StudieID %in% transformed_species_matrix$ID) %>% arrange(StudieID) -> sample_metadata_2 ; transformed_species_matrix %>% mutate(Group=sample_metadata_2$Group,Source=sample_metadata_2$Source,Medication_usage=sample_metadata_2$Medication_usage) ->transformed_species_matrix
 wilcox.test(Koren ~ Group, filter(transformed_species_matrix, Source=="pocket")) ; wilcox.test(Koren ~ Group, filter(transformed_species_matrix, Source=="saliva"))
 transformed_species_matrix %>% ggplot(aes(x=factor(Source), y= ClusterB_ade, col=factor(Group))) + geom_boxplot(outlier.shape = NA) + geom_sina()  + theme_bw() +
-  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance Koren") 
+  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab("Location") + ylab("CLR-abundance Koren") 
 
 
 
@@ -440,6 +472,7 @@ for (Tissue in c("pocket", "saliva")){
 
 #results_phenos_sp %>% group_by(Source, Phenotype, FDR<0.05) %>% summarise(n())
 ancom_total %>% filter(detected_0.6 == T) %>% filter( Structural_0 == "No")
+write_tsv(path="manuscript/Supplement/Species_otherphenos.tsv",x = ancom_total)
 
 
 
@@ -517,7 +550,9 @@ Diversity_analysis(pathway_abundance2,sample_metadata) -> Figures_diversity
 Figures_diversity[[5]]
 Filter_abundance(pathway_abundance2, threshold = 0.2, min_abundance = 0.001 ) -> pathway_abundance2
 Do_ancom(pathway_abundance2, sample_metadata) -> Results_ancom_pathway
-write_tsv(Results_ancom_pathway, "Pathway_results.csv")
+#write_tsv(Results_ancom_pathway, "Pathway_results.csv")
+write_tsv(path="manuscript/Supplement/Pathway_ancom.tsv",x = Results_ancom_pathway)
+
 
 Results_ancom_pathway %>% ggplot() + geom_point(aes(x=CLR_mean_diff, y=W, col=detected_0.6==T)) +
   theme_bw() + facet_wrap(~ TEST)
@@ -531,6 +566,8 @@ Correlate_with_phenotypes(Ancom_results = dplyr::filter(Results_ancom_pathway, T
 
 write_csv(path = "Pathways_targeted_pocket.csv",x=Inflammation_pocket)
 write_csv(path = "Pathways_targeted_saliva.csv",x=Inflammation_saliva)
+
+Do_heatmap(DF = Inflammation_pocket ,OUT= "manuscript/Supplement/Figures/Pocket_pathway.pdf", size = 0.3)
 
 
 make_pheatmap(Inflammation_pocket)
@@ -552,9 +589,11 @@ for (Tissue in c("pocket", "saliva")){
 }
 #results_phenos_sp %>% group_by(Source, Phenotype, FDR<0.05) %>% summarise(n())
 ancom_total_path %>% filter(detected_0.6 == T) %>% filter( Structural_0 == "No")
+write_tsv(path="manuscript/Supplement/Pathway_otherphenos.tsv",x = ancom_total_path)
 
 
 ##Other Phenotypes
+"""
 Filter_abundance(pathway_abundance2, threshold = 0.2, min_abundance = 0.0001) %>% arrange(ID) -> Taxa_matrix2
 sample_metadata %>% arrange(StudieID) %>% filter(StudieID %in% Taxa_matrix2$ID) -> sample_metadata_s
 sample_metadata_s %>% mutate(PPDdeepest=`PPDdeepest (mm)`, PPDmean = `PPDmean (mm)`) -> sample_metadata_s
@@ -589,6 +628,7 @@ for (Tissue in c("pocket", "saliva", "all")){
 results_phenos %>% group_by(Tissue, Pheno, FDR< 0.05) %>% summarise(n())
 results_phenos %>% filter(Pheno == "PPDmean" & FDR < 0.05) %>% arrange(V2)
 write_csv()
+""" 
 ####
 
 
@@ -614,23 +654,64 @@ Preprocess_f(phylum_matrix, paste(c("Phylum_results","/Summary.csv"), collapse="
 metadata_phylum = arrange(filter(sample_metadata, StudieID %in% Taxa_matrix2$ID),StudieID)
 #Check top species in each Group
 Taxa_matrix2 %>% arrange(ID) %>% mutate(Location = metadata_phylum$Source, Group = as.factor(metadata_phylum$Group)) %>% gather(Taxa, Abundance, 2:12, factor_key=TRUE) %>%
-  group_by(Group, Location, Taxa) %>% summarise(Median_abundance = median(Abundance), Sd_abundance=sd(Abundance)) %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) %>%
-  ggplot(aes(x= Taxa, y = Median_abundance, fill=Clinical_Group)) + geom_bar(stat="identity",position = "dodge")+
-  geom_errorbar(aes(ymin=Median_abundance, ymax=Median_abundance+Sd_abundance), width=.2,position=position_dodge(.9)) +facet_wrap(~Location) +
-  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, size= 5)) + scale_fill_manual(values = wes_palette("Royal1")) -> Fig_phylum_composition
+  group_by(Group, Location, Taxa) %>% summarise(Median_abundance = median(Abundance), Mean_abundance=mean(Abundance), Sd_abundance=sd(Abundance)) %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) %>%
+  arrange(Mean_abundance) %>% 
+  ggplot(aes(x= reorder(Taxa, -Mean_abundance), y = Mean_abundance, fill=Clinical_Group)) + geom_bar(stat="identity",position = "dodge",col="black")+
+  geom_errorbar(aes(ymin=Mean_abundance, ymax=Median_abundance+Sd_abundance), width=.2,position=position_dodge(.9)) +facet_wrap(~Location) + ylab("Mean realtive abundance (%)") + xlab("Phylum") +
+  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, size= 5, face="italic")) + scale_fill_manual(values = wes_palette("Royal1")) -> Fig_phylum_composition
 
 Preprocess_f(species_matrix, paste(c("Species_results","/Summary.csv"), collapse="")) -> Taxa_matrix2
 Taxa_matrix2 %>% arrange(ID) %>% mutate(Location = metadata_phylum$Source, Group = as.factor(metadata_phylum$Group)) %>% gather(Taxa, Abundance, 2:236, factor_key=TRUE) -> Taxa_matrix3
 Taxa_matrix3 %>% group_by(Taxa) %>% summarise(MA = median(Abundance)) %>% arrange(desc(MA)) %>% head(10) -> Top_species
-Taxa_matrix3 %>% filter(Taxa %in% Top_species$Taxa) %>% group_by(Group, Location, Taxa) %>% summarise(Median_abundance = median(Abundance),Sd_abundance=sd(Abundance)) %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) %>%
-  ggplot(aes(x= Taxa, y = Median_abundance, fill=Clinical_Group)) + geom_bar(stat="identity",position = "dodge")+ facet_wrap(~Location) +
-  geom_errorbar(aes(ymin=Median_abundance, ymax=Median_abundance+Sd_abundance), width=.2,position=position_dodge(.9)) +
-  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, size= 5)) + scale_fill_manual(values = wes_palette("Royal1")) -> Fig_sp_composition
+Taxa_matrix3 %>% filter(Taxa %in% Top_species$Taxa) %>% group_by(Group, Location, Taxa) %>% summarise(Median_abundance = median(Abundance),Sd_abundance=sd(Abundance), Mean_abundance=mean(Abundance)) %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) %>%
+  arrange(Mean_abundance) %>% 
+  ggplot(aes(x= reorder(Taxa, -Mean_abundance), y = Mean_abundance, fill=Clinical_Group)) + geom_bar(stat="identity",position = "dodge", color="black")+ facet_wrap(~Location) +
+  geom_errorbar(aes(ymin=Mean_abundance, ymax=Mean_abundance+Sd_abundance), width=.2,position=position_dodge(.9)) + ylab("Mean relative abundance (%)") + xlab("Species")+
+  theme_bw() + theme(axis.text.x = element_text(angle = 90, hjust = 1, size= 5,face="italic")) + scale_fill_manual(values = wes_palette("Royal1")) -> Fig_sp_composition
 
 
 (Fig_phylum_composition + labs(title = "A")) + (Fig_sp_composition+labs(title = "B")) + plot_layout(guides = "collect",ncol = 1) -> Combined_composition
 
-SAVE(PLOT=Combined_composition, NAME = "manuscript/Plots/combined_composition.png")
+SAVE(PLOT=Combined_composition, NAME = "manuscript/Plots/combined_composition.pdf")
+
+
+#1. Reviewer's comments, do boxplots:
+Preprocess_f(phylum_matrix, paste(c("Phylum_results","/Summary.csv"), collapse="")) -> Taxa_matrix2
+Taxa_matrix2 %>% arrange(ID) %>% mutate(Location = metadata_phylum$Source, Group = as.factor(metadata_phylum$Group)) %>% gather(Taxa, Abundance, 2:12, factor_key=TRUE) %>%
+  group_by(Group, Location, Taxa) %>% summarise(Median_abundance = median(Abundance), Mean_abundance=mean(Abundance), Sd_abundance=sd(Abundance)) %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) %>%
+  arrange(Mean_abundance) -> Info_median_phylum
+Taxa_matrix2 %>% arrange(ID) %>% mutate(Location = metadata_phylum$Source, Group = as.factor(metadata_phylum$Group)) %>% gather(Taxa, Abundance, 2:(dim(Taxa_matrix2)[2]), factor_key=TRUE) -> Abundances_table
+left_join(Abundances_table, select(Info_median_phylum, c(Group, Location,Taxa, Median_abundance ))  ,by = c("Location", "Group", "Taxa") ) %>% drop_na() -> Abundances_table
+
+Abundances_table %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) %>%
+  arrange(Median_abundance) %>% filter(!Taxa %in% c("p__Ascomycota", "p__Tenericutes")) %>%
+  ggplot(aes(x= reorder(Taxa, -Median_abundance), y = log10(Abundance), fill=Clinical_Group)) + geom_boxplot(col="black",outlier.shape = NA )+
+  facet_wrap(~Location) + ylab("Log10(Relative abundance (%))") + xlab("Phylum") +
+  theme_bw() + theme(axis.text.y = element_text(size= 10, face="italic")) + scale_fill_manual(values = wes_palette("Royal1")) +
+  coord_flip() + geom_sina() -> Fig_phylum_composition_v2
+
+
+#Species
+Preprocess_f(species_matrix, paste(c("Species_results","/Summary.csv"), collapse="")) -> Taxa_matrix2
+Taxa_matrix3 %>% filter(Taxa %in% Top_species$Taxa) %>% group_by(Group, Location, Taxa) %>% summarise(Median_abundance = median(Abundance),Sd_abundance=sd(Abundance), Mean_abundance=mean(Abundance)) %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) -> Info_median
+Taxa_matrix2 %>% arrange(ID) %>% mutate(Location = metadata_phylum$Source, Group = as.factor(metadata_phylum$Group)) %>% gather(Taxa, Abundance, 2:(dim(Taxa_matrix2)[2]), factor_key=TRUE) -> Abundances_table
+left_join(Abundances_table, select(Info_median, c(Group, Location,Taxa, Median_abundance ))  ,by = c("Location", "Group", "Taxa") ) %>% drop_na() -> Abundances_table
+
+Abundances_table %>% mutate(Clinical_Group = ifelse(Group == 0, "PD mild", "PD severe")) %>%
+  arrange(Median_abundance) %>% 
+  ggplot(aes(x= reorder(Taxa, -Median_abundance), y = log10(Abundance), fill=Clinical_Group)) + geom_boxplot(col="black",outlier.shape = NA)+
+  facet_wrap(~Location) + ylab("log10(Relative abundance (%))") + xlab("Species") +
+  theme_bw() + theme(axis.text.y = element_text(size= 10, face="italic")) + scale_fill_manual(values = wes_palette("Royal1")) +
+  coord_flip() + geom_sina() -> Fig_sp_composition_v2
+
+(Fig_phylum_composition_v2 + labs(title = "A")) + (Fig_sp_composition_v2+labs(title = "B")) + plot_layout(guides = "collect",ncol = 1) -> Combined_composition_v2
+
+SAVE(PLOT=Combined_composition_v2, NAME = "manuscript/Plots/combined_composition_v2.pdf", Height = 10, Width=10)
+
+
+
+
+
 #ggsave(Fig_phylum_composition, filename = "manuscript/Plots/Phylum_composition.png")
 #ggsave(Fig_sp_composition, filename = "manuscript/Plots/Sp_composition.png")
 #ggsave(Combined_composition, filename = "manuscript/Plots/combined_composition.png",scale = 2)
@@ -642,7 +723,7 @@ SAVE(PLOT=Combined_composition, NAME = "manuscript/Plots/combined_composition.pn
 #Richness diversity
 Taxa_matrix3 %>% mutate(Richness = ifelse(Abundance==0, 0, 1)) %>% group_by(ID,Location,Group) %>% summarise(Richness=sum(Richness)) %>%
 ggplot(aes(x=Location, y=Richness, col=Group))+  geom_boxplot(outlier.shape = NA)+ geom_sina() + theme_bw() +
-   scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group") -> Richness_plot 
+   scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group") -> Richness_plot 
 
 
 Prepare_phylobject = function(M, metadata, Tree=NA){
@@ -669,24 +750,24 @@ Prepare_phylobject = function(M, metadata, Tree=NA){
 Prepare_phylobject(Taxa_matrix2,mutate(sample_metadata, Group = as.factor(Group))) -> phyloobject
 
 ordinate(phyloobject,"PCoA", "bray") -> ord
-plot_ordination(phyloobject, ord, color="Group", shape="Source") + theme_bw() +
-  stat_ellipse(type = "t", linetype = 2) + scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group", shape="Location") + theme_bw() + xlab("PCoA1(34.5%)") + ylab("PCoA2(16.2%") +
+plot_ordination(phyloobject, ord, color="Group", shape="Source") + theme_bw() + geom_point(size = 4) +
+  stat_ellipse(type = "t", linetype = 2) + scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group", shape="Location") + theme_bw() + xlab("PCoA1(34.5%)") + ylab("PCoA2(16.2%") +
   theme(legend.title = element_text(size = 14),legend.text = element_text(size = 13)) -> PCoA_plot
 #plot_ordination(phyloobject, ord, shape="Group", type="split")
 
 Diversity_analysis(Taxa_matrix2,sample_metadata) -> Figures_diversity
-Figures_diversity[[1]] + scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group", shape="Location")+ 
+Figures_diversity[[1]] + scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group", shape="Location")+ 
   theme(legend.title = element_text(size = 14),legend.text = element_text(size = 13))-> clustering_plot
 #Figures_diversity[[4]] + scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group", shape="Location")  -> PCoA_plot
-Figures_diversity[[2]] + scale_color_manual(values = wes_palette("Royal1"),labels = c("Mid PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab(label = "Location") + ylab(label = "Diversity") +
-  scale_shape_discrete(labels = c("Mid PD", "Severe PD")) -> Shannon_plot
+Figures_diversity[[2]] + scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + labs(color = "Clinical_Group") + xlab(label = "Location") + ylab(label = "Diversity") +
+  scale_shape_discrete(labels = c("Mild PD", "Severe PD")) -> Shannon_plot
 (Richness_plot + labs(title = "A")) + (Shannon_plot+labs(title = "B")) + plot_layout(guides = "collect",ncol = 1) -> Combined_richness
 #ggsave(Combined_richness, filename = "manuscript/Plots/combined_richness.png",scale = 2)
-SAVE(PLOT=Combined_richness, NAME="manuscript/Plots/combined_richness.png")
+SAVE(PLOT=Combined_richness, NAME="manuscript/Plots/combined_richness.pdf")
 
 (PCoA_plot + labs(title = "A")) + (clustering_plot+labs(title = "B")+ theme(legend.position = "none")) + plot_layout(guides = "collect",ncol = 1) -> Combined_beta
 #ggsave(Combined_beta, filename = "manuscript/Plots/combined_beta.png",scale = 4)
-SAVE(PLOT=Combined_beta, NAME="manuscript/Plots/combined_beta.png", Width = 12.6 , Height = 12.6)
+SAVE(PLOT=Combined_beta, NAME="manuscript/Plots/combined_beta.pdf", Width = 12.6 , Height = 12.6)
 
 #3. Heatmap association with inflammation
 
@@ -723,3 +804,131 @@ SAVE(PLOT = heatmap_sp_saliva, NAME= "manuscript/Plots/Heatmap_Inflammation_sp_s
 SAVE(PLOT = heatmap_pathway_pocket, NAME= "manuscript/Plots/Heatmap_Inflammation_pathway_pocket.png" )
 
 
+#Pathway plots
+Results_ancom_pathway
+compositional_transformation(select(pathway_abundance2, -ID)) %>% mutate(ID = pathway_abundance2$ID) -> transformed_ptw_matrix 
+
+select(transformed_ptw_matrix, c(ID, colnames(pathway_abundance2)[grepl("PWY-7111", colnames(pathway_abundance2))])) -> To_plot
+left_join(To_plot, select(sample_metadata, c(ID,Source,Group ))) -> To_plot
+
+To_plot %>% ggplot(aes(y=`PWY-7111: pyruvate fermentation to isobutanol (engineered)`, x=factor(Group))) + geom_boxplot() + facet_wrap(~Source) + theme_bw()
+
+#Indv taxa plot
+transformed_species_matrix %>% select(ID,s__Anaeroglobus_geminatus) -> To_plot
+species_matrix2 %>% select(ID,s__Anaeroglobus_geminatus) -> To_plot
+
+left_join(To_plot, select(sample_metadata, c(ID,Source,Group ))) -> To_plot
+To_plot %>% ggplot(aes(y=s__Anaeroglobus_geminatus, x=factor(Group))) + geom_boxplot()+ geom_point() + facet_wrap(~Source) + theme_bw()
+
+
+#Summary stats
+Prev = function(x){
+  x[x != 0] = 1
+  sum(x)/length(x)
+  
+}
+Summary_t = tibble()
+for (Taxa in seq(1,nrow(matrix_taxonomy))){
+  Taxa = matrix_taxonomy[Taxa,]
+  ID = Taxa$ID
+  Taxa %>% select(-ID) %>% t() %>% as.numeric() -> Abundance
+  sapply(colnames(Taxa)[2:ncol(Taxa)], FUN = function(x){ str_split(x,"_")[[1]][1]}) %>% as.vector() -> IDs
+  DF = tibble(Ab = Abundance, ID = IDs)
+  Meta = sample_metadata %>% mutate(ID=StudieID) %>% select(ID, Group, Source) 
+  left_join(DF, Meta, by ="ID") -> DF
+  DF %>% group_by(Group, Source) %>% summarise(Mean=mean(Ab), SD=sd(Ab), Prevalence = Prev(Ab)) -> SU
+  SU %>% mutate(Taxa= ID) -> SU
+  Summary_t = bind_rows(Summary_t, SU)
+}
+write_tsv(x = Summary_t, path = "manuscript/Supplement/Summary_taxa.tsv")
+
+Summary_p = tibble()
+for (Taxa in seq(1,nrow(pathway_abundance))){
+  Taxa = pathway_abundance[Taxa,]
+  colnames(Taxa)[1] = "ID"
+  ID = Taxa$ID
+  Taxa %>% select(-ID) %>% t() %>% as.numeric() -> Abundance
+  sapply(colnames(Taxa)[2:ncol(Taxa)], FUN = function(x){ str_split(x,"_")[[1]][1]}) %>% as.vector() -> IDs
+  DF = tibble(Ab = Abundance, ID = IDs)
+  Meta = sample_metadata %>% mutate(ID=StudieID) %>% select(ID, Group, Source) 
+  left_join(DF, Meta, by ="ID") -> DF
+  DF %>% group_by(Group, Source) %>% summarise(Mean=mean(Ab), SD=sd(Ab), Prevalence = Prev(Ab)) -> SU
+  SU %>% mutate(Pathway= ID) -> SU
+  Summary_p = bind_rows(Summary_p, SU)
+}
+write_tsv(x = Summary_p, path = "manuscript/Supplement/Summary_ptw.tsv")
+
+################################################
+#Strainphlan strain analysis####################
+################################################
+filename <- system("dir Strainphlan_trees/",intern=TRUE)
+All_result = tibble()
+tip_name_new = function(x){
+  str_split(x, "_")[[1]][1]
+  
+  
+}
+
+
+List_plots = list()
+I = 0
+Get_plots = function(Tree_file){
+  Tree = read.tree(Tree_file)
+  Tree$tip.label = as_vector(lapply(Tree$tip.label,  tip_name_new))
+  sample_metadata %>% filter(StudieID %in% Tree$tip.label) -> meta_tree
+  meta_tree[match(Tree$tip.label,meta_tree$StudieID),] %>% mutate(Group = as.factor(Group)) -> meta_tree
+  cophenetic(Tree) -> Dist_matrix
+  pcoa(Dist_matrix) -> PCOA_strains
+  Variance = PCOA_strains$values$Relative_eig
+  PCOA_strains$vectors %>% as.data.frame()  %>% rownames_to_column("StudieID") %>% as_tibble()  -> PCOA_data
+  left_join(PCOA_data, meta_tree, by= "StudieID") -> PCOA_data
+  ggplot(PCOA_data, aes(label=StudieID,x=Axis.1,y=Axis.2,color= Group)) + geom_point(aes(shape=Source)) + theme_bw() +
+    scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) + ggrepel::geom_text_repel() + 
+    xlab(paste(c("PCoA1 (",as.character(round(Variance[1],2)*100),"%)"), collapse="")) + ylab(paste(c("PCoA2 (",as.character(round(Variance[1],2)*100),"%)"), collapse="")) -> PCoA_tree
+  meta_tree %>% mutate(Col = ifelse(Group == 0, wes_palette("Royal1")[1], wes_palette("Royal1")[2] ) ) -> meta_tree
+  plot(Tree,tip.color = meta_tree$Col ) -> Phylo_tree
+  return(list(PCoA_tree, Phylo_tree))
+}
+
+for ( Tree_file in list.files(path="Strainphlan_trees/", pattern='*.tree', full.names = TRUE) ){
+
+  Tree = read.tree(Tree_file)
+  Tree$tip.label = as_vector(lapply(Tree$tip.label,  tip_name_new))
+  sample_metadata %>% filter(StudieID %in% Tree$tip.label) -> meta_tree
+  meta_tree[match(Tree$tip.label,meta_tree$StudieID),] %>% mutate(Group = as.factor(Group)) -> meta_tree
+  cophenetic(Tree) -> Dist_matrix
+  #pcoa(Dist_matrix) -> PCOA_strains
+  #PCOA_strains$vectors %>% as.data.frame()  %>% rownames_to_column("StudieID") %>% as_tibble()  -> PCOA_data
+  #left_join(PCOA_data, meta_tree, by= "StudieID") -> PCOA_data
+  #ggplot(PCOA_data) + geom_point(aes(x=Axis.1,y=Axis.2, shape=Source, color= as.factor(Group))) + theme_bw() +
+  #  scale_color_manual(values = wes_palette("Royal1"),labels = c("Mild PD", "Severe PD")) -> PCoA_tree
+  #meta_tree %>% mutate(Col = ifelse(Group == 0, wes_palette("Royal1")[1], wes_palette("Royal1")[2] ) ) -> meta_tree
+  #plot(Tree,tip.color = meta_tree$Col ) -> Phylo_tree
+  L1 = length(unique(meta_tree$Group))
+  L2 = length(unique(meta_tree$Source))
+  if (L1 > 1 && L2 > 1){
+      adonis2(Dist_matrix ~ Source + Group ,meta_tree, strata=StudieID) -> Result
+  } else if (L1 >1){
+    adonis2(Dist_matrix ~ Group, meta_tree) -> Result
+  } else {
+    adonis2(Dist_matrix ~ Source, meta_tree) -> Result
+  }
+  Result %>% as.data.frame() %>% rownames_to_column("Feature") %>% mutate(Tree=Tree_file) %>%
+    as_tibble() %>% mutate(Index= I) %>% mutate(N = dim(meta_tree)[1],
+  N_pocket =dim(filter(meta_tree, Source=="pocket"))[1], N_saliva=N-N_pocket, 
+                N_disease=dim(filter(meta_tree, Group==1))[1], N_healthy=N-N_disease ) -> Result
+  All_result = rbind(All_result, Result)
+  #Plots = list(PCoA_tree, Phylo_tree)
+  I = I+1
+}
+
+All_result %>% arrange(`Pr(>F)`) -> All_result
+lapply(All_result$Tree,FUN=function(x){str_split(x,"\\.")[[1]][2]}) %>% as_vector() -> S
+All_result %>% mutate(Taxon=S) %>%  select(Taxon, Feature, `Pr(>F)`, N, N_saliva, N_pocket, N_disease) %>% gt::gt()
+All_result %>% mutate(Taxon=S) %>% select(-c(Tree, Index)) -> To_save
+write_tsv(To_save,path = "manuscript/Supplement/Strain_permanova.tsv")
+
+Get_plots(All_result$Tree[1]) -> Plots1
+Plots1[[1]]
+Get_plots(All_result$Tree[2])
+Get_plots(All_result$Tree[3])
