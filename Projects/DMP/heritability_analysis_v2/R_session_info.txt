@@ -1,0 +1,31 @@
+R version 3.6.0 (2019-04-26)
+Platform: x86_64-w64-mingw32/x64 (64-bit)
+Running under: Windows 7 x64 (build 7600)
+
+Matrix products: default
+
+Random number generation:
+ RNG:     Mersenne-Twister 
+ Normal:  Inversion 
+ Sample:  Rounding 
+ 
+locale:
+[1] LC_COLLATE=English_United States.1252  LC_CTYPE=English_United States.1252    LC_MONETARY=English_United States.1252
+[4] LC_NUMERIC=C                           LC_TIME=English_United States.1252    
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] tidyr_1.0.2         ggplot2_3.3.3       plyr_1.8.6          foreach_1.4.8       lmerTest_3.1-1      lme4_1.1-26        
+ [7] Matrix_1.2-17       RLRsim_3.1-6        lme4qtl_0.2.2       coxme_2.2-16        bdsmatrix_1.3-4     survival_3.1-12    
+[13] compositions_1.40-3 bayesm_3.1-4        robustbase_0.93-5   tensorA_0.36.1     
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.0.6          nloptr_1.2.2.2      pillar_1.5.1        DEoptimR_1.0-8      compiler_3.6.0      iterators_1.0.12   
+ [7] tools_3.6.0         boot_1.3-22         statmod_1.4.35      lifecycle_1.0.0     tibble_3.1.0        gtable_0.3.0       
+[13] nlme_3.1-139        lattice_0.20-38     mgcv_1.8-28         pkgconfig_2.0.3     rlang_0.4.10        yaml_2.2.1         
+[19] withr_2.4.1         kinship2_1.8.5      dplyr_0.8.4         vctrs_0.3.7         grid_3.6.0          tidyselect_1.0.0   
+[25] glue_1.4.1          R6_2.5.0            fansi_0.4.1         minqa_1.2.4         purrr_0.3.3         magrittr_2.0.1     
+[31] codetools_0.2-16    scales_1.1.1        ellipsis_0.3.1      splines_3.6.0       MASS_7.3-51.4       assertthat_0.2.1   
+[37] colorspace_2.0-0    numDeriv_2016.8-1.1 quadprog_1.5-8      utf8_1.2.1          munsell_0.5.0       crayon_1.4.1 
