@@ -41,15 +41,15 @@ do_clr_externalWeighting = function(interest_matrix, core_matrix){
 # ===========================
 
 # load all necessary data
-covar = read.table("Mock_data/covariates.txt")
+covar = read.table("../Mock_data/covariates.txt")
 Ncovar = ncol(covar)
 
-taxa = read.table("Mock_data/taxa.txt")
+taxa = read.table("../Mock_data/taxa.txt")
 shannon.div = diversity(taxa[,grep("[.]s__",colnames(taxa))],index = "shannon")
-pathways = read.table("Mock_data/pathways.txt")
+pathways = read.table("../Mock_data/pathways.txt")
 
 # select diseases
-pheno_disease = read.table("Mock_data/diseases.txt")
+pheno_disease = read.table("../Mock_data/diseases.txt")
 Ndisease = ncol(pheno_disease) - 1 # the last disease is 'no disease' phenotype
 
 # transform data using CLR
