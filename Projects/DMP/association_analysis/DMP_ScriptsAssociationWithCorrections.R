@@ -1,7 +1,8 @@
 ### Script to correct the phenotype-species associations for mutiple covariates###
 ## Author: A.Kur, 12 th August, 2020
 ## Updates: T.Sinha, 16th August, 2020
-##          R.Gacesa, 22/09/2020
+##          R.Gacesa, 22nd Sep, 2020
+##          A.Kur, 24th May, 2021
 ## =================================================
 library(data.table)
 library(foreach)
@@ -32,10 +33,15 @@ do_clr_externalWeighting = function(interest_matrix, core_matrix) {
 #   ASSOCIATION ANALYSIS FOR DAG3 
 # ========================================
 # ========================================
+# Notes: 
+# 1. to save space, only random taxa and pathway microbiome data emulated in ../Mock_data
+# 2. Among phenotypes, only diseases (from ../Mock_data/diseaes.txt) are emulated
+# 3. List of covariates emulated only included age, sex and BMI. In the analysis on real data, another list of covariates included (please see the manuscript)
+
 dag3AssociationsWithCorrections <- function(dataType='taxa',
                                             covariates=c(),
                                             idsToKeep = NULL,
-                                            dataPath='/groups/umcg-lifelines/tmp01/users/umcg-akurilshchikov') {
+                                            dataPath='./') {
   # define parameters
   dataType = dataType
   #phenoOut = outFile
@@ -50,7 +56,7 @@ dag3AssociationsWithCorrections <- function(dataType='taxa',
   workPWD = dataPath
   print ('  >> Taxa')
   # > taxa
-  taxa = read.table(paste0(workPWD,"/Association.analysis.input/taxa.txt"))
+  taxa = read.table(paste0(workPWD,"/../Mock_data/taxa.txt"))
   if (!is.null(idsToKeep)) {
     taxa <- taxa[rownames(taxa) %in% idsToKeep,]
     if (nrow(taxa) == 0) {
@@ -64,7 +70,7 @@ dag3AssociationsWithCorrections <- function(dataType='taxa',
   
   # > pathways
   print ('  >> PWYs')
-  pathways = read.table(paste0(workPWD,"/Association.analysis.input/pathways_metacyc.txt"))
+  pathways = read.table(paste0(workPWD,"../Mock_data/pathways.txt"))
   if (!is.null(idsToKeep)) {
     pathways <- pathways[rownames(pathways) %in% idsToKeep,]
     if (nrow(pathways) == 0) {
@@ -76,48 +82,48 @@ dag3AssociationsWithCorrections <- function(dataType='taxa',
   pathways_transformed = pathways_transformed[,colSums(pathways>0)>nrow(pathways)*0.05]# Filtering 
   print ('    >> Done!')
   
-  # > CARD
-  print ('  >> CARDs')
-  CARD = read.table(paste0(workPWD,"/Association.analysis.input/DAG3_CARD_nofiltering.txt"),header=T,sep='\t',stringsAsFactors = F,row.names = 1)
-  CARD = CARD[intersect(rownames(CARD),rownames(taxa)),]
-  if (!is.null(idsToKeep)) {
-    CARD <- CARD[rownames(CARD) %in% idsToKeep,]
-    if (nrow(CARD) == 0) {
-      stop("ERROR: No samples kept after subsetting by idsToKeep, quitting!")
-    }
-  }
-  #  > do CLR
-  CARD_transformed = do_clr_externalWeighting(CARD,CARD)
+  ## > CARD
+  #print ('  >> CARDs')
+  #CARD = read.table(paste0(workPWD,"../Mock_data/DAG3_CARD_nofiltering.txt"),header=T,sep='\t',stringsAsFactors = F,row.names = 1)
+  #CARD = CARD[intersect(rownames(CARD),rownames(taxa)),]
+  #if (!is.null(idsToKeep)) {
+  #  CARD <- CARD[rownames(CARD) %in% idsToKeep,]
+  #  if (nrow(CARD) == 0) {
+  #    stop("ERROR: No samples kept after subsetting by idsToKeep, quitting!")
+  #  }
+  #}
+  ##  > do CLR
+  #CARD_transformed = do_clr_externalWeighting(CARD,CARD)
   #  > filter by prevalence
-  CARD_transformed = CARD_transformed[,colSums(CARD>0)>0.05 * nrow(CARD)]
-  print ('    >> Done!')
+  #CARD_transformed = CARD_transformed[,colSums(CARD>0)>0.05 * nrow(CARD)]
+  #print ('    >> Done!')
   
   # VFs
-  print ('  >> VFs')
-  VFDB = read.table(paste0(workPWD,"/Association.analysis.input/DAG3_VFDB_VFs_nofiltering.txt"),header=T,sep='\t',stringsAsFactors = F,row.names = 1)
-  VFDB = VFDB[intersect(rownames(taxa),rownames(VFDB)),]
-  if (!is.null(idsToKeep)) {
-    VFDB <- VFDB[rownames(VFDB) %in% idsToKeep,]
-    if (nrow(VFDB) == 0) {
-      stop("ERROR: No samples kept after subsetting by idsToKeep, quitting!")
-    }
-  }
+  #print ('  >> VFs')
+  #VFDB = read.table(paste0(workPWD,"../Mock_data/DAG3_VFDB_VFs_nofiltering.txt"),header=T,sep='\t',stringsAsFactors = F,row.names = 1)
+  #VFDB = VFDB[intersect(rownames(taxa),rownames(VFDB)),]
+  #if (!is.null(idsToKeep)) {
+  #  VFDB <- VFDB[rownames(VFDB) %in% idsToKeep,]
+  #  if (nrow(VFDB) == 0) {
+  #    stop("ERROR: No samples kept after subsetting by idsToKeep, quitting!")
+  #  }
+  #}
   #  > do CLR
-  VFDB_transformed = do_clr_externalWeighting(VFDB,VFDB)
+  #VFDB_transformed = do_clr_externalWeighting(VFDB,VFDB)
   #  > filter by prevalence
-  VFDB_transformed = VFDB_transformed[,colSums(VFDB>0)>0.05 * nrow(VFDB)]
-  print ('    >> Done!')
+  #VFDB_transformed = VFDB_transformed[,colSums(VFDB>0)>0.05 * nrow(VFDB)]
+  #print ('    >> Done!')
   
   # > load phenotypes
-  print ('  >> Phenotypes')
-  load(paste0(workPWD,"/Association.analysis.input/pheno_release27.RData")) 
-  pheno = pheno27[rownames(taxa_transformed),]
-  if (!is.null(idsToKeep)) {
-    pheno <- pheno[rownames(pheno) %in% idsToKeep,]
-    if (nrow(pheno) == 0) {
-      stop("ERROR: No samples kept after subsetting by idsToKeep, quitting!")
-    }
-  }
+  #print ('  >> Phenotypes')
+  #load(paste0(workPWD,"/Association.analysis.input/pheno_release27.RData")) 
+  #pheno = pheno27[rownames(taxa_transformed),]
+  #if (!is.null(idsToKeep)) {
+  #  pheno <- pheno[rownames(pheno) %in% idsToKeep,]
+  #  if (nrow(pheno) == 0) {
+  #    stop("ERROR: No samples kept after subsetting by idsToKeep, quitting!")
+  #  }
+  #}
   print ('    >> Done!')
   
   # ===============================================================
@@ -129,15 +135,14 @@ dag3AssociationsWithCorrections <- function(dataType='taxa',
     print(paste0('WARNING: Covariates < ',paste(missingCovar,collapse=', '),' > missing from phenotype file!'))
   }
   # > technical covariates (these should always be included)
-  covar = read.table(paste0(workPWD,"/Association.analysis.input/covariates.txt"),sep='\t') 
-  covar$GeoMean <- NULL #Remove geometric mean
+  covar = read.table(paste0(workPWD,"../Mock_data/covariates.txt"),sep='\t') 
   # > TODO: allow retention of these
   # remove covariates from phenotypes
-  pheno$META.BATCH <- NULL
-  pheno$META.DNA.conc.ng.ul <- NULL
-  pheno$META.POOP.COLLECTION_SEASON <- NULL
-  pheno$ANTHRO.AGE <- NULL
-  pheno$ANTHRO.Sex <- NULL
+  #pheno$META.BATCH <- NULL
+  #pheno$META.DNA.conc.ng.ul <- NULL
+  #pheno$META.POOP.COLLECTION_SEASON <- NULL
+  #pheno$ANTHRO.AGE <- NULL
+  #pheno$ANTHRO.Sex <- NULL
   
   # clean covariate matrix & add extra covariates
   covar = covar[rownames(taxa_transformed),]
