@@ -1,0 +1,248 @@
+Phenotype,Group.smaller,Group.renamed,Group.renamed.old
+META.BATCH,Metadata,META.BATCH,META.BATCH
+META.DNA.conc.ng.ul,Metadata,META.DNA.conc.ng.ul,META.DNA.conc.ng.ul
+META.DNA.postclean.reads,Metadata,META.DNA.postclean.reads,META.DNA.postclean.reads
+META.POOP.BristolMean,Metadata,META.POOP.BristolMean,META.POOP.BristolMean
+META.POOP.COLLECTION_SEASON,Metadata,META.POOP.COLLECTION_SEASON,META.POOP.COLLECTION_SEASON
+META.POOP.Freq,Metadata,META.POOP.Freq,META.POOP.Freq
+MED.MEDS.ACE_inhibitors_ATC_C09AA,Medication.Use,MED.MEDS.ACE_inhibitors_ATC_C09AA,MED.MEDS.ACE_inhibitors_ATC_C09AA
+MED.MEDS.Acetanilide_derivatives_ATC_N02BE,Medication.Use,MED.MEDS.Acetanilide_derivatives_ATC_N02BE,MED.MEDS.Acetanilide_derivatives_ATC_N02BE
+MED.MEDS.Alfa_blokkers_ATC_G04CA,Medication.Use,MED.MEDS.Alfa_blokkers_ATC_G04CA,MED.MEDS.Alfa_blokkers_ATC_G04CA
+MED.MEDS.Angiotensine_receptor_blockers_ATC_C09CA,Medication.Use,MED.MEDS.Angiotensine_receptor_blockers_ATC_C09CA,MED.MEDS.Angiotensine_receptor_blockers_ATC_C09CA
+MED.MEDS.Anti_epileptics_ATC_N03A,Medication.Use,MED.MEDS.Anti_epileptics_ATC_N03A,MED.MEDS.Anti_epileptics_ATC_N03A
+MED.MEDS.Antiarrithmics_class1_ATC_C01B,Medication.Use,MED.MEDS.Antiarrithmics_class1_ATC_C01B,MED.MEDS.Antiarrithmics_class1_ATC_C01B
+MED.MEDS.Antibacterials_ATC_J01,Medication.Use,MED.MEDS.Antibacterials_ATC_J01,MED.MEDS.Antibacterials_ATC_J01
+MED.MEDS.Anticoagulants_ATC_B01AE,Medication.Use,MED.MEDS.Anticoagulants_ATC_B01AE,MED.MEDS.Anticoagulants_ATC_B01AE
+MED.MEDS.Antihistaminics_ATC_R06AX,Medication.Use,MED.MEDS.Antihistaminics_ATC_R06AX,MED.MEDS.Antihistaminics_ATC_R06AX
+MED.MEDS.Antiinflammatory_and_antirheumatic_ATC_M01,Medication.Use,MED.MEDS.Antiinflammatory_and_antirheumatic_ATC_M01,MED.MEDS.Antiinflammatory_and_antirheumatic_ATC_M01
+MED.MEDS.Antipsychotics_atypical_ATC_N05AH,Medication.Use,MED.MEDS.Antipsychotics_atypical_ATC_N05AH,MED.MEDS.Antipsychotics_atypical_ATC_N05AH
+MED.MEDS.Benzodiazepine_agonists_ATC_N05,Medication.Use,MED.MEDS.Benzodiazepine_agonists_ATC_N05,MED.MEDS.Benzodiazepine_agonists_ATC_N05
+MED.MEDS.Beta_2_sympathicomimetics_ATC_R03AC,Medication.Use,MED.MEDS.Beta_2_sympathicomimetics_ATC_R03AC,MED.MEDS.Beta_2_sympathicomimetics_ATC_R03AC
+MED.MEDS.Beta_blokkers_ATC_C07AB,Medication.Use,MED.MEDS.Beta_blokkers_ATC_C07AB,MED.MEDS.Beta_blokkers_ATC_C07AB
+MED.MEDS.Biguanides_ATC_A10BA,Medication.Use,MED.MEDS.Biguanides_ATC_A10BA,MED.MEDS.Biguanides_ATC_A10BA
+MED.MEDS.Calcium_antagonists_ATC_C08CA,Medication.Use,MED.MEDS.Calcium_antagonists_ATC_C08CA,MED.MEDS.Calcium_antagonists_ATC_C08CA
+MED.MEDS.Corticosteroids_Eyedrops_ATC_S03A,Medication.Use,MED.MEDS.Corticosteroids_Eyedrops_ATC_S03A,MED.MEDS.Corticosteroids_Eyedrops_ATC_S03A
+MED.MEDS.Corticosteroids_Oral_ATC_H02,Medication.Use,MED.MEDS.Corticosteroids_Oral_ATC_H02,MED.MEDS.Corticosteroids_Oral_ATC_H02
+MED.MEDS.Endocrine_therapy_ATC_L02,Medication.Use,MED.MEDS.Endocrine_therapy_ATC_L02,MED.MEDS.Endocrine_therapy_ATC_L02
+MED.MEDS.Fluorochinolons_ATC_C08DA,Medication.Use,MED.MEDS.Fluorochinolons_ATC_C08DA,MED.MEDS.Fluorochinolons_ATC_C08DA
+MED.MEDS.Glucocorticoids_Inhaled_ATC_R03BA,Medication.Use,MED.MEDS.Glucocorticoids_Inhaled_ATC_R03BA,MED.MEDS.Glucocorticoids_Inhaled_ATC_R03BA
+MED.MEDS.Insuline_ATC_A10A,Medication.Use,MED.MEDS.Insuline_ATC_A10A,MED.MEDS.Insuline_ATC_A10A
+MED.MEDS.Intestinal_antiinflammatory_agents_ATC_A07E,Medication.Use,MED.MEDS.Intestinal_antiinflammatory_agents_ATC_A07E,MED.MEDS.Intestinal_antiinflammatory_agents_ATC_A07E
+MED.MEDS.Iron_preparations_ATC_B03AA,Medication.Use,MED.MEDS.Iron_preparations_ATC_B03AA,MED.MEDS.Iron_preparations_ATC_B03AA
+MED.MEDS.Laxatives_osmotic_ATC_A06AD,Medication.Use,MED.MEDS.Laxatives_osmotic_ATC_A06AD,MED.MEDS.Laxatives_osmotic_ATC_A06AD
+MED.MEDS.Laxatives_volume_increasing_ATC_A06AC,Medication.Use,MED.MEDS.Laxatives_volume_increasing_ATC_A06AC,MED.MEDS.Laxatives_volume_increasing_ATC_A06AC
+MED.MEDS.Lipid_Modifying_ATC_C10,Medication.Use,MED.MEDS.Lipid_Modifying_ATC_C10,MED.MEDS.Lipid_Modifying_ATC_C10
+MED.MEDS.Low_Ceiling_Diuretics_ATC_C03EA,Medication.Use,MED.MEDS.Low_Ceiling_Diuretics_ATC_C03EA,MED.MEDS.Low_Ceiling_Diuretics_ATC_C03EA
+MED.MEDS.NSAIDs_ATC_M01A,Medication.Use,MED.MEDS.NSAIDs_ATC_M01A,MED.MEDS.NSAIDs_ATC_M01A
+MED.MEDS.Obstructive_Airways_ATC_R03,Medication.Use,MED.MEDS.Obstructive_Airways_ATC_R03,MED.MEDS.Obstructive_Airways_ATC_R03
+MED.MEDS.Opioids_ATC_N02A,Medication.Use,MED.MEDS.Opioids_ATC_N02A,MED.MEDS.Opioids_ATC_N02A
+MED.MEDS.Other_Alimentary_Metabolism_ATC_A,Medication.Use,MED.MEDS.Other_Alimentary_Metabolism_ATC_A,MED.MEDS.Other_Alimentary_Metabolism_ATC_A
+MED.MEDS.Other_Antiinfectives_sys_ATC_J,Medication.Use,MED.MEDS.Other_Antiinfectives_sys_ATC_J,MED.MEDS.Other_Antiinfectives_sys_ATC_J
+MED.MEDS.Other_Antineoplastic_immunomodulating_ATC_L,Medication.Use,MED.MEDS.Other_Antineoplastic_immunomodulating_ATC_L,MED.MEDS.Other_Antineoplastic_immunomodulating_ATC_L
+MED.MEDS.Other_Antiparasitic_ATC_P,Medication.Use,MED.MEDS.Other_Antiparasitic_ATC_P,MED.MEDS.Other_Antiparasitic_ATC_P
+MED.MEDS.Other_Cardiovascular_ATC_C,Medication.Use,MED.MEDS.Other_Cardiovascular_ATC_C,MED.MEDS.Other_Cardiovascular_ATC_C
+MED.MEDS.Other_Dermatologicals_ATC_D,Medication.Use,MED.MEDS.Other_Dermatologicals_ATC_D,MED.MEDS.Other_Dermatologicals_ATC_D
+MED.MEDS.Other_GenitoUrinarySystm_SexHormones_ATC_G04,Medication.Use,MED.MEDS.Other_GenitoUrinarySystm_SexHormones_ATC_G04,MED.MEDS.Other_GenitoUrinarySystm_SexHormones_ATC_G04
+MED.MEDS.Other_Musculo_skeletal_ATC_M,Medication.Use,MED.MEDS.Other_Musculo_skeletal_ATC_M,MED.MEDS.Other_Musculo_skeletal_ATC_M
+MED.MEDS.Other_NervousSystem_ATC_N,Medication.Use,MED.MEDS.Other_NervousSystem_ATC_N,MED.MEDS.Other_NervousSystem_ATC_N
+MED.MEDS.P2Y12_inhibitors_ATC_B01AC,Medication.Use,MED.MEDS.P2Y12_inhibitors_ATC_B01AC,MED.MEDS.P2Y12_inhibitors_ATC_B01AC
+MED.MEDS.Parasympathicolyticum_ATC_R03BB,Medication.Use,MED.MEDS.Parasympathicolyticum_ATC_R03BB,MED.MEDS.Parasympathicolyticum_ATC_R03BB
+MED.MEDS.PPIs_ATC_A02BC,Medication.Use,MED.MEDS.PPIs_ATC_A02BC,MED.MEDS.PPIs_ATC_A02BC
+MED.MEDS.Psychoanaleptics_ATC_N06,Medication.Use,MED.MEDS.Psychoanaleptics_ATC_N06,MED.MEDS.Psychoanaleptics_ATC_N06
+MED.MEDS.Psycholeptics_ATC_N05,Medication.Use,MED.MEDS.Psycholeptics_ATC_N05,MED.MEDS.Psycholeptics_ATC_N05
+MED.MEDS.Salycilates_ATC_B01AC,Medication.Use,MED.MEDS.Salycilates_ATC_B01AC,MED.MEDS.Salycilates_ATC_B01AC
+MED.MEDS.Seratonine_uptake_inhibitors_selective_ATC_N06AB,Medication.Use,MED.MEDS.Seratonine_uptake_inhibitors_selective_ATC_N06AB,MED.MEDS.Seratonine_uptake_inhibitors_selective_ATC_N06AB
+MED.MEDS.Sertoltransport_blockers_ATC_C10AX,Medication.Use,MED.MEDS.Sertoltransport_blockers_ATC_C10AX,MED.MEDS.Sertoltransport_blockers_ATC_C10AX
+MED.MEDS.SexHormones_AndModulators_ATC_G03,Medication.Use,MED.MEDS.SexHormones_AndModulators_ATC_G03,MED.MEDS.SexHormones_AndModulators_ATC_G03
+MED.MEDS.Statines_ATC_C10AA,Medication.Use,MED.MEDS.Statines_ATC_C10AA,MED.MEDS.Statines_ATC_C10AA
+MED.MEDS.Stomach_Acid_ATC_A02,Medication.Use,MED.MEDS.Stomach_Acid_ATC_A02,MED.MEDS.Stomach_Acid_ATC_A02
+MED.MEDS.Sulfonylureumderivaties_ATC_A10BB,Medication.Use,MED.MEDS.Sulfonylureumderivaties_ATC_A10BB,MED.MEDS.Sulfonylureumderivaties_ATC_A10BB
+MED.MEDS.Thiazides_ATC_C03BA,Medication.Use,MED.MEDS.Thiazides_ATC_C03BA,MED.MEDS.Thiazides_ATC_C03BA
+MED.MEDS.Thyreomimetics_ATC_H03AA,Medication.Use,MED.MEDS.Thyreomimetics_ATC_H03AA,MED.MEDS.Thyreomimetics_ATC_H03AA
+MED.MEDS.Tricyclic_antidepressants_ATC_N06AA,Medication.Use,MED.MEDS.Tricyclic_antidepressants_ATC_N06AA,MED.MEDS.Tricyclic_antidepressants_ATC_N06AA
+MED.MEDS.Trombocyte_aggregation_inhibitors_ATC_B01AC,Medication.Use,MED.MEDS.Trombocyte_aggregation_inhibitors_ATC_B01AC,MED.MEDS.Trombocyte_aggregation_inhibitors_ATC_B01AC
+MED.MEDS.Vertigo_middelen_ATC_N07CA,Medication.Use,MED.MEDS.Vertigo_middelen_ATC_N07CA,MED.MEDS.Vertigo_middelen_ATC_N07CA
+MED.MEDS.Vitamine_B_ATC_A11DA,Medication.Use,MED.MEDS.Vitamine_B_ATC_A11DA,MED.MEDS.Vitamine_B_ATC_A11DA
+MED.MEDS.Vitamine_D_ATC_A11CC,Medication.Use,MED.MEDS.Vitamine_D_ATC_A11CC,MED.MEDS.Vitamine_D_ATC_A11CC
+MED.MEDS.Vitamine_K_antagonists_ATC_B01AA,Medication.Use,MED.MEDS.Vitamine_K_antagonists_ATC_B01AA,MED.MEDS.Vitamine_K_antagonists_ATC_B01AA
+MED.MEDS.Vitamine_supplements_ATC_A11A,Medication.Use,MED.MEDS.Vitamine_supplements_ATC_A11A,MED.MEDS.Vitamine_supplements_ATC_A11A
+MED.MEDS.Xanhine_oxidase_inhibitors_ATC_M04AA,Medication.Use,MED.MEDS.Xanhine_oxidase_inhibitors_ATC_M04AA,MED.MEDS.Xanhine_oxidase_inhibitors_ATC_M04AA
+META.Antibiotics_3m,Medication.Use,META.Antibiotics_3m,META.Antibiotics_3m
+MED.BLOOD.Basophilic_Granulocytes_10E9perL,Medical.measurements,Basophilic Granulocytes,MED.BLOOD.Basophilic_Granulocytes_10E9perL
+MED.BLOOD.Bpressure.diastolic.mm.Hg,Medical.measurements,Blood Pressure diastolic,MED.BLOOD.Bpressure.diastolic.mm.Hg
+MED.BLOOD.Bpressure.systolic.mm.Hg,Medical.measurements,Blood Pressure systolic,MED.BLOOD.Bpressure.systolic.mm.Hg
+MED.BLOOD.Creatinine_umolperL,Medical.measurements,Creatinine,MED.BLOOD.Creatinine_umolperL
+MED.BLOOD.Eosinophil_Granulocytes_10E9perL,Medical.measurements,Eosinophil Granulocytes,MED.BLOOD.Eosinophil_Granulocytes_10E9perL
+MED.BLOOD.Erythrocytes_10E12perL,Medical.measurements,Erythrocytes,MED.BLOOD.Erythrocytes_10E12perL
+MED.BLOOD.Glucose_mmolperL,Medical.measurements,Glucose,MED.BLOOD.Glucose_mmolperL
+MED.BLOOD.HbA1c_mmolpermol,Medical.measurements,HbA1c,MED.BLOOD.HbA1c_mmolpermol
+MED.BLOOD.HDL_Cholesterol_mmolperL,Medical.measurements,HDL Cholesterol,MED.BLOOD.HDL_Cholesterol_mmolperL
+MED.BLOOD.Hematocrit_vperv,Medical.measurements,Hematocrit,MED.BLOOD.Hematocrit_vperv
+MED.BLOOD.Hemoglobin_mmolperL,Medical.measurements,Hemoglobin,MED.BLOOD.Hemoglobin_mmolperL
+MED.BLOOD.hsCRP_mgperL,Medical.measurements,hsCRP,MED.BLOOD.hsCRP_mgperL
+MED.BLOOD.LDL_Cholesterol_mmolperL,Medical.measurements,LDL Cholesterol,MED.BLOOD.LDL_Cholesterol_mmolperL
+MED.BLOOD.Lymphocytes_10E9perL,Medical.measurements,Lymphocytes,MED.BLOOD.Lymphocytes_10E9perL
+MED.BLOOD.Monocytes_10E9perL,Medical.measurements,Monocytes,MED.BLOOD.Monocytes_10E9perL
+MED.BLOOD.Neutrophil_Granulocytes_10E9perL,Medical.measurements,Neutrophil Granulocytes,MED.BLOOD.Neutrophil_Granulocytes_10E9perL
+MED.BLOOD.Potassium_mmolperL,Medical.measurements,Potassium,MED.BLOOD.Potassium_mmolperL
+MED.BLOOD.Pulse_rate_in_beats_per_minute,Medical.measurements,Pulse rate,MED.BLOOD.Pulse_rate_in_beats_per_minute
+MED.BLOOD.Sodium_mmolperL,Medical.measurements,Sodium,MED.BLOOD.Sodium_mmolperL
+MED.BLOOD.Thrombocytes_10E9perL,Medical.measurements,Thrombocytes,MED.BLOOD.Thrombocytes_10E9perL
+MED.BLOOD.Triglycerides_mmolperL,Medical.measurements,Triglycerides,MED.BLOOD.Triglycerides_mmolperL
+MED.URINE.Creatinine_24_hrs_urine_mmolperL,Medical.measurements,Creatinine (24h),MED.URINE.Creatinine_24_hrs_urine_mmolperL
+MED.DISEASES.None.No.Diseases,Medical.General,No Diseases,H.No.Diseases
+MED.HEALTH.RAND.Health.Change.1y,Medical.General,Health change in a year,H.Health.1y
+MED.HEALTH.RAND.Health.General,Medical.General,General Health (factor),H.Health.General
+MED.HEALTH.RAND.Health.General.asInteger,Medical.General,General Health,H.Health.General.Numeric
+MED.INDICES.FattyLiverIndex.T1.Class,Medical.General,Fatty Liver Index (factor),MED.INDICES.FattyLiverIndex.T1.Class
+MED.INDICES.FattyLiverIndex.T1.NR,Medical.General,Fatty Liver Index,MED.INDICES.FattyLiverIndex.T1.NR
+MED.INDICES.Fibrosis.Score.T1.lvl,Medical.General,Fibrosis Score (factor),MED.INDICES.Fibrosis.Score.T1.lvl
+MED.INDICES.Fibrosis.score.T1.NR,Medical.General,Fibrosis Score,MED.INDICES.Fibrosis.score.T1.NR
+MED.INDICES.NAFLD.T1.CLASS,Medical.General,NAFLD Score,MED.INDICES.NAFLD.T1.CLASS
+MED.SURGERY.Appendectomy,Medical.General,Appendectomy (ever),MED.SURGERY.Appendectomy
+DEMOGRAPHICS.LOCATION.LAT,Geography.and.Socioeconomics,Location.Lat,DEMOGRAPHICS.LOCATION.LAT
+DEMOGRAPHICS.LOCATION.LON,Geography.and.Socioeconomics,Location.Lon,DEMOGRAPHICS.LOCATION.LON
+SOCIOEC.INCOME.Income.Month,Geography.and.Socioeconomics,Income,SOCIOEC.INCOME.Income.Month
+SOCIOEC.OTHER.Religious,Geography.and.Socioeconomics,Religious,SOCIOEC.OTHER.Religious
+SOCIOEC.STATUS.Retired,Geography.and.Socioeconomics,Retired,SOCIOEC.STATUS.Retired
+SOCIOEC.STATUS.Schoolgoer,Geography.and.Socioeconomics,Schoolgoer,SOCIOEC.STATUS.Schoolgoer
+SOCIOEC.WORK.Days.paidwork.week,Geography.and.Socioeconomics,Days working per week,SOCIOEC.WORK.Days.paidwork.week
+SOCIOEC.WORK.Hours.paidwork.week,Geography.and.Socioeconomics,Hours working per week,SOCIOEC.WORK.Hours.paidwork.week
+SOCIOEC.WORK.Housewife.husband,Geography.and.Socioeconomics,Housewife/husband,SOCIOEC.WORK.Housewife.husband
+SOCIOEC.WORK.Paidwork.any,Geography.and.Socioeconomics,Employed,SOCIOEC.WORK.Paidwork.any
+SOCIOEC.WORK.Unemployed,Geography.and.Socioeconomics,Unemployed,SOCIOEC.WORK.Unemployed
+SOCIOECONOMIC.BUURT.Highincome.Pop.Prop,Geography.and.Socioeconomics,High income prop.,SOCIOECONOMIC.BUURT.Highincome.Pop.Prop
+SOCIOECONOMIC.BUURT.Lowincome.Pop.Prop,Geography.and.Socioeconomics,Low income prop.,SOCIOECONOMIC.BUURT.Lowincome.Pop.Prop
+SOCIOECONOMIC.BUURT.Urbanicity,Geography.and.Socioeconomics,Urbanicity,SOCIOECONOMIC.BUURT.Urbanicity
+EXP.BIRTH.Breastfed.0.4.W,Exposome.Earlylife,Breastfed 0-4 W,EXP.BIRTH.Breastfed.0.4.W
+EXP.BIRTH.Breastfed.1.3.M,Exposome.Earlylife,Breastfed 1-3 M,EXP.BIRTH.Breastfed.1.3.M
+EXP.BIRTH.Breastfed.3.6.M,Exposome.Earlylife,Breastfed 3-6 M,EXP.BIRTH.Breastfed.3.6.M
+EXP.BIRTH.Breastfed.6.M.Plus,Exposome.Earlylife,Breastfed 6M+,EXP.BIRTH.Breastfed.6.M.Plus
+EXP.EARLYLIFE.Birth.lt,Exposome.Earlylife,Birth Length,EXP.EARLYLIFE.Birth.lt
+EXP.EARLYLIFE.Birth.Mode,Exposome.Earlylife,Birth Mode,EXP.EARLYLIFE.Birth.Mode
+EXP.EARLYLIFE.Birth.wt.g,Exposome.Earlylife,Birth Weight,EXP.EARLYLIFE.Birth.wt.g
+EXP.EARLYLIFE.LIVINGPLACE.child.1.4,Exposome.Earlylife,Childhood Urbanicity,EXP.EARLYLIFE.LIVINGPLACE.child.1.4
+EXP.EARLYLIFE.Parent.smoker.childhood,Exposome.Earlylife,Childhood Parents Smoking,EXP.EARLYLIFE.Parent.smoker.childhood
+EXP.EARLYLIFE.PETS.child.0.15.Any,Exposome.Earlylife,Childhood Pets,EXP.EARLYLIFE.PETS.child.0.15.Any
+EXP.EARLYLIFE.PETS.child.0.15.Cat,Exposome.Earlylife,Childhood Pets Cat,EXP.EARLYLIFE.PETS.child.0.15.Cat
+EXP.EARLYLIFE.PETS.child.0.15.Dog,Exposome.Earlylife,Childhood Pets Dog,EXP.EARLYLIFE.PETS.child.0.15.Dog
+EXP.EARLYLIFE.Preg.Mother.Smoking,Exposome.Earlylife,Pregnant Mother Smoking,EXP.EARLYLIFE.Preg.Mother.Smoking
+EXP.EARLYLIFE.PretermBorn,Exposome.Earlylife,Preterm Birth,EXP.EARLYLIFE.PretermBorn
+EXP.GREENSPACE.NDVI.100m,Exposome.Current,Greenspace NDVI,EXP.GREENSPACE.NDVI.100m
+EXP.PETS.now.Any,Exposome.Current,Pet ownership,EXP.PETS.now.Any
+EXP.PETS.now.Cat,Exposome.Current,Pet ownership Cat,EXP.PETS.now.Cat
+EXP.PETS.now.Dog,Exposome.Current,Per ownership Dog,EXP.PETS.now.Dog
+EXP.POLLUTION.NO2,Exposome.Current,NO2 Concentration,EXP.POLLUTION.NO2
+EXP.POLLUTION.PM2.5,Exposome.Current,PM2.5 Concentration,EXP.POLLUTION.PM2.5
+EXP.SMOKING.Passive,Exposome.Current,Smoking Passive,EXP.SMOKING.Passive
+EXP.SMOKING.Smoker.Now,Exposome.Current,Smoking Active,EXP.SMOKING.Smoker.Now
+EXP.SMOKING.Smoker.OneYear.Ever,Exposome.Current,"Smoker Active, 1 Year+",EXP.SMOKING.Smoker.OneYear.Ever
+EXP.SMOKING.Smoker.stopped,Exposome.Current,"Smoker, Stopped",EXP.SMOKING.Smoker.stopped
+MED.DISEASES.Other.Autoimmune.Rheumatoid.Artritis,Diseases.Other,D.Other.Rheumatoid.Arthritis,D.Other.Rheumatoid.Arthritis
+MED.DISEASES.Other.Chronic.cystitis,Diseases.Other,D.Other.Chronic.Cystitis,D.Other.Chronic.Cystitis
+MED.DISEASES.Other.Chronic.Inflammation.Throatnose,Diseases.Other,D.Other.Chronic.Inflammation.Throatnose,D.Other.Chronic.Inflammation.Throatnose
+MED.DISEASES.Other.Chronic.Muscle.Weakness,Diseases.Other,D.Other.Chronic.Muscle.Weakness,D.Other.Chronic.Muscle.Weakness
+MED.DISEASES.Other.Fractures.Hip,Diseases.Other,D.Other.Fractures.Hip,D.Other.Fractures.Hip
+MED.DISEASES.Other.Fractures.Other,Diseases.Other,D.Other.Fractures.Other,D.Other.Fractures.Other
+MED.DISEASES.Other.Kidney.Stones,Diseases.Other,D.Other.Kidney.Stones,D.Other.Kidney.Stones
+MED.DISEASES.Other.Osteoarthritis,Diseases.Other,D.Other.Osteoarthritis,D.Other.Osteoarthritis
+MED.DISEASES.Other.Osteoporosis,Diseases.Other,D.Other.Osteoporosis,D.Other.Osteoporosis
+MED.DISEASES.Pulmonary.Autoimmune.Asthma,Diseases.Other,D.Pulmonary.Asthma,D.Pulmonary.Asthma
+MED.DISEASES.Pulmonary.COPD,Diseases.Other,D.Pulmonary.COPD,D.Pulmonary.COPD
+MED.DISEASES.Pulmonary.Pulmonary.Embolism,Diseases.Other,D.Pulmonary.Pulmonary.Embolism,D.Pulmonary.Pulmonary.Embolism
+MED.DISEASES.Skin.Autoimmune.Atopic.dermatitis,Diseases.Other,D.Skin.Atopic.dermatitis,D.Skin.Atopic.dermatitis
+MED.DISEASES.Skin.Autoimmune.Psoriasis,Diseases.Other,D.Skin.Psoriasis,D.Skin.Psoriasis
+MED.DISEASES.Skin.Autoimmune.Severe.acne,Diseases.Other,D.Skin.Severe.acne,D.Skin.Severe.acne
+MED.DISEASES.Mental.Addiction.Any,Diseases.Mental.Neuro,D.Mental.Addiction.Any,D.Mental.Addiction.Any
+MED.DISEASES.Mental.ADHD,Diseases.Mental.Neuro,D.Mental.ADHD,D.Mental.ADHD
+MED.DISEASES.Mental.Agoraphobia,Diseases.Mental.Neuro,D.Mental.Agoraphobia,D.Mental.Agoraphobia
+MED.DISEASES.Mental.Any,Diseases.Mental.Neuro,D.Mental.Any,D.Mental.Any
+MED.DISEASES.Mental.Bipolar,Diseases.Mental.Neuro,D.Mental.Bipolar,D.Mental.Bipolar
+MED.DISEASES.Mental.Burn.Out,Diseases.Mental.Neuro,D.Mental.Burnout,D.Mental.Burnout
+MED.DISEASES.Mental.Depression,Diseases.Mental.Neuro,D.Mental.Depression,D.Mental.Depression
+MED.DISEASES.Mental.Eating.disorder,Diseases.Mental.Neuro,D.Mental.Eating.disorder,D.Mental.Eating.disorder
+MED.DISEASES.Mental.OCD,Diseases.Mental.Neuro,D.Mental.OCD,D.Mental.OCD
+MED.DISEASES.Mental.Other.anxiety,Diseases.Mental.Neuro,D.Mental.Anixety,D.Mental.Anixety
+MED.DISEASES.Mental.Panic.disorder,Diseases.Mental.Neuro,D.Mental.Panic.disorder,D.Mental.Panic.disorder
+MED.DISEASES.Mental.Social.phobia,Diseases.Mental.Neuro,D.Mental.Social.phobia,D.Mental.Social.phobia
+MED.DISEASES.Neurological.Autoimmune.Multiple.Sclerosis,Diseases.Mental.Neuro,D.Neurolo.Multiple.Sclerosis,D.Neurolo.Multiple.Sclerosis
+MED.DISEASES.Neurological.Dizziness.Falling,Diseases.Mental.Neuro,D.Neuro.Dizziness.Falling,D.Neuro.Dizziness.Falling
+MED.DISEASES.Neurological.Epilepsy,Diseases.Mental.Neuro,D.Neuro.Epilepsy,D.Neuro.Epilepsy
+MED.DISEASES.Neurological.Headaches.Duration,Diseases.Mental.Neuro,D.Neuro.Headaches.duration,D.Neuro.Headaches.duration
+MED.DISEASES.Neurological.Headaches.HowOften,Diseases.Mental.Neuro,D.Neuro.Headaches,D.Neuro.Headaches
+MED.DISEASES.Neurological.Mental.Fatigue.Chronic,Diseases.Mental.Neuro,D.Neuro.Mental.Fatigue.Chronic,D.Neuro.Mental.Fatigue.Chronic
+MED.DISEASES.Neurological.Mental.Fibromyalgia,Diseases.Mental.Neuro,D.Neuro.Fibromyalgia,D.Neuro.Fibromyalgia
+MED.DISEASES.Neurological.Migraine,Diseases.Mental.Neuro,D.Neuro.Migraine,D.Neuro.Migraine
+MED.DISEASES.Neurological.Seizure.Fit,Diseases.Mental.Neuro,D.Neuro.Seizures,D.Neuro.Seizures
+MED.DISEASES.Neurological.Stroke,Diseases.Mental.Neuro,D.Neuro.Stroke,D.Neuro.Stroke
+MED.DISEASES.Gastrointestinal.Autoimmune.Celiac,Diseases.MDL,D.GI.Celiac,D.GI.Celiac
+MED.DISEASES.Gastrointestinal.Autoimmune.IBD.CD,Diseases.MDL,D.GI.IBD.CD,D.GI.IBD.CD
+MED.DISEASES.Gastrointestinal.Autoimmune.IBD.UC,Diseases.MDL,D.GI.IBD.UC,D.GI.IBD.UC
+MED.DISEASES.Gastrointestinal.Discomfort.Bloating,Diseases.MDL,D.GI.Discomfort.Bloating,D.GI.Discomfort.Bloating
+MED.DISEASES.Gastrointestinal.Discomfort.Burping,Diseases.MDL,D.GI.Discomfort.Burping,D.GI.Discomfort.Burping
+MED.DISEASES.Gastrointestinal.Discomfort.Constipation,Diseases.MDL,D.GI.Discomfort.Constipation,D.GI.Discomfort.Constipation
+MED.DISEASES.Gastrointestinal.Discomfort.Diarrhea,Diseases.MDL,D.GI.Discomfort.Diarrhea,D.GI.Discomfort.Diarrhea
+MED.DISEASES.Gastrointestinal.Discomfort.Flatulence,Diseases.MDL,D.GI.Discomfort.Flatulence,D.GI.Discomfort.Flatulence
+MED.DISEASES.Gastrointestinal.Discomfort.Nausea,Diseases.MDL,D.GI.Discomfort.Nausea,D.GI.Discomfort.Nausea
+MED.DISEASES.Gastrointestinal.Discomfort.Pain,Diseases.MDL,D.GI.Discomfort.Pain,D.GI.Discomfort.Pain
+MED.DISEASES.Gastrointestinal.Discomfort.Unwell,Diseases.MDL,D.GI.Discomfort.Unwell,D.GI.Discomfort.Unwell
+MED.DISEASES.Gastrointestinal.FGID.Bloating,Diseases.MDL,D.GI.FGID.Bloating,D.GI.FGID.Bloating
+MED.DISEASES.Gastrointestinal.FGID.Constipation,Diseases.MDL,D.GI.FGID.Constipation,D.GI.FGID.Constipation
+MED.DISEASES.Gastrointestinal.FGID.Diarrhea,Diseases.MDL,D.GI.FGID.Diarrhea,D.GI.FGID.Diarrhea
+MED.DISEASES.Gastrointestinal.Rome3_IBS.Any,Diseases.MDL,D.GI.IBS.Any,D.GI.IBS.Any
+MED.DISEASES.Gastrointestinal.Rome3_IBS.TypeC,Diseases.MDL,D.GI.IBS.TypeC,D.GI.IBS.TypeC
+MED.DISEASES.Gastrointestinal.Rome3_IBS.TypeD,Diseases.MDL,D.GI.IBS.TypeD,D.GI.IBS.TypeD
+MED.DISEASES.Gastrointestinal.Rome3_IBS.TypeM,Diseases.MDL,D.GI.IBS.TypeM,D.GI.IBS.TypeM
+MED.DISEASES.Gastrointestinal.Stomach.Ulcer,Diseases.MDL,D.GI.Stomach.Ulcer,D.GI.Stomach.Ulcer
+MED.DISEASES.Hepatologic.Gallstones,Diseases.MDL,D.GI.Gallstones,D.GI.Gallstones
+MED.DISEASES.Hepatologic.Hepatitis,Diseases.MDL,D.GI.Hepatitis,D.GI.Hepatitis
+MED.DISEASES.Hepatologic.Liver.Disorder.Unspec,Diseases.MDL,D.GI.Liver.disorders,D.GI.Liver.disorders
+MED.DISEASES.Rome3_IBS.factor,Diseases.MDL,D.Rome3_IBS.factor,D.Rome3_IBS.factor
+MED.DISEASES.Blood.Anemia,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Anemia,D.Cardiomet.Anemia
+MED.DISEASES.Blood.Thrombosis,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Thrombosis,D.Cardiomet.Thrombosis
+MED.DISEASES.Cardiovascular.Arrythmia.MedDiagnosed,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Arrythmia,D.Cardiomet.Arrythmia
+MED.DISEASES.Cardiovascular.Atherosclerosis,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Atherosclerosis,D.Cardiomet.Atherosclerosis
+MED.DISEASES.Cardiovascular.Blood.clotting.disorder,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Blood.clotting.disorder,D.Cardiomet.Blood.clotting.disorder
+MED.DISEASES.Cardiovascular.Cholesterol.high,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Cholesterol.high,D.Cardiomet.Cholesterol.high
+MED.DISEASES.Cardiovascular.Colesterol.high,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Cholesterol.high,D.Cardiomet.Cholesterol.high
+MED.DISEASES.Cardiovascular.Clogged.Artheries,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Clogged.Artheries,D.Cardiomet.Clogged.Artheries
+MED.DISEASES.Cardiovascular.Heart.Attack,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Heart.Attack,D.Cardiomet.Heart.Attack
+MED.DISEASES.Cardiovascular.Heart.Failure.Disorder,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Heart.Failure,D.Cardiomet.Heart.Failure
+MED.DISEASES.Cardiovascular.Heartrate.complains,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Heartrate.complains,D.Cardiomet.Heartrate.complains
+MED.DISEASES.Cardiovascular.Heath.valve.problems,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Heath.valve.problems,D.Cardiomet.Heath.valve.problems
+MED.DISEASES.Cardiovascular.Hypertension,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.Hypertension,D.Cardiomet.Hypertension
+MED.DISEASES.Endocrine.Autoimmune.DiabetesT1,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.DiabetesT1,D.Cardiomet.DiabetesT1
+MED.DISEASES.Endocrine.DiabetesT2,Diseases.Hemato.Cardio.Metabolic,D.Cardiomet.DiabetesT2,D.Cardiomet.DiabetesT2
+MED.DISEASES.Cancer.Any,Diseases.Cancer,D.Cancer.Any,D.Cancer.Any
+MED.DISEASES.Cancer.AnyNonBasal,Diseases.Cancer,D.Cancer.NonBasal,D.Cancer.NonBasal
+MED.DISEASES.Cancer.Breast,Diseases.Cancer,D.Cancer.Breast,D.Cancer.Breast
+MED.DISEASES.Cancer.Cervix,Diseases.Cancer,D.Cancer.Cervix,D.Cancer.Cervix
+MED.DISEASES.Cancer.Colon,Diseases.Cancer,D.Cancer.Colon,D.Cancer.Colon
+MED.DISEASES.Cancer.Melanoma,Diseases.Cancer,D.Cancer.Melanoma,D.Cancer.Melanoma
+MED.DISEASES.Cancer.Prostate,Diseases.Cancer,D.Cancer.Prostate,D.Cancer.Prostate
+MED.DISEASES.Cancer.Skin.Basal,Diseases.Cancer,D.Cancer.Skin,D.Cancer.Skin
+EXP.DIET.Amounts.GlycLoadTotal,Diet,Glycemic Load,EXP.DIET.Amounts.GlycLoadTotal
+EXP.DIET.Amounts.KcalTotal,Diet,Total Kcal,EXP.DIET.Amounts.KcalTotal
+EXP.DIET.ECorrected.AlchAll,Diet,Alchohol Intake,EXP.DIET.ECorrected.AlchAll
+EXP.DIET.ECorrected.CarbsAll,Diet,Carb Intake,EXP.DIET.ECorrected.CarbsAll
+EXP.DIET.ECorrected.CarbsFructose,Diet,Carbs Fructose,EXP.DIET.ECorrected.CarbsFructose
+EXP.DIET.ECorrected.CarbsGlucose,Diet,Carbs Glucose,EXP.DIET.ECorrected.CarbsGlucose
+EXP.DIET.ECorrected.CarbsLactose,Diet,Carbs Lactose,EXP.DIET.ECorrected.CarbsLactose
+EXP.DIET.ECorrected.CarbsMaltose,Diet,Carbs Maltose,EXP.DIET.ECorrected.CarbsMaltose
+EXP.DIET.ECorrected.CarbsPoly,Diet,Carbs Poly,EXP.DIET.ECorrected.CarbsPoly
+EXP.DIET.ECorrected.CarbsSuchrose,Diet,Carbs Suchrose,EXP.DIET.ECorrected.CarbsSuchrose
+EXP.DIET.ECorrected.FatAll,Diet,Fat Intake,EXP.DIET.ECorrected.FatAll
+EXP.DIET.ECorrected.ProtAll,Diet,Protein Intake,EXP.DIET.ECorrected.ProtAll
+EXP.DIET.ECorrected.ProtAnimal,Diet,Protein Animal,EXP.DIET.ECorrected.ProtAnimal
+EXP.DIET.ECorrected.ProtPlant,Diet,Protein Plant,EXP.DIET.ECorrected.ProtPlant
+EXP.DIET.Probiotics,Diet,Probiotics,EXP.DIET.Probiotics
+EXP.DIET.Ratios.CarbToFat,Diet,Carb Fat Ratio,EXP.DIET.Ratios.CarbToFat
+EXP.DIET.Ratios.CarbToProtein,Diet,Carb Protein Ratio,EXP.DIET.Ratios.CarbToProtein
+EXP.DIET.Scores.LLDietScore,Diet,Lifelines Diet Score,EXP.DIET.Scores.LLDietScore
+EXP.DIET.Scores.LLProtein,Diet,Lifelines Protein Score,EXP.DIET.Scores.LLProtein
+EXP.DIET.Scores.LowCarb,Diet,Lowcarb Dietscore,EXP.DIET.Scores.LowCarb
+EXP.DIET.Scores.ProtPlantScore,Diet,Plantprotein Diet score,EXP.DIET.Scores.ProtPlantScore
+ANTHRO.AGE,Anthropometrics,AGE,ANTHRO.AGE
+ANTHRO.BMI,Anthropometrics,BMI,ANTHRO.BMI
+ANTHRO.BMI.deltaT2T1,Anthropometrics,BMI.delta5y,ANTHRO.BMI.deltaT2T1
+ANTHRO.Sex,Anthropometrics,SEX,ANTHRO.Sex
