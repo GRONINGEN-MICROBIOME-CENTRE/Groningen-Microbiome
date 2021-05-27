@@ -1339,6 +1339,7 @@ makeMultiSummary <- function(inDF,ftrsToTest,nrClassesToList=2) {
 #  directionValue [def=effect.mu]: which value to use to determine direction (default: effect.mu), other options: effect.nu, effect.sigma
 #  transformValues [def=T]: if T, does -1*log transform on p-values [Padj, Pvalue], no transformation on effect, R2, Chisq
 #  logLimit [def=10]: limit log-values to entered number
+# nonLogLimit [def=NA]: limit non-log values to entered number
 
 plotTaxaAssociationsBEZIHeatmap <- function(phenosToPlot,
                                         inData,
@@ -1358,6 +1359,7 @@ plotTaxaAssociationsBEZIHeatmap <- function(phenosToPlot,
                                         directionValue = "effect.mu", 
                                         transformValues=T,
                                         logLimit = 10.0,
+                                        nonLogLimit = NA,
                                         sigAll = 0.9, 
                                         textSize=15, 
                                         colLow = "Orange", 
@@ -1576,10 +1578,15 @@ plotTaxaAssociationsBEZIHeatmap <- function(phenosToPlot,
     if (statToPlot %in% c("Pvalue","Padj")) {
       inValueWide <- log10(inValueWide)*-1
       for (cn in colnames(inValueWide)) {
-        inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+        if (!is.na(logLimit)) {
+          inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+        }
       }
     } else {
       inValueWide <- abs(inValueWide)
+      if (!is.na(nonLogLimit)) {
+        inValueWide[[cn]][inValueWide[[cn]] > nonLogLimit] <- nonLogLimit
+      }
     }
   }
   # >>> now multiply values by direction (for coloring of the plot)
@@ -1627,6 +1634,7 @@ plotTaxaAssociationsBEZIHeatmap <- function(phenosToPlot,
 #  plotTextSig [def=all]:   what to put text on: all (no significance filter), nomSig (nominal signifiance < sigNominal) or padjSig (padj significance < sigValue) 
 #  transformValues [def=T]: if T, does -1*log transform on p-values [qval, pval], no transformation on effect
 #  logLimit [def=10]: limit log-values to entered number
+#  nonLogLimit [def = NA]: if not NA, limit non-log-values to entered number
 plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
                                             inData,
                                             nrFeaturesToPlot = 20,
@@ -1643,6 +1651,7 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
                                             plotTextSig = "all", 
                                             transformValues=T,
                                             logLimit = 10.0,
+                                            nonLogLimit = NA,
                                             sigAll = 0.9, 
                                             textSize=15, 
                                             colLow = "Orange", 
@@ -1879,10 +1888,15 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
     if (statToPlot %in% c("pval","qval")) {
       inValueWide <- log10(inValueWide)*-1
       for (cn in colnames(inValueWide)) {
-        inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+        if (!is.na(logLimit)) {
+          inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+        }
       }
     } else {
       inValueWide <- abs(inValueWide)
+      if (!is.na(nonLogLimit)) {
+        inValueWide[[cn]][inValueWide[[cn]] > nonLogLimit] <- nonLogLimit
+      }
     }
   }
   # >>> now multiply values by direction (for coloring of the plot)
@@ -1939,6 +1953,7 @@ plotTaxaAssociationsMaaslinHeatmap <- function(phenosToPlot,
 #  plotTextSig [def=all]:   what to put text on: all (no significance filter), nomSig (nominal signifiance < sigNominal) or padjSig (padj significance < sigValue) 
 #  transformValues [def=T]: if T, does -1*log transform on p-values [qval, pval], no transformation on effect
 #  logLimit [def=10]: limit log-values to entered number
+#  nonLogLimit [def = NA] : limit non-log-values to entered number
 plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
                                           inData,
                                           nrFeaturesToPlot = 20,
@@ -1956,6 +1971,7 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
                                           plotTextSig = "padjSig", 
                                           transformValues=T,
                                           logLimit = 10.0,
+                                          nonLogLimit = NA,
                                           sigAll = 0.9, 
                                           textSize=15, 
                                           colLow = "Orange", 
@@ -1987,8 +2003,8 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   if (!sigStat %in% c("Pvalue",	"PadjBH","PadjBonferroni") ) {
     stop("ERROR: sigStat parameter MUST BE one of [Pvalue, PadjBH, PadjBonferroni]")
   }
-  if (!statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni","F.stat","R2","effect.size") ) {
-    stop("ERROR: statToPlot parameter MUST BE one of [Pvalue, PadjBH, PadjBonferroni, R2, F.stat, effect.size]")
+  if (!statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni","F.stat","R2","effect.size","z.score") ) {
+    stop("ERROR: statToPlot parameter MUST BE one of [Pvalue, PadjBH, PadjBonferroni, R2, F.stat, effect.size, z.score]")
   }
   if (!addText %in% c("","Direction","Significance")) {
     stop(paste0("ERROR: addText parameter MUST BE one of ['Direction', 'Significance', '']"))
@@ -2036,6 +2052,10 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
   inDFf <- inDF[inDF$phenotype %in% phenosToPlot,]
   #colnames(inDFf) <- gsub('\\.full$','\\.FullModel',colnames(inDFf))
   toPlotValue = statToPlot
+  # calculate z.score if requested to plot
+  if (toPlotValue == 'z.score') {
+    inDFf$z.score = -qnorm(inDFf$Pvalue/2)
+  }
   nominalSigParameter = sigStatNominal
   sigParameter = sigStat
   
@@ -2300,10 +2320,19 @@ plotAssociationsDag3HeatmapV2 <- function(phenosToPlot,
     if (statToPlot %in% c("Pvalue",	"PadjBH","PadjBonferroni")) {
       inValueWide <- log10(inValueWide)*-1
       for (cn in colnames(inValueWide)) {
-        inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+        if (!is.na(logLimit)) {
+          inValueWide[[cn]][inValueWide[[cn]] > logLimit] <- logLimit
+        }
       }
     } else {
       inValueWide <- abs(inValueWide)
+      print(nonLogLimit)
+      if (!is.na(nonLogLimit)) {
+        print(paste0('applying limit: max / min = +/-',nonLogLimit))
+        for (cn in colnames(inValueWide)) {
+          inValueWide[[cn]][inValueWide[[cn]] > nonLogLimit] <- nonLogLimit
+        }
+      }
     }
   }
   # >>> now multiply values by direction (for coloring of the plot)
