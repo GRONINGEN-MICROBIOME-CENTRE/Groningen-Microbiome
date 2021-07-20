@@ -1,4 +1,6 @@
-##if you have any questions please contact: lianminchen@yeah.net
+
+## Strainphlan 2.0 for version 3.0 please check: 
+## For questions please contact: lianminchen@yeah.net/t.sinha@rug.nl
 ##the strainphlan including two parts, first part for creating marker file from MGS, second part will merge all maker files (each samples one marker file) you show interest and do phylogenetic analysis
 ##run strainphlan for .bam files as an example in Boxy cluster
 
