@@ -48,8 +48,9 @@ echo ' feed it with .aln file (multiple alignment)'
 echo 'NOTE: make sure conda is loaded'
 distmat -sequence ${1} -nucmethod 2 -outfile ${1/.aln/.dmat}
 
+# Uses Kimura Two-Parameter distance (disrances expressed in terms of the number of substitutions per 100 b.p of amino acids) 
 
-# Step 3: Cleaning the distance matrix from MSA (Kumura distance) file 
+# Step 3: Cleaning the distance matrix from MSA file 
 ml RPlus 
 
 #Example: Rscript parseDMat_LLNext.R s__Bifidobacterium_bifidum.dmat
