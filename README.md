@@ -13,9 +13,3 @@ Resources
 *Scripts* folder contains useful tools for microbiome analysis (commonly used scripts)
 
 
-
-Contact: 
----
-
-groningenmicrobiomecentre@gmail.com
-
