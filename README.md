@@ -1,4 +1,4 @@
-# Groningen-Microbiome
+# Groningen-Microbiome-OLD-FORMAT
 
 Microbiome projects from the Department of Genetics & the Department of Gastroenterology and Hepatology & the Department of Pediatrics, University Medical Centre Groningen (UMCG)
 
