@@ -1,5 +1,8 @@
 # ===============================================================================================
 # this script is to analyze 16S from dada2 output
+# author: Shixian Hu
+# this script inludes count reads, low-quality sample removal, rare ASV removeal, decontamination
+# low-quality sample : Qbit <1, reads <2000
 # ===============================================================================================
 library(ggplot2)
 source("Microbiome.function.R")
