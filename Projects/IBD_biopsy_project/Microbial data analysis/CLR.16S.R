@@ -20,7 +20,7 @@ library(microbiome)
 source("Microbiome.function.R")
 library(lmerTest)
 # ===========================================================================================
-# bacteria abundance transformation, clr
+# bacteria abundance transformation, clr, remove low present 10%
 # ===========================================================================================
 
 # fucntions are from Johannes, rows are samples and colums are taxa, and the input is abundance table
