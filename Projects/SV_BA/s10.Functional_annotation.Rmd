@@ -1,7 +1,7 @@
 ---
 title: "Functional annotation"
 author: "Daoming Wang"
-date: "2020/10/22"
+date: "2021/08/10"
 output:
   html_document: 
     theme: flatly
@@ -20,7 +20,6 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 ```
 
 ## 1 Preparation
@@ -38,6 +37,23 @@ source("functions.R")
 Read input files.
 
 ```{r 1.2, echo=TRUE}
+vsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv", 
+                                                sep = "\t", header = T, check.names = F)
+dsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv", 
+                                                sep = "\t", header = T, check.names = F)
+
+vsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", 
+                                                sep = "\t", header = T, check.names = F)
+dsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", 
+                                                sep = "\t", header = T, check.names = F)
+
+vsv_info<-read.table("01.cleanData/SV_info/20200801_LLD_300OB_vsgv_info_anno.tsv",
+                     sep = "\t",header = T,stringsAsFactors = F, quote = "")
+dsv_info<-read.table("01.cleanData/SV_info/20200801_LLD_300OB_dsgv_info_anno.tsv",
+                     sep = "\t",header = T,stringsAsFactors = F,quote = "")
+
+ba_gene<-read.table("00.rawData/BA_gene/Gene_list - clean.txt", sep = "\t",header = T, check.names = F)
+
 B.wex_scaf<-read.csv("00.rawData/Single_bacteria/Blautia wexlerae DSM 19850/sequence_data_export.txt",
                      sep = "\t",header = T,stringsAsFactors = F, check.names = F)
 B.wex<-read.csv("00.rawData/Single_bacteria/Blautia wexlerae DSM 19850/Blautia wexlerae DSM 19850.txt",
@@ -70,9 +86,33 @@ B.xyl<-read.csv("00.rawData/Single_bacteria/Bacteroides xylanisolvens XB1A/Bacte
 
 ```
 
-### 2 Get bile acid genes
+
+### 2 Get BA-associated SV list
 
 ```{r 2}
+write.table(vsv_info$Genes, "10.Functional_annotation/all_vsv_gene.tsv", sep = "\t", row.names = F, col.names = F, quote = F)
+write.table(dsv_info$Genes, "10.Functional_annotation/all_dsv_gene.tsv", sep = "\t", row.names = F, col.names = F, quote = F)
+
+all_sv_gene<-c(vsv_info$Genes, dsv_info$Genes)
+write.table(all_sv_gene, "10.Functional_annotation/all_sv_gene.tsv", sep = "\t", row.names = F, col.names = F, quote = F)
+
+ba_assoc_vsv<-c(vsv_ba_lm_adjAbun_res.sig.anno.edge$SV,vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV) %>% unique
+ba_assoc_dsv<-c(dsv_ba_lm_adjAbun_res.sig.anno.edge$SV,dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV) %>% unique
+
+ba_assoc_vsv_gene<-c(vsv_ba_lm_adjAbun_res.sig.anno.edge$Genes,vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$Genes) %>% unique
+write.table(ba_assoc_vsv_gene, "10.Functional_annotation/ba_assoc_vsv_gene.tsv", sep = "\t", row.names = F, col.names = F, quote = F)
+
+ba_assoc_dsv_gene<-c(dsv_ba_lm_adjAbun_res.sig.anno.edge$Genes,dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$Genes) %>% unique
+write.table(ba_assoc_dsv_gene, "10.Functional_annotation/ba_assoc_dsv_gene.tsv", sep = "\t", row.names = F, col.names = F, quote = F)
+
+ba_assoc_sv_gene<-c(ba_assoc_vsv_gene, ba_assoc_dsv_gene) %>% unique
+write.table(ba_assoc_sv_gene, "10.Functional_annotation/ba_assoc_sv_gene.tsv", sep = "\t", row.names = F, col.names = F, quote = F)
+```
+
+
+### 3 Get bile acid genes
+
+```{r 3}
 B.wex_gene<-reCalcuPos(B.wex, B.wex_scaf)
 
 ba_gene_keyword<-c("Bile acid","Choloylglycine","sulfatase")
@@ -102,11 +142,22 @@ write.table(E.hal_gene, "10.Functional_annotation/E.hal_gene.tsv",
             col.names = T, row.names = F, sep = "\t", quote = F)
 write.table(B.xyl_gene, "10.Functional_annotation/B.xyl_gene.tsv",
             col.names = T, row.names = F, sep = "\t", quote = F)
-
-
 ```
 
+### 4 BA genes
 
+```{r 4}
+ba_gene_long<-gather(ba_gene, BA_gene, Feature_id, c(3:18)) %>% na.omit
+ba_gene_long$Feature_id_1 <- str_extract_all(ba_gene_long$Feature_id, ",.*") %>% str_replace_all(", ", "") %>% as.numeric
+ba_gene_long$Feature_id   <- ba_gene_long$Feature_id %>% str_replace_all(",.*", "") %>% as.numeric
 
+ba_gene_long$Feature_id<-str_extract_all(ba_gene_long$`Organism (PubSEED ID)`, "\\(.+\\)") %>% str_replace_all("\\(|\\)", "") %>% paste("fig",.,sep = "|") %>% paste(.,".peg.",ba_gene_long$Feature_id,sep = "")
+ba_gene_long$Feature_id_1<-str_extract_all(ba_gene_long$`Organism (PubSEED ID)`, "\\(.+\\)") %>% str_replace_all("\\(|\\)", "") %>% paste("fig",.,sep = "|") %>% paste(.,".peg.",ba_gene_long$Feature_id_1,sep = "")
+ba_gene_long$Feature_id_1[grep("peg.NA",ba_gene_long$Feature_id_1)]<-NA
+
+if(!dir.exists("10.Functional_annotation/PATRIC")){dir.create("10.Functional_annotation/PATRIC")}
+write.table(ba_gene_long, "10.Functional_annotation/PATRIC/ba_gene_our_genomes.tsv",col.names = T, row.names = F, sep = "\t", quote = F)
+
+```
 
 

@@ -1,7 +1,7 @@
 ---
 title: "Causal inference"
 author: "Daoming Wang"
-date: "2020/10/22"
+date: "2021/7/31"
 output:
   html_document: 
     theme: flatly
@@ -20,7 +20,6 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 ```
 
 ## 1 Preparation
@@ -38,8 +37,8 @@ source("functions.R")
 Read input files.
 
 ```{r 1.2, echo=TRUE}
-lld_dsv <- read.table("01.cleanData/SV_lld/20200801_LLD_deletionStructuralVariation_1135samples.tsv",check.names = F)
-lld_vsv <- read.table("01.cleanData/SV_lld/20200801_LLD_variableStructuralVariation_1135samples.tsv",check.names = F)
+load("01.cleanData/SV_lld/dsgv_lld.RData")
+load("01.cleanData/SV_lld/vsgv_lld.RData")
 
 info    <- read.table("01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv",
                       sep = "\t", header = T, stringsAsFactors = F)
@@ -55,16 +54,25 @@ lld_phen<-read.table("00.rawData/LLD_phenotype/20200226_207allPhenotypes_1135pat
 
 lld_exp<-lld_phen[,c(81:207)]
 
-lld_abun<-read.table("01.cleanData/mbio_lld/20200801_LLD_metaphlan3_species_1135samples.tsv") 
+lld_abun<-read.table("01.cleanData/mbio_lld/LLD_SV_55species_abun_1135samples.tsv", check.names = F) 
 
-load("09.Microbial_GWAS/RData/lld_vsv_ba_lm_res.RData")
-load("09.Microbial_GWAS/RData/lld_dsv_ba_lm_res.RData")
+load("09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbun_res.RData")
+
+load("09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbunPCs_res.RData")
+
+load("01.cleanData/SV_lld/lld_msv_pc_cum0.6.RData")
+load("01.cleanData/SV_300OB/ob_msv_pc_cum0.6.RData")
+load("01.cleanData/SV_all/msv_pc_cum0.6_info.RData")
 ```
 
 ### 1.3 Preparation
 
 ```{r 1.3}
 ## Prepare covariate table
+# lld
+lld_abun$Others<-1-rowSums(lld_abun)
 lld_abun_clr<-abundances(x=as.data.frame(na.omit(lld_abun)), transform="clr") %>%as.data.frame
 lld_abun_clr <- lld_abun_clr[match(rownames(lld_abun), rownames(lld_abun_clr)),]
 rownames(lld_abun_clr) <- rownames(lld_abun)
@@ -85,27 +93,24 @@ if (!dir.exists("11.Causal_inference/RData")) {dir.create("11.Causal_inference/R
 #### 2.1.1 Associations between vSV and exposure
 
 ```{r 2.1.1, eval=FALSE}
-lld_vsv_exp_lm_adjAbun_res<-lm_btw_mats_adjAbun2(lld_vsv,lld_exp,lld_covar,covar,lld_abun_clr,info,y_mat = 0)
+lld_vsv_exp_lm_adjAbun_res<-lm_btw_mats_adjAbun2(vsgv_lld,lld_exp,lld_basic,covar,lld_abun_clr,info, 9)
 save(lld_vsv_exp_lm_adjAbun_res, file = "11.Causal_inference/RData/lld_vsv_exp_lm_adjAbun_res.RData")
-beep("fanfare")
 ```
 
 #### 2 Associations between dSV and exposure
 
 ```{r 2.1.2, eval=FALSE}
 ## Prepare covariate table
-lld_dsv_exp_lr_adjAbun_res<-lr_btw_mats_adjAbun2(lld_dsv,lld_exp,lld_covar,covar,lld_abun_clr,info,y_mat = 0)
+lld_dsv_exp_lr_adjAbun_res<-lr_btw_mats_adjAbun2(dsgv_lld,lld_exp,lld_basic,covar,lld_abun_clr,info,9)
 save(lld_dsv_exp_lr_adjAbun_res, file = "11.Causal_inference/RData/lld_dsv_exp_lr_adjAbun_res.RData")
-beep("fanfare")
 ```
 
 
 ### 2.2 Associations between BA and exposure
 
 ```{r 2.2, eval=FALSE}
-lld_ba_exp_lm_res <- lm_btw_mats(lld_ba, lld_exp, lld_covar, covar, y_mat = 1)
+lld_ba_exp_lm_res <- lm_btw_mats(lld_ba, lld_exp, lld_basic, covar)
 save(lld_ba_exp_lm_res, file = "11.Causal_inference/RData/lld_ba_exp_lm_res.RData")
-beep("fanfare")
 ```
 
 
@@ -115,21 +120,19 @@ beep("fanfare")
 
 ```{r 3.1, eval=FALSE}
 ## load SV-BA associations restuls
-#load("RData/SV_BA_assoc/lld_vsv_ba_lm_res.RData")
-
-vsv_ba_lm_res.sig.anno.edge<-read.table("09.Microbial_GWAS/adjAbun/vsv_ba_lm_adjAbun.sig.anno.tsv",
+vsv_ba_lm_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.tsv",
                                         sep = "\t", header = T,stringsAsFactors = F,check.names = F, quote = "")
 
 load("11.Causal_inference/RData/lld_vsv_exp_lm_adjAbun_res.RData")
 load("11.Causal_inference/RData/lld_ba_exp_lm_res.RData")
 
-lld_vsv_exp_lm_adjAbun.edge <- lld_vsv_exp_lm_adjAbun_res$table
-lld_vsv_exp_lm_adjAbun.edge$Taxa<-as.character(lld_vsv_exp_lm_adjAbun.edge$Taxa)
-lld_vsv_exp_lm_adjAbun.edge$Phenotype<-as.character(lld_vsv_exp_lm_adjAbun.edge$Phenotype)
+lld_vsv_exp_lm_adjAbun.edge <- lld_vsv_exp_lm_adjAbun_res
+lld_vsv_exp_lm_adjAbun.edge$Y<-as.character(lld_vsv_exp_lm_adjAbun.edge$Y)
+lld_vsv_exp_lm_adjAbun.edge$X<-as.character(lld_vsv_exp_lm_adjAbun.edge$X)
 
-lld_ba_exp_lm_adjAbun.edge  <- lld_ba_exp_lm_res$table
-lld_ba_exp_lm_adjAbun.edge$Taxa<-as.character(lld_ba_exp_lm_adjAbun.edge$Taxa)
-lld_ba_exp_lm_adjAbun.edge$Phenotype<-as.character(lld_ba_exp_lm_adjAbun.edge$Phenotype)
+lld_ba_exp_lm_adjAbun.edge  <- lld_ba_exp_lm_res
+lld_ba_exp_lm_adjAbun.edge$Y<-as.character(lld_ba_exp_lm_adjAbun.edge$Y)
+lld_ba_exp_lm_adjAbun.edge$X<-as.character(lld_ba_exp_lm_adjAbun.edge$X)
 
 ## Get candidate groups
 exp_id <- colnames(lld_exp)
@@ -151,8 +154,8 @@ for (i in exp_id) {
       #j<-vsv_id[1]
       #k<-ba_id[1]
       
-      p_vsv_exp <- lld_vsv_exp_lm_adjAbun.edge$p[lld_vsv_exp_lm_adjAbun.edge$Taxa==i & lld_vsv_exp_lm_adjAbun.edge$Phenotype==j]
-      p_ba_exp  <- lld_ba_exp_lm_adjAbun.edge$p[  lld_ba_exp_lm_adjAbun.edge$Taxa==i & lld_ba_exp_lm_adjAbun.edge$Phenotype==k]
+      p_vsv_exp <- lld_vsv_exp_lm_adjAbun.edge$p[lld_vsv_exp_lm_adjAbun.edge$X==i & lld_vsv_exp_lm_adjAbun.edge$Y==j]
+      p_ba_exp  <- lld_ba_exp_lm_adjAbun.edge$p[  lld_ba_exp_lm_adjAbun.edge$X==i & lld_ba_exp_lm_adjAbun.edge$Y==k]
       p_ba_vsv  <- vsv_ba_lm_res.sig.anno.edge$LLD.p[vsv_ba_lm_res.sig.anno.edge$SV==j & vsv_ba_lm_res.sig.anno.edge$BA==k]
       
       if(length(p_ba_vsv) > 0 & !is.na(p_vsv_exp)  & !is.na(p_ba_exp) ){
@@ -175,21 +178,19 @@ write.table(exp_vsv_ba_df, "11.Causal_inference/exp_vsv_ba_df.tsv",
 
 ```{r 3.2, eval=FALSE}
 ## load SV-BA associations restuls
-#load("RData/SV_BA_assoc/lld_dsv_ba_lm_res.RData")
-
-dsv_ba_lm_res.sig.anno.edge<-read.table("09.Microbial_GWAS/adjAbun/dsv_ba_lm_adjAbun.sig.anno.tsv",
+dsv_ba_lm_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.tsv",
                                         sep = "\t", header = T,stringsAsFactors = F,check.names = F, quote = "")
 
 load("11.Causal_inference/RData/lld_dsv_exp_lr_adjAbun_res.RData")
 load("11.Causal_inference/RData/lld_ba_exp_lm_res.RData")
 
-lld_dsv_exp_lr_adjAbun.edge <- lld_dsv_exp_lr_adjAbun_res$table
-lld_dsv_exp_lr_adjAbun.edge$Taxa<-as.character(lld_dsv_exp_lr_adjAbun.edge$Taxa)
-lld_dsv_exp_lr_adjAbun.edge$Phenotype<-as.character(lld_dsv_exp_lr_adjAbun.edge$Phenotype)
+lld_dsv_exp_lr_adjAbun.edge <- lld_dsv_exp_lr_adjAbun_res
+lld_dsv_exp_lr_adjAbun.edge$Y<-as.character(lld_dsv_exp_lr_adjAbun.edge$Y)
+lld_dsv_exp_lr_adjAbun.edge$X<-as.character(lld_dsv_exp_lr_adjAbun.edge$X)
 
-lld_ba_exp_lm_adjAbun.edge  <- lld_ba_exp_lm_res$table
-lld_ba_exp_lm_adjAbun.edge$Taxa<-as.character(lld_ba_exp_lm_adjAbun.edge$Taxa)
-lld_ba_exp_lm_adjAbun.edge$Phenotype<-as.character(lld_ba_exp_lm_adjAbun.edge$Phenotype)
+lld_ba_exp_lm_adjAbun.edge  <- lld_ba_exp_lm_res
+lld_ba_exp_lm_adjAbun.edge$Y<-as.character(lld_ba_exp_lm_adjAbun.edge$Y)
+lld_ba_exp_lm_adjAbun.edge$X<-as.character(lld_ba_exp_lm_adjAbun.edge$X)
 
 ## Get candidate groups
 exp_id <- colnames(lld_exp)
@@ -211,8 +212,8 @@ for (i in exp_id) {
       #j<-dsv_id[1]
       #k<-ba_id[1]
       
-      p_dsv_exp <- lld_dsv_exp_lr_adjAbun.edge$p[lld_dsv_exp_lr_adjAbun.edge$Taxa==i & lld_dsv_exp_lr_adjAbun.edge$Phenotype==j]
-      p_ba_exp  <- lld_ba_exp_lm_adjAbun.edge$p[  lld_ba_exp_lm_adjAbun.edge$Taxa==i & lld_ba_exp_lm_adjAbun.edge$Phenotype==k]
+      p_dsv_exp <- lld_dsv_exp_lr_adjAbun.edge$p[lld_dsv_exp_lr_adjAbun.edge$Y==i & lld_dsv_exp_lr_adjAbun.edge$X==j]
+      p_ba_exp  <- lld_ba_exp_lm_adjAbun.edge$p[  lld_ba_exp_lm_adjAbun.edge$X==i & lld_ba_exp_lm_adjAbun.edge$Y ==k]
       p_ba_dsv  <- dsv_ba_lm_res.sig.anno.edge$LLD.p[dsv_ba_lm_res.sig.anno.edge$SV==j & dsv_ba_lm_res.sig.anno.edge$BA==k]
       
       if(length(p_ba_dsv) > 0 & !is.na(p_dsv_exp)  & !is.na(p_ba_exp) ){
@@ -238,8 +239,7 @@ write.table(exp_dsv_ba_df, "11.Causal_inference/exp_dsv_ba_df.tsv",
 ```{r 4.1, eval=FALSE}
 load("11.Causal_inference/RData/exp_vsv_ba_df.RData")
 
-covar_abun<-str_replace_all(exp_vsv_ba_df[,2],"\\:\\d+_\\d+.*","") %>% match(.,info$organism) %>% info$Metaphlan3_name[.]
-covar_abun[info$Abundance_available[match(covar_abun, info$Metaphlan3_name)]=='No']<-NA
+covar_abun<-str_replace_all(exp_vsv_ba_df[,2],"\\:\\d+_\\d+.*","") 
 exp_vsv_ba_df<-cbind(exp_vsv_ba_df, covar_abun)
 
 date() # "Wed Nov 11 21:46:05 2020"
@@ -247,11 +247,9 @@ vsv_mediation_res<-NULL
 for (i in 1:nrow(exp_vsv_ba_df)) {
   #i<-1131
   cat(paste(i,"\n"))
-  
-
   res_i<-lm_bimediation(exp_vsv_ba_df[i,],
                         indvDf=lld_exp, 
-                        dvDf1=lld_vsv, 
+                        dvDf1=vsgv_lld, 
                         dvDf2=lld_ba, 
                         covDf=lld_covar, 
                         covar=c('Gender','Age','BMI','Reads_number'))
@@ -259,7 +257,7 @@ for (i in 1:nrow(exp_vsv_ba_df)) {
   vsv_mediation_res[[i]]<-res_i
 }
 date()
-beep("fanfare")
+
 
 vsv_mediation <- matrix(unlist(vsv_mediation_res), ncol = 34, byrow = T) %>% as.data.frame
 colnames(vsv_mediation)<-names(vsv_mediation_res[[1]])
@@ -289,7 +287,7 @@ for (i in 1:nrow(exp_dsv_ba_df)) {
 
   res_i<-lm_bimediation(exp_dsv_ba_df[i,],
                         indvDf=lld_exp, 
-                        dvDf1=lld_dsv, 
+                        dvDf1=dsgv_lld, 
                         dvDf2=lld_ba, 
                         covDf=lld_covar, 
                         covar=c('Gender','Age','BMI','Reads_number'))
@@ -297,8 +295,6 @@ for (i in 1:nrow(exp_dsv_ba_df)) {
   dsv_mediation_res[[i]]<-res_i
 }
 date()
-beep("fanfare")
-
 
 dsv_mediation <- matrix(unlist(dsv_mediation_res), ncol = 34, byrow = T) %>% as.data.frame
 colnames(dsv_mediation)<-names(dsv_mediation_res[[1]])
@@ -370,7 +366,22 @@ write.table(mediation_final, "11.Causal_inference/mediation.tsv",
 ### 5.2 Venn diagram
 
 ```{r 5.2}
+mediation_m1<-read.table("11.Causal_inference/mediation.tsv", 
+                            sep = "\t", header = T, stringsAsFactors = F) %>% .[.$MediationDirection !="none",]
+mediation_m2<-read.table("11.Causal_inference/mediation_model2.tsv", 
+                            sep = "\t", header = T, stringsAsFactors = F) %>% .[.$MediationDirection !="none",]
+mediation_m1$Model<-1
+mediation_m2$Model<-2
 
+mediation_merge<-rbind(mediation_m2, mediation_m1)
+mediation_merge<-mediation_merge[!duplicated(paste(mediation_merge$indv,mediation_merge$dv1,mediation_merge$dv2,mediation_merge$MediationDirection)),]
+mediation_merge<-mediation_merge[!duplicated(paste(mediation_merge$indv,mediation_merge$dv1,mediation_merge$dv2)),]
+
+mediation_final<-mediation_merge
+
+
+write.table(mediation_final, "11.Causal_inference/mediation_final_merged.tsv",
+            sep = "\t", col.names = T, row.names = F, quote = F)
 ## venn diagram
 mediation_final_count<-table(mediation_final$MediationDirection)
 pdf("11.Causal_inference/mediation_count.venn.pdf", width = 2, height = 2)
@@ -386,17 +397,18 @@ dev.off()
 ### 5.3 Sankey diagram of direction 1
 
 ```{r 5.3}
-mediation_final<-read.table("11.Causal_inference/mediation.tsv", 
+mediation_final<-read.table("11.Causal_inference/mediation_final_merged.tsv", 
                             sep = "\t", header = T, stringsAsFactors = F)
 mediation_plot_dir1<-mediation_final[mediation_final$MediationDirection=='indv_dv1_dv2' &
-                                       mediation_final$dir1.Prop.mediated.p < 0.05,]#mediation_final$dir1.Prop.mediated>0.2
+                                       mediation_final$dir1.Prop.mediated.p < 0.05 &
+                                       mediation_final$dir1.Prop.mediated > 0.25,]#mediation_final$dir1.Prop.mediated>0.2
 
 mediation_plot_dir1$fre<-1
 sankey_colors<-c(wes_palette("Darjeeling1", length(unique(mediation_plot_dir1$dv2)), type = "continuous"))
 
 #mediation_plot_dir1$indv<-factor(mediation_plot_dir1$indv, levels = c("fruits", "pasta" , "sugar_sweets","how_often_breakfast", "how_often_fruits","how_often_fish"  ,"how_often_alcohol" ,           "red_wine",                     "white_wine"        ,"how_often_muesli"  ,           "how_often_boiled_potatos"   ,  "how_often_soda","how_often_chocolade",   "how_often_nuts" ,           "smk_current","beta_sympathomimetic_inhaler" ,"oral_contraceptive"   ,        "how_often_pizza" ))
 
-pdf("11.Causal_inference/mediation_dir1.sankey.pdf",width = 7,height = 4)
+pdf("11.Causal_inference/mediation_dir1.sankey.pdf",width = 7,height = 3.5)
 ggplot(mediation_plot_dir1,aes(axis1 = mediation_plot_dir1$indv, 
                                axis2 = mediation_plot_dir1$dv1, 
                                axis3 = mediation_plot_dir1$dv2,
@@ -429,7 +441,7 @@ mediation_plot_dir2<-mediation_final[mediation_final$MediationDirection=='indv_d
 mediation_plot_dir2$fre<-1
 sankey_colors<-c(wes_palette("Darjeeling1", length(unique(mediation_plot_dir2$dv1)), type = "continuous"))
 
-pdf("11.Causal_inference/mediation_dir2.sankey.pdf",width = 7,height = 20)
+pdf("11.Causal_inference/mediation_dir2.sankey.pdf",width = 7,height = 4)
 ggplot(mediation_plot_dir2,aes(axis1 = mediation_plot_dir2$indv, 
                                axis2 = mediation_plot_dir2$dv2, 
                                axis3 = mediation_plot_dir2$dv1,

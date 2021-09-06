@@ -1,0 +1,388 @@
+---
+title: "Phenotype association"
+author: "Daoming Wang"
+date: "2021/07/30"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 Preparation
+
+### 1.1 Import
+
+Import packages and functions.
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+info    <- read.table("01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv",sep = "\t", header = T, stringsAsFactors = F)
+
+load("01.cleanData/SV_lld/dsgv_lld.RData")
+load("01.cleanData/SV_lld/vsgv_lld.RData")
+load("01.cleanData/SV_300OB/dsgv_ob.RData")
+load("01.cleanData/SV_300OB/vsgv_ob.RData")
+
+lld_ba <- read.table("01.cleanData/phen_lld/20200801_LLD_39BA_1135samples.tsv")
+lld_basic <- read.table("01.cleanData/phen_lld/20200801_LLD_basic_1135samples.tsv")
+ob_ba <- read.table("01.cleanData/phen_300OB/20200801_300OB_39BA_302samples.tsv")
+ob_basic <- read.table("01.cleanData/phen_300OB/20200801_300OB_basic_302samples.tsv")
+all_ba<-read.table("01.cleanData/phen_all/20200801_LLD_300OB_39BA_1437samples.tsv")
+
+lld_abun<-read.table("01.cleanData/mbio_lld/LLD_SV_55species_abun_1135samples.tsv", check.names = F) 
+ob_abun<-read.table("01.cleanData/mbio_300OB/300OB_SV_55species_abun_302samples.tsv", check.names = F) 
+
+lld_intri<-read.table("00.rawData/LLD_phenotype/20150715_intristic_1135patients.txt")[,-c(1:4)]
+lld_disea<-read.table("00.rawData/LLD_phenotype/20150715_diseases_1135patients.txt")
+ob_phen<-read.table("00.rawData/300OB_phenotype/ob_130pheno_302samples.txt")
+
+
+load("01.cleanData/SV_lld/lld_msv_pc_cum0.6.RData")
+load("01.cleanData/SV_300OB/ob_msv_pc_cum0.6.RData")
+load("01.cleanData/SV_all/msv_pc_cum0.6_info.RData")
+```
+
+## 2 Associations between SVs and BAs
+
+### 2.1 Preparation
+
+```{r 2.1}
+ob_binary<-ob_phen[,apply(ob_phen, 2, my_uniq) == 2 ][,-c(1,20)]
+ob_contin<-ob_phen[,apply(ob_phen, 2, my_uniq) != 2 ][,-c(1:5)]
+
+lld_abun$Others<-1-rowSums(lld_abun)
+lld_abun_clr<-abundances(x=as.data.frame(na.omit(lld_abun)), transform="clr") %>%as.data.frame
+lld_abun_clr <- lld_abun_clr[match(rownames(lld_abun), rownames(lld_abun_clr)),]
+rownames(lld_abun_clr) <- rownames(lld_abun)
+
+lld_covar<-cbind(lld_basic,lld_abun_clr)
+
+ob_abun$Others<-1-rowSums(ob_abun)
+ob_abun_clr<-abundances(x=as.data.frame(na.omit(ob_abun)), transform="clr") %>%as.data.frame
+ob_abun_clr <- ob_abun_clr[match(rownames(ob_abun), rownames(ob_abun_clr)),]
+rownames(ob_abun_clr) <- rownames(ob_abun)
+
+ob_covar<-cbind(ob_basic,ob_abun_clr)
+
+covar <- c('Gender','Age','BMI','Reads_number')
+```
+
+### 2.2 SV-phenotype association (model 1)
+
+```{r 2.2, eval=FALSE}
+
+##### association #####
+if (!dir.exists("12.phen_sv")) {dir.create("12.phen_sv")}
+
+# intrinsic factors
+lld_intri_vsv_adjAbun<-lm_btw_mats_adjAbun(lld_intri,vsgv_lld,lld_covar,covar,lld_abun_clr,info,9)
+save(lld_intri_vsv_adjAbun, file = "12.phen_sv/lld_intri_vsv_adjAbun.RData")
+
+lld_intri_dsv_adjAbun<-lm_btw_mats_adjAbun(lld_intri,dsgv_lld,lld_covar,covar,lld_abun_clr,info,9)
+save(lld_intri_dsv_adjAbun, file = "12.phen_sv/lld_intri_dsv_adjAbun.RData")
+
+# diseases
+lld_disea_vsv_adjAbun<-lr_btw_mats_adjAbun(lld_disea,vsgv_lld,lld_covar,covar,lld_abun_clr,info,9)
+save(lld_disea_vsv_adjAbun, file = "12.phen_sv/lld_disea_vsv_adjAbun.RData")
+
+lld_disea_dsv_adjAbun<-lr_btw_mats_adjAbun(lld_disea,dsgv_lld,lld_covar,covar,lld_abun_clr,info,9)
+save(lld_disea_dsv_adjAbun, file = "12.phen_sv/lld_disea_dsv_adjAbun.RData")
+
+# continuous
+ob_contin_vsv_adjAbun<-lm_btw_mats_adjAbun(ob_contin,vsgv_ob,ob_covar,covar,ob_abun_clr,info,9)
+save(ob_contin_vsv_adjAbun, file = "12.phen_sv/ob_contin_vsv_adjAbun.RData")
+
+ob_contin_dsv_adjAbun<-lm_btw_mats_adjAbun(ob_contin,dsgv_ob,ob_covar,covar,ob_abun_clr,info,9)
+save(ob_contin_dsv_adjAbun, file = "12.phen_sv/ob_contin_dsv_adjAbun.RData")
+
+# binary
+ob_binary_vsv_adjAbun<-lr_btw_mats_adjAbun(ob_binary,vsgv_ob,ob_covar,covar,ob_abun_clr,info,9)
+save(ob_binary_vsv_adjAbun, file = "12.phen_sv/ob_binary_vsv_adjAbun.RData")
+
+ob_binary_dsv_adjAbun<-lr_btw_mats_adjAbun(ob_binary,dsgv_ob,ob_covar,covar,ob_abun_clr,info,9)
+save(ob_binary_dsv_adjAbun, file = "12.phen_sv/ob_binary_dsv_adjAbun.RData")
+```
+
+### 2.3 SV-phenotype association (model 2)
+
+
+```{r 2.2, eval=FALSE}
+
+##### association #####
+if (!dir.exists("12.phen_sv")) {dir.create("12.phen_sv")}
+
+# intrinsic factors
+lld_intri_vsv_adjAbunPCs<-lm_btw_mats_adjAbunPCs(lld_intri,vsgv_lld,lld_covar,covar,lld_abun_clr,lld_msv_pc_cum0.6, info,9)
+save(lld_intri_vsv_adjAbunPCs, file = "12.phen_sv/lld_intri_vsv_adjAbunPCs.RData")
+
+lld_intri_dsv_adjAbunPCs<-lm_btw_mats_adjAbunPCs(lld_intri,dsgv_lld,lld_covar,covar,lld_abun_clr,lld_msv_pc_cum0.6, info,9)
+save(lld_intri_dsv_adjAbunPCs, file = "12.phen_sv/lld_intri_dsv_adjAbunPCs.RData")
+
+# diseases
+lld_disea_vsv_adjAbunPCs<-lr_btw_mats_adjAbunPCs(lld_disea,vsgv_lld,lld_covar,covar,lld_abun_clr,lld_msv_pc_cum0.6,info,9)
+save(lld_disea_vsv_adjAbunPCs, file = "12.phen_sv/lld_disea_vsv_adjAbunPCs.RData")
+
+lld_disea_dsv_adjAbunPCs<-lr_btw_mats_adjAbunPCs(lld_disea,dsgv_lld,lld_covar,covar,lld_abun_clr,lld_msv_pc_cum0.6,info,9)
+save(lld_disea_dsv_adjAbunPCs, file = "12.phen_sv/lld_disea_dsv_adjAbunPCs.RData")
+
+# continuous
+ob_contin_vsv_adjAbunPCs<-lm_btw_mats_adjAbunPCs(ob_contin,vsgv_ob,ob_covar,covar,ob_abun_clr,ob_msv_pc_cum0.6,info,9)
+save(ob_contin_vsv_adjAbunPCs, file = "12.phen_sv/ob_contin_vsv_adjAbunPCs.RData")
+
+ob_contin_dsv_adjAbunPCs<-lm_btw_mats_adjAbunPCs(ob_contin,dsgv_ob,ob_covar,covar,ob_abun_clr,ob_msv_pc_cum0.6,info,9)
+save(ob_contin_dsv_adjAbunPCs, file = "12.phen_sv/ob_contin_dsv_adjAbunPCs.RData")
+
+# binary
+ob_binary_vsv_adjAbunPCs<-lr_btw_mats_adjAbunPCs(ob_binary,vsgv_ob,ob_covar,covar,ob_abun_clr,ob_msv_pc_cum0.6,info,9)
+save(ob_binary_vsv_adjAbunPCs, file = "12.phen_sv/ob_binary_vsv_adjAbunPCs.RData")
+
+ob_binary_dsv_adjAbunPCs<-lr_btw_mats_adjAbunPCs(ob_binary,dsgv_ob,ob_covar,covar,ob_abun_clr,ob_msv_pc_cum0.6,info,9)
+save(ob_binary_dsv_adjAbunPCs, file = "12.phen_sv/ob_binary_dsv_adjAbunPCs.RData")
+```
+
+
+## 3 Clean results
+
+### 3.1 model 1
+
+```{r 3.1}
+
+## Select LLD phenotypes
+lld_phen_list<-c("Bristol_av.stool.type", "Bristol_av.stool.freq",
+                 "Biochem_TG", "Biochem_HDL", "Biochem_LDL", "Biochem_Cholesterol","Biochem_Glucose", "Biochem_Insulin",
+                 "diabetes","bloodpressure_ever_high")
+
+ob_phen_list<-c("Diabetes","Hypertension","Dyslipidemia",
+                " Liver_fat","Adipocyte_area", "Numberofplaques","Max_plaquethicknessallvessels",
+                "total_cholesterol","Triglycerides","B_HDLC","B_NHDL","B_LDLC","glucose","insulin_level")
+
+##### Seclect associations #####
+load("12.phen_sv/lld_intri_vsv_adjAbun.RData")
+load("12.phen_sv/lld_intri_dsv_adjAbun.RData")
+load("12.phen_sv/lld_disea_vsv_adjAbun.RData")
+load("12.phen_sv/lld_disea_dsv_adjAbun.RData")
+
+
+vsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+lld_intri_vsv_ba_adjAbun<-lld_intri_vsv_adjAbun[(lld_intri_vsv_adjAbun$X %in% unique(vsv_ba_lm_adjAbun_res.sig.anno.edge$SV)) &  (lld_intri_vsv_adjAbun$Y %in% lld_phen_list),]
+lld_intri_vsv_ba_adjAbun$fdr.p<-p.adjust(lld_intri_vsv_ba_adjAbun$p, method = "fdr")
+lld_intri_vsv_ba_adjAbun$fdr.p<-p.adjust(lld_intri_vsv_ba_adjAbun$p, method = "bonferroni")
+save(lld_intri_vsv_ba_adjAbun, file = "12.phen_sv/lld_intri_vsv_ba_adjAbun.RData")
+
+dsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+lld_intri_dsv_ba_adjAbun<-lld_intri_dsv_adjAbun[(lld_intri_dsv_adjAbun$X %in% unique(dsv_ba_lm_adjAbun_res.sig.anno.edge$SV)) & (lld_intri_dsv_adjAbun$Y %in% lld_phen_list),]
+lld_intri_dsv_ba_adjAbun$fdr.p<-p.adjust(lld_intri_dsv_ba_adjAbun$p, method = "fdr")
+lld_intri_dsv_ba_adjAbun$fdr.p<-p.adjust(lld_intri_dsv_ba_adjAbun$p, method = "bonferroni")
+save(lld_intri_dsv_ba_adjAbun, file = "12.phen_sv/lld_intri_dsv_ba_adjAbun.RData")
+
+
+vsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+lld_disea_vsv_ba_adjAbun<-lld_disea_vsv_adjAbun[(lld_disea_vsv_adjAbun$X %in% unique(vsv_ba_lm_adjAbun_res.sig.anno.edge$SV)) &  (lld_disea_vsv_adjAbun$Y %in% lld_phen_list),]
+lld_disea_vsv_ba_adjAbun$p[lld_disea_vsv_ba_adjAbun$y_1_N<15]<-NA
+lld_disea_vsv_ba_adjAbun$fdr.p<-p.adjust(lld_disea_vsv_ba_adjAbun$p, method = "fdr")
+lld_disea_vsv_ba_adjAbun$fdr.p<-p.adjust(lld_disea_vsv_ba_adjAbun$p, method = "bonferroni")
+save(lld_disea_vsv_ba_adjAbun, file = "12.phen_sv/lld_disea_vsv_ba_adjAbun.RData")
+
+dsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+lld_disea_dsv_ba_adjAbun<-lld_disea_dsv_adjAbun[(lld_disea_dsv_adjAbun$X %in% unique(dsv_ba_lm_adjAbun_res.sig.anno.edge$SV)) &  (lld_disea_dsv_adjAbun$Y %in% lld_phen_list),]
+lld_disea_dsv_ba_adjAbun$p[lld_disea_dsv_ba_adjAbun$y_1_N<15]<-NA
+lld_disea_dsv_ba_adjAbun$fdr.p<-p.adjust(lld_disea_dsv_ba_adjAbun$p, method = "fdr")
+lld_disea_dsv_ba_adjAbun$fdr.p<-p.adjust(lld_disea_dsv_ba_adjAbun$p, method = "bonferroni")
+save(lld_disea_dsv_ba_adjAbun, file = "12.phen_sv/lld_disea_dsv_ba_adjAbun.RData")
+
+#####
+load("12.phen_sv/lld_intri_vsv_ba_adjAbun.RData")
+load("12.phen_sv/lld_intri_dsv_ba_adjAbun.RData")
+load("12.phen_sv/lld_disea_vsv_ba_adjAbun.RData")
+load("12.phen_sv/lld_disea_dsv_ba_adjAbun.RData")
+
+lld_intri_vsv_ba_adjAbun_top10<-lld_intri_vsv_ba_adjAbun[order(lld_intri_vsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(lld_intri_vsv_ba_adjAbun_top10, "12.phen_sv/lld_intri_vsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+lld_intri_dsv_ba_adjAbun_top10<-lld_intri_dsv_ba_adjAbun[order(lld_intri_dsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(lld_intri_dsv_ba_adjAbun_top10, "12.phen_sv/lld_intri_dsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+lld_disea_vsv_ba_adjAbun_top10<-lld_disea_vsv_ba_adjAbun[order(lld_disea_vsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(lld_disea_vsv_ba_adjAbun_top10, "12.phen_sv/lld_disea_vsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+lld_disea_dsv_ba_adjAbun_top10<-lld_disea_dsv_ba_adjAbun[order(lld_disea_dsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(lld_disea_dsv_ba_adjAbun_top10, "12.phen_sv/lld_disea_dsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+
+############################################
+
+load("12.phen_sv/ob_contin_vsv_adjAbun.RData")
+load("12.phen_sv/ob_contin_dsv_adjAbun.RData")
+load("12.phen_sv/ob_binary_vsv_adjAbun.RData")
+load("12.phen_sv/ob_binary_dsv_adjAbun.RData")
+
+vsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+ob_contin_vsv_ba_adjAbun<-ob_contin_vsv_adjAbun[(ob_contin_vsv_adjAbun$X %in% unique(vsv_ba_lm_adjAbun_res.sig.anno.edge$SV)) & (ob_contin_vsv_adjAbun$Y %in% ob_phen_list),]
+ob_contin_vsv_ba_adjAbun$fdr.p<-p.adjust(ob_contin_vsv_ba_adjAbun$p, method = "fdr")
+ob_contin_vsv_ba_adjAbun$fdr.p<-p.adjust(ob_contin_vsv_ba_adjAbun$p, method = "bonferroni")
+save(ob_contin_vsv_ba_adjAbun, file = "12.phen_sv/ob_contin_vsv_ba_adjAbun.RData")
+
+dsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+ob_contin_dsv_ba_adjAbun<-ob_contin_dsv_adjAbun[(ob_contin_dsv_adjAbun$X %in% unique(dsv_ba_lm_adjAbun_res.sig.anno.edge$SV))& (ob_contin_dsv_adjAbun$Y %in% ob_phen_list),]
+ob_contin_dsv_ba_adjAbun$fdr.p<-p.adjust(ob_contin_dsv_ba_adjAbun$p, method = "fdr")
+ob_contin_dsv_ba_adjAbun$fdr.p<-p.adjust(ob_contin_dsv_ba_adjAbun$p, method = "bonferroni")
+save(ob_contin_dsv_ba_adjAbun, file = "12.phen_sv/ob_contin_dsv_ba_adjAbun.RData")
+
+
+vsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+ob_binary_vsv_ba_adjAbun<-ob_binary_vsv_adjAbun[(ob_binary_vsv_adjAbun$X %in% unique(vsv_ba_lm_adjAbun_res.sig.anno.edge$SV)) & (ob_binary_vsv_adjAbun$Y %in% ob_phen_list),]
+ob_binary_vsv_ba_adjAbun$fdr.p<-p.adjust(ob_binary_vsv_ba_adjAbun$p, method = "fdr")
+ob_binary_vsv_ba_adjAbun$fdr.p<-p.adjust(ob_binary_vsv_ba_adjAbun$p, method = "bonferroni")
+save(ob_binary_vsv_ba_adjAbun, file = "12.phen_sv/ob_binary_vsv_ba_adjAbun.RData")
+
+dsv_ba_lm_adjAbun_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv",header = T, sep = "\t")
+ob_binary_dsv_ba_adjAbun<-ob_binary_dsv_adjAbun[(ob_binary_dsv_adjAbun$X %in% unique(dsv_ba_lm_adjAbun_res.sig.anno.edge$SV)) & (ob_binary_dsv_adjAbun$Y %in% ob_phen_list),]
+ob_binary_dsv_ba_adjAbun$fdr.p<-p.adjust(ob_binary_dsv_ba_adjAbun$p, method = "fdr")
+ob_binary_dsv_ba_adjAbun$fdr.p<-p.adjust(ob_binary_dsv_ba_adjAbun$p, method = "bonferroni")
+save(ob_binary_dsv_ba_adjAbun, file = "12.phen_sv/ob_binary_dsv_ba_adjAbun.RData")
+
+
+#####
+load("12.phen_sv/ob_contin_vsv_ba_adjAbun.RData")
+load("12.phen_sv/ob_contin_dsv_ba_adjAbun.RData")
+load("12.phen_sv/ob_binary_vsv_ba_adjAbun.RData")
+load("12.phen_sv/ob_binary_dsv_ba_adjAbun.RData")
+
+ob_contin_vsv_ba_adjAbun_top10<-ob_contin_vsv_ba_adjAbun[order(ob_contin_vsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(ob_contin_vsv_ba_adjAbun_top10, "12.phen_sv/ob_contin_vsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+ob_contin_dsv_ba_adjAbun_top10<-ob_contin_dsv_ba_adjAbun[order(ob_contin_dsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(ob_contin_dsv_ba_adjAbun_top10, "12.phen_sv/ob_contin_dsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+ob_binary_vsv_ba_adjAbun_top10<-ob_binary_vsv_ba_adjAbun[order(ob_binary_vsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(ob_binary_vsv_ba_adjAbun_top10, "12.phen_sv/ob_binary_vsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+ob_binary_dsv_ba_adjAbun_top10<-ob_binary_dsv_ba_adjAbun[order(ob_binary_dsv_ba_adjAbun$p), ] %>% .[c(1:10), ]
+write.table(ob_binary_dsv_ba_adjAbun_top10, "12.phen_sv/ob_binary_dsv_ba_adjAbun_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+```
+
+
+
+### 3.2 model 1
+
+```{r 3.2}
+
+## Select LLD phenotypes
+lld_phen_list<-c("Bristol_av.stool.type", "Bristol_av.stool.freq",
+                 "Biochem_TG", "Biochem_HDL", "Biochem_LDL", "Biochem_Cholesterol","Biochem_Glucose", "Biochem_Insulin",
+                 "diabetes","bloodpressure_ever_high")
+
+ob_phen_list<-c("Diabetes","Hypertension","Dyslipidemia",
+                " Liver_fat","Adipocyte_area", "Numberofplaques","Max_plaquethicknessallvessels",
+                "total_cholesterol","Triglycerides","B_HDLC","B_NHDL","B_LDLC","glucose","insulin_level")
+
+##### Seclect associations #####
+load("12.phen_sv/lld_intri_vsv_adjAbunPCs.RData")
+load("12.phen_sv/lld_intri_dsv_adjAbunPCs.RData")
+load("12.phen_sv/lld_disea_vsv_adjAbunPCs.RData")
+load("12.phen_sv/lld_disea_dsv_adjAbunPCs.RData")
+
+
+vsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+lld_intri_vsv_ba_adjAbunPCs<-lld_intri_vsv_adjAbunPCs[(lld_intri_vsv_adjAbunPCs$X %in% unique(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV)) &  (lld_intri_vsv_adjAbunPCs$Y %in% lld_phen_list),]
+lld_intri_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_intri_vsv_ba_adjAbunPCs$p, method = "fdr")
+lld_intri_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_intri_vsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(lld_intri_vsv_ba_adjAbunPCs, file = "12.phen_sv/lld_intri_vsv_ba_adjAbunPCs.RData")
+
+dsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+lld_intri_dsv_ba_adjAbunPCs<-lld_intri_dsv_adjAbunPCs[(lld_intri_dsv_adjAbunPCs$X %in% unique(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV)) & (lld_intri_dsv_adjAbunPCs$Y %in% lld_phen_list),]
+lld_intri_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_intri_dsv_ba_adjAbunPCs$p, method = "fdr")
+lld_intri_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_intri_dsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(lld_intri_dsv_ba_adjAbunPCs, file = "12.phen_sv/lld_intri_dsv_ba_adjAbunPCs.RData")
+
+
+vsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+lld_disea_vsv_ba_adjAbunPCs<-lld_disea_vsv_adjAbunPCs[(lld_disea_vsv_adjAbunPCs$X %in% unique(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV)) &  (lld_disea_vsv_adjAbunPCs$Y %in% lld_phen_list),]
+lld_disea_vsv_ba_adjAbunPCs$p[lld_disea_vsv_ba_adjAbunPCs$y_1_N<15]<-NA
+lld_disea_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_disea_vsv_ba_adjAbunPCs$p, method = "fdr")
+lld_disea_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_disea_vsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(lld_disea_vsv_ba_adjAbunPCs, file = "12.phen_sv/lld_disea_vsv_ba_adjAbunPCs.RData")
+
+dsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+lld_disea_dsv_ba_adjAbunPCs<-lld_disea_dsv_adjAbunPCs[(lld_disea_dsv_adjAbunPCs$X %in% unique(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV)) &  (lld_disea_dsv_adjAbunPCs$Y %in% lld_phen_list),]
+lld_disea_dsv_ba_adjAbunPCs$p[lld_disea_dsv_ba_adjAbunPCs$y_1_N<5]<-NA
+lld_disea_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_disea_dsv_ba_adjAbunPCs$p, method = "fdr")
+lld_disea_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(lld_disea_dsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(lld_disea_dsv_ba_adjAbunPCs, file = "12.phen_sv/lld_disea_dsv_ba_adjAbunPCs.RData")
+
+#####
+load("12.phen_sv/lld_intri_vsv_ba_adjAbunPCs.RData")
+load("12.phen_sv/lld_intri_dsv_ba_adjAbunPCs.RData")
+load("12.phen_sv/lld_disea_vsv_ba_adjAbunPCs.RData")
+load("12.phen_sv/lld_disea_dsv_ba_adjAbunPCs.RData")
+
+lld_intri_vsv_ba_adjAbunPCs_top10<-lld_intri_vsv_ba_adjAbunPCs[order(lld_intri_vsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(lld_intri_vsv_ba_adjAbunPCs_top10, "12.phen_sv/lld_intri_vsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+lld_intri_dsv_ba_adjAbunPCs_top10<-lld_intri_dsv_ba_adjAbunPCs[order(lld_intri_dsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(lld_intri_dsv_ba_adjAbunPCs_top10, "12.phen_sv/lld_intri_dsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+lld_disea_vsv_ba_adjAbunPCs_top10<-lld_disea_vsv_ba_adjAbunPCs[order(lld_disea_vsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(lld_disea_vsv_ba_adjAbunPCs_top10, "12.phen_sv/lld_disea_vsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+lld_disea_dsv_ba_adjAbunPCs_top10<-lld_disea_dsv_ba_adjAbunPCs[order(lld_disea_dsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(lld_disea_dsv_ba_adjAbunPCs_top10, "12.phen_sv/lld_disea_dsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+
+############################################
+
+load("12.phen_sv/ob_contin_vsv_adjAbunPCs.RData")
+load("12.phen_sv/ob_contin_dsv_adjAbunPCs.RData")
+load("12.phen_sv/ob_binary_vsv_adjAbunPCs.RData")
+load("12.phen_sv/ob_binary_dsv_adjAbunPCs.RData")
+
+vsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+ob_contin_vsv_ba_adjAbunPCs<-ob_contin_vsv_adjAbunPCs[(ob_contin_vsv_adjAbunPCs$X %in% unique(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV)) & (ob_contin_vsv_adjAbunPCs$Y %in% ob_phen_list),]
+ob_contin_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_contin_vsv_ba_adjAbunPCs$p, method = "fdr")
+ob_contin_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_contin_vsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(ob_contin_vsv_ba_adjAbunPCs, file = "12.phen_sv/ob_contin_vsv_ba_adjAbunPCs.RData")
+
+dsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+ob_contin_dsv_ba_adjAbunPCs<-ob_contin_dsv_adjAbunPCs[(ob_contin_dsv_adjAbunPCs$X %in% unique(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV))& (ob_contin_dsv_adjAbunPCs$Y %in% ob_phen_list),]
+ob_contin_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_contin_dsv_ba_adjAbunPCs$p, method = "fdr")
+ob_contin_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_contin_dsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(ob_contin_dsv_ba_adjAbunPCs, file = "12.phen_sv/ob_contin_dsv_ba_adjAbunPCs.RData")
+
+
+vsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+ob_binary_vsv_ba_adjAbunPCs<-ob_binary_vsv_adjAbunPCs[(ob_binary_vsv_adjAbunPCs$X %in% unique(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV)) & (ob_binary_vsv_adjAbunPCs$Y %in% ob_phen_list),]
+ob_binary_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_binary_vsv_ba_adjAbunPCs$p, method = "fdr")
+ob_binary_vsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_binary_vsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(ob_binary_vsv_ba_adjAbunPCs, file = "12.phen_sv/ob_binary_vsv_ba_adjAbunPCs.RData")
+
+dsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",header = T, sep = "\t")
+ob_binary_dsv_ba_adjAbunPCs<-ob_binary_dsv_adjAbunPCs[(ob_binary_dsv_adjAbunPCs$X %in% unique(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV)) & (ob_binary_dsv_adjAbunPCs$Y %in% ob_phen_list),]
+ob_binary_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_binary_dsv_ba_adjAbunPCs$p, method = "fdr")
+ob_binary_dsv_ba_adjAbunPCs$fdr.p<-p.adjust(ob_binary_dsv_ba_adjAbunPCs$p, method = "bonferroni")
+save(ob_binary_dsv_ba_adjAbunPCs, file = "12.phen_sv/ob_binary_dsv_ba_adjAbunPCs.RData")
+
+
+#####
+load("12.phen_sv/ob_contin_vsv_ba_adjAbunPCs.RData")
+load("12.phen_sv/ob_contin_dsv_ba_adjAbunPCs.RData")
+load("12.phen_sv/ob_binary_vsv_ba_adjAbunPCs.RData")
+load("12.phen_sv/ob_binary_dsv_ba_adjAbunPCs.RData")
+
+ob_contin_vsv_ba_adjAbunPCs_top10<-ob_contin_vsv_ba_adjAbunPCs[order(ob_contin_vsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(ob_contin_vsv_ba_adjAbunPCs_top10, "12.phen_sv/ob_contin_vsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+ob_contin_dsv_ba_adjAbunPCs_top10<-ob_contin_dsv_ba_adjAbunPCs[order(ob_contin_dsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(ob_contin_dsv_ba_adjAbunPCs_top10, "12.phen_sv/ob_contin_dsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+ob_binary_vsv_ba_adjAbunPCs_top10<-ob_binary_vsv_ba_adjAbunPCs[order(ob_binary_vsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(ob_binary_vsv_ba_adjAbunPCs_top10, "12.phen_sv/ob_binary_vsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+ob_binary_dsv_ba_adjAbunPCs_top10<-ob_binary_dsv_ba_adjAbunPCs[order(ob_binary_dsv_ba_adjAbunPCs$p), ] %>% .[c(1:10), ]
+write.table(ob_binary_dsv_ba_adjAbunPCs_top10, "12.phen_sv/ob_binary_dsv_ba_adjAbunPCs_top10.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
+```

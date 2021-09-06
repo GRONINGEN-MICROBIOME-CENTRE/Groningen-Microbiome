@@ -52,10 +52,10 @@ table(all_basic$Cohort, all_basic$Gender)
 
 all_gender_tbl <- table(all_basic$Cohort,all_basic$Gender) 
 chisq.test(all_gender_tbl) 
-
-#pdf("02.summary/all_gender.pdf", width = 3, height = 3)
-p_gender<-ggplot()+
-  geom_mosaic(data=all_basic,aes(x = product(Cohort), fill=factor(Gender)))+
+all_basic$Cohort<-as.factor(all_basic$Cohort)
+all_basic$Gender<-as.factor(all_basic$Gender)
+p_gender<-ggplot(data=all_basic)+
+  geom_mosaic(aes(x = product(Cohort), fill=Gender))+
   ylab("Gender")+
   xlab("Cohort")+
   scale_fill_manual(values=mycolor2_green_blue) +
@@ -65,7 +65,6 @@ p_gender<-ggplot()+
         #axis.text.y = element_text(colour = "white"), 
         legend.position = "none",
         plot.title = element_text(hjust = 0.5))
-#dev.off()
 
 ## Age
 mean(lld_basic$Age, na.rm = T)

@@ -20,7 +20,6 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 ```
 
 ## 1 Preparation
@@ -42,7 +41,7 @@ info    <- read.table("01.cleanData/SV_info/20200801_LLD_300OB_Informative_speci
                       sep = "\t", header = T, stringsAsFactors = F)
 
 # abundance
-all_abun_sv<-read.table("01.cleanData/mbio_all/20200801_LLD_300OB_metaphlan3_species_sv_1437samples.tsv",check.names = F)
+all_abun_sv<-read.table("01.cleanData/mbio_all/LLD_300OB_SV_55species_abun_1437samples.tsv",check.names = F)
 
 # Basic
 all_basic <- read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
@@ -275,12 +274,39 @@ print(p_sv_abun_density)
 
 ## 4 SV correlation
 
-```{r 4}
+```{r 4, eval=FALSE}
+vsv_corr <- rcorr(as.matrix(all_vsv))
+vsv_corr.r<-vsv_corr$r
+vsv_corr.p<-vsv_corr$P
+vsv_corr.n<-vsv_corr$n
+vsv_corr.r.edge<-melt(vsv_corr.r)
+vsv_corr.p.edge<-melt(vsv_corr.p)
+vsv_corr.n.edge<-melt(vsv_corr.n)
+
+vsv_corr.edge<-cbind(vsv_corr.r.edge, vsv_corr.p.edge[,-c(1:2)], vsv_corr.n.edge[,-c(1:2)])
+colnames(vsv_corr.edge)<-c("SV1", "SV2", "R", "P", "N")
+
+save(vsv_corr.edge, file = "03.SV_summary_statistics/vsv_corr.edge.RData")
+
+dsv_corr <- rcorr(as.matrix(all_dsv))
+dsv_corr.r<-dsv_corr$r
+dsv_corr.p<-dsv_corr$P
+dsv_corr.n<-dsv_corr$n
+dsv_corr.r.edge<-melt(dsv_corr.r)
+dsv_corr.p.edge<-melt(dsv_corr.p)
+dsv_corr.n.edge<-melt(dsv_corr.n)
+
+dsv_corr.edge<-cbind(dsv_corr.r.edge, dsv_corr.p.edge[,-c(1:2)], dsv_corr.n.edge[,-c(1:2)])
+colnames(dsv_corr.edge)<-c("SV1", "SV2", "R", "P", "N")
+
+save(dsv_corr.edge, file = "03.SV_summary_statistics/dsv_corr.edge.RData")
+
+
 all_vsv_M_plot.list<-list()
 all_dsv_M_plot.list<-list()
 
 for (i in c(1:nrow(info))){
-  #i<-1
+#  i<-1
   
   file_name<-str_replace_all(info$organism[i], "\\/", "\\.")
   spe_name<-str_replace_all(info$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")

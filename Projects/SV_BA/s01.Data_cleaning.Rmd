@@ -1,7 +1,7 @@
 ---
 title: "Data cleaning"
 author: "Daoming Wang"
-date: "2020/10/22"
+date: "2021/7/18"
 output:
   html_document: 
     theme: flatly
@@ -17,22 +17,20 @@ output:
       latex_engine: xelatex
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 ```
 
 ## 1 Preparation
 ### 1.1 Import
 
-```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r 1.1, message=FALSE, warning=FALSE, paged.print=FALSE}
 source("functions.R")
 ```
 
 ### 1.2 Inputs
 
-```{r 1.2, echo=TRUE}
+```{r 1.2, message=FALSE, warning=FALSE}
 # Read 300OB files
 ob_ba<-read.table("00.rawData/300OB_phenotype/ob_39ba_entities_301samples_plasma.txt")
 ob_phen<-read.table("00.rawData/300OB_phenotype/ob_130pheno_302samples.txt")
@@ -61,17 +59,15 @@ taxonomy    <- read.csv("00.rawdata/database/representatives.genomes.taxonomy.cs
                    sep = ",", header = T,check.names = F,stringsAsFactors = F)
 taxonomy[taxonomy == ""]<-"Unknown"
 colnames(taxonomy)[1]<-'X'
-species_name<- read.table("00.rawData/database/Species_names.tsv",
-                          sep = "\t", header = T, check.names = F, stringsAsFactors = F)
+ncbi<-read.csv("00.rawData/database/NCBI_accession.txt", sep = "\t",header = T)
+tax_relationship<-read.csv("00.rawData/database/progenome1_species_relationship.tsv",sep = "\t",header = F)
 
-# Read metaphlan3 files
-abun <- read.table("00.rawData/LLD_mbio/metaphlan3_lld_base_fup_500fg_300ob_ibd_2713samples_merged_taxa_abundance.txt",
-                 sep = "\t", header = T,stringsAsFactors = F) %>% 
-  .[-match('UNKNOWN', .$clade_name),] %>%
-  data.frame(row.names = 'clade_name') %>%
-  .[,-1]
+# Read species abundance files
+lld_SV_abun_s<-read.csv("00.rawData/mbio/LLD.s1135.SV_spe_abun.S.tsv",header = T,sep = "\t",check.names = F)
+ob_SV_abun_s<-read.csv("00.rawData/mbio/300OB.s298.SV_spe_abun.S.tsv",header = T,sep = "\t",check.names = F)
 
 ```
+
 
 ## 2 Clean phenotypical data
 
@@ -209,14 +205,20 @@ if(!dir.exists("01.cleanData")){dir.create("01.cleanData")}
 if(!dir.exists("01.cleanData/SV_lld")){dir.create("01.cleanData/SV_lld")}
 write.table(dsgv_lld,"01.cleanData/SV_lld/20200801_LLD_deletionStructuralVariation_1135samples.tsv",sep = '\t')
 write.table(vsgv_lld,"01.cleanData/SV_lld/20200801_LLD_variableStructuralVariation_1135samples.tsv",sep = '\t')
+save(dsgv_lld, file = "01.cleanData/SV_lld/dsgv_lld.RData")
+save(vsgv_lld, file = "01.cleanData/SV_lld/vsgv_lld.RData")
 
 if(!dir.exists("01.cleanData/SV_300OB")){dir.create("01.cleanData/SV_300OB")}
 write.table(dsgv_ob,"01.cleanData/SV_300OB/20200801_300OB_deletionStructuralVariation_302samples.tsv",sep = '\t')
 write.table(vsgv_ob,"01.cleanData/SV_300OB/20200801_300OB_variableStructuralVariation_302samples.tsv",sep = '\t')
+save(dsgv_ob, file = "01.cleanData/SV_300OB/dsgv_ob.RData")
+save(vsgv_ob, file = "01.cleanData/SV_300OB/vsgv_ob.RData")
 
 if(!dir.exists("01.cleanData/SV_all")){dir.create("01.cleanData/SV_all")}
 write.table(dsgv,"01.cleanData/SV_all/20200801_LLD_300OB_deletionStructuralVariation_1437samples.tsv",sep = '\t')
 write.table(vsgv,"01.cleanData/SV_all/20200801_LLD_300OB_variableStructuralVariation_1437samples.tsv",sep = '\t')
+save(dsgv, file = "01.cleanData/SV_all/dsgv.RData")
+save(vsgv, file = "01.cleanData/SV_all/vsgv.RData")
 
 ```
 
@@ -225,7 +227,7 @@ write.table(vsgv,"01.cleanData/SV_all/20200801_LLD_300OB_variableStructuralVaria
 ```{r 4.2}
 # Name conversion
 organism<-str_replace_all(colnames(dsgv),"\\:\\d+_\\d+.*","") %>%
-  .[!duplicated(.)] 
+  .[!duplicated(.)]
 
 Short_name<- organism %>% 
   str_replace_all('\\[','') %>%
@@ -238,10 +240,12 @@ Short_name[grep(' sp\\.', organism, invert = F)] <- Short_name[grep(' sp\\.', or
 Fst_letter<-Short_name[grep(' sp\\.', organism, invert = T)] %>%
   str_replace_all(' .*','') %>%
   str_sub(start = 1,end = 1)
+
 Spe_name<-Short_name[grep(' sp\\.', organism, invert = T)] %>%
   str_extract_all(' .*') %>%
   str_replace_all('^ ', '') %>%
   str_replace_all(' .*', '')
+
 Short_name[grep(' sp\\.', organism, invert = T)] <-paste(Fst_letter,'.', Spe_name, sep = '')
 
 taxa_name<-data.frame(NCBI_taxonomy_id = taxonomy$X[match(organism,taxonomy$organism)],
@@ -250,8 +254,7 @@ taxa_name<-data.frame(NCBI_taxonomy_id = taxonomy$X[match(organism,taxonomy$orga
 
 taxa_name$Short_name[match('bacterium LF-3',taxa_name$organism)]<-'bacterium LF-3'
 
-taxa_name$Metaphlan3_name<-species_name$Metaphlan3_name[match(taxa_name$organism,
-                                                              species_name$organism)]
+taxa_name<-left_join(taxa_name, ncbi, by = "NCBI_taxonomy_id")
 
 if(!dir.exists("01.cleanData/SV_info")){dir.create("01.cleanData/SV_info")}
 write.table(taxa_name, "01.cleanData/SV_info/20200801_LLD_300OB_Species_name.tsv", sep = "\t", col.names = T, row.names = F, quote = F)
@@ -263,23 +266,26 @@ write.table(taxa_name, "01.cleanData/SV_info/20200801_LLD_300OB_Species_name.tsv
 # SV annotation tables
 dsgv_info_anno<-data.frame(dsgv_anno,
                            SV_ID=dsgv_anno$SV_id,
-                           Taxonomy_Name = taxa_name$organism[match(str_replace_all(dsgv_anno$Taxonomy_id, '\\..*', ''), taxa_name$NCBI_taxonomy_id)],
+                           Taxonomy_Name = taxa_name$organism[match(str_replace_all(dsgv_anno$Taxonomy_id, '\\..*', ''),
+                                                                    taxa_name$NCBI_taxonomy_id)],
                            SV_Name = changeSVname(dsgv_anno$SV_id),
                            Taxonomy_ID = dsgv_anno$Taxonomy_id,
-                           SV_size = calcSVSize(dsgv_anno$SV_id))[,c(9,7,6,8,1,3,10,4,5)]
+                           SV_size = calcSVSize(dsgv_anno$SV_id))[,c(9,7,6,8,3,10,4,5)]
 
 vsgv_info_anno<-data.frame(vsgv_anno,
                            SV_ID=vsgv_anno$SV_id,
-                           Taxonomy_Name = taxa_name$organism[match(str_replace_all(vsgv_anno$Taxonomy_id, '\\..*', ''), taxa_name$NCBI_taxonomy_id)],
+                           Taxonomy_Name = taxa_name$organism[match(str_replace_all(vsgv_anno$Taxonomy_id, '\\..*', ''),
+                                                                    taxa_name$NCBI_taxonomy_id)],
                            SV_Name = changeSVname(vsgv_anno$SV_id),
                            Taxonomy_ID = vsgv_anno$Taxonomy_id,
-                           SV_size = calcSVSize(vsgv_anno$SV_id))[,c(9,7,6,8,1,3,10,4,5)]
+                           SV_size = calcSVSize(vsgv_anno$SV_id))[,c(9,7,6,8,3,10,4,5)]
 
 write.table(dsgv_info_anno, "01.cleanData/SV_info/20200801_LLD_300OB_dsgv_info_anno.tsv", 
             sep = "\t", quote = F, col.names = T, row.names = F)
 write.table(vsgv_info_anno, "01.cleanData/SV_info/20200801_LLD_300OB_vsgv_info_anno.tsv", 
             sep = "\t", quote = F, col.names = T, row.names = F)
 ```
+
 
 ### 4.4 Get species information table
 
@@ -351,7 +357,6 @@ OB_infor_sample_n<-data.frame(Species = rownames(OB_infor_sample_n),OB_infor_sam
 ## merge LLD and 300OB sample size
 infor_sample_n <- cbind(lld_infor_sample_n,OB_infor_sample_n,sample_n)[,-c(3,6)] %>% .[,c(1,4,2,3,5)]
 
-
 ## Merge sample size and SV number information
 species_sample_n<-dplyr::full_join(species_sgv_n,infor_sample_n, by = "Species")
 taxa_length$Species<-str_replace_all(taxa_length$Species, '\\..*', '')
@@ -360,19 +365,18 @@ species_sample_n<-dplyr::left_join(species_sample_n, taxa_length, by = c("NCBI_t
 species_sample_n<-data.frame(species_sample_n,
                              SVs.number = species_sample_n[,3]+species_sample_n[,4])
 
-
 ## Merge all information
 Informative_species_information <- match(species_sample_n$NCBI_taxonomy_id, taxonomy$X)%>%
   taxonomy[.,] %>%
   cbind(.,species_sample_n)
-Informative_species_information <- full_join(Informative_species_information[,-11],
+
+info <- full_join(Informative_species_information[,-11],
                                              taxa_name,
                                              by = 'organism')[,c(1:9,20,21,11,12,18,14,15,16,17)]
 
-colnames(Informative_species_information)[c(1,10:18)]<-c("NCBI_taxonomy_id","Short_name","Metaphlan3_name",   "Deletion_SVs_number", "Variable_SVs_number","SVs_number","LLD_sample_number","300OB_sample_number","Total_samples_number", "Length")
+colnames(info)[c(1,10:18)]<-c("NCBI_taxonomy_id","Short_name","NCBI_bioproject_accession",   "Deletion_SVs_number", "Variable_SVs_number","SVs_number","LLD_sample_number","300OB_sample_number","Total_samples_number", "Length")
 
-write.table(Informative_species_information, "01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv", col.names = T, row.names = F, sep = "\t", quote = F)
-
+write.table(info, "01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv", col.names = T, row.names = F, sep = "\t", quote = F)
 ```
 
 ### 4.5 Get distance matrices
@@ -380,51 +384,32 @@ write.table(Informative_species_information, "01.cleanData/SV_info/20200801_LLD_
 
 ```{r 4.5.1, eval=FALSE}
 ## msv (vsv+dsv) distance
+sgv<-cbind(vsgv, dsgv)
+all_shared_sv_dis<-shared_sv_dis(sgv)
+save(all_shared_sv_dis, file = "01.cleanData/SV_all/all_shared_sv_dis.RData")
+
+## SV distance matrices of all species
 all_msv_dist<-NULL
 
-for (i in c(1:nrow(Informative_species_information))){
+for (i in c(1:nrow(info))){
   #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
+  file_name<-str_replace_all(info$organism[i], "\\/", "\\.")
+  spe_name<-str_replace_all(info$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
   vsgv_i<-vsgv[,grep(spe_name,colnames(vsgv))]
   dsgv_i<-dsgv[,grep(spe_name,colnames(dsgv))]
   all_msv_i<-cbind(vsgv_i,dsgv_i) %>%
     na.omit(.)
-  
+
   all_msv_dist_i <- as.matrix(vegdist(as.data.frame(all_msv_i),method = "canberra"))
   all_msv_dist[[i]]<-all_msv_dist_i
 }
 
-names(all_msv_dist)<-paste('msv_',Informative_species_information$organism, sep = '')
+names(all_msv_dist)<-paste('msv_',info$organism, sep = '')
 all_msv_dist_std <- lapply(all_msv_dist, myfun<-function(x){x/max(x,na.rm = T)})
-
-all_msv_dist_full<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_i<-vsgv[,grep(spe_name,colnames(vsgv))]
-  dsgv_i<-dsgv[,grep(spe_name,colnames(dsgv))]
-  all_msv_i<-cbind(vsgv_i,dsgv_i) %>%
-    na.omit(.)
-  
-  all_msv_dist_i <- as.matrix(vegdist(as.data.frame(all_msv_i),method = "canberra"))
-  all_msv_dist_i <- all_msv_dist_i[match(rownames(vsgv), rownames(all_msv_dist_i)),
-                                   match(rownames(vsgv), colnames(all_msv_dist_i))]
-  rownames(all_msv_dist_i)<-rownames(vsgv)
-  colnames(all_msv_dist_i)<-rownames(vsgv)
-  
-  all_msv_dist_full[[i]]<-all_msv_dist_i
-}
-all_msv_dist_full_std <- lapply(all_msv_dist_full, myfun<-function(x){x/max(x,na.rm = T)})
-all_msv_dist_std_avg<-mergeDist(all_msv_dist_full_std);
 
 if(!dir.exists("01.cleanData/SV_all/distMat")){dir.create("01.cleanData/SV_all/distMat")}
 save(all_msv_dist, file = "01.cleanData/SV_all/all_msv_dist.RData")
 save(all_msv_dist_std, file = "01.cleanData/SV_all/all_msv_dist_std.RData")
-save(all_msv_dist_std_avg, file = "01.cleanData/SV_all/all_msv_dist_std_avg.RData")
-
 ```
 
 #### 4.5.2 LLD samples
@@ -449,34 +434,9 @@ for (i in c(1:nrow(Informative_species_information))){
 names(lld_msv_dist)<-paste('msv_',Informative_species_information$organism, sep = '')
 lld_msv_dist_std <- lapply(lld_msv_dist, myfun<-function(x){x/max(x,na.rm = T)})
 
-lld_msv_dist_full<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_i<-vsgv_lld[,grep(spe_name,colnames(vsgv_lld))]
-  dsgv_i<-dsgv_lld[,grep(spe_name,colnames(dsgv_lld))]
-  lld_msv_i<-cbind(vsgv_i,dsgv_i) %>%
-    na.omit(.)
-  
-  lld_msv_dist_i <- as.matrix(vegdist(as.data.frame(lld_msv_i),method = "canberra"))
-  lld_msv_dist_i <- lld_msv_dist_i[match(rownames(vsgv_lld), rownames(lld_msv_dist_i)),
-                                   match(rownames(vsgv_lld), colnames(lld_msv_dist_i))]
-  rownames(lld_msv_dist_i)<-rownames(vsgv_lld)
-  colnames(lld_msv_dist_i)<-rownames(vsgv_lld)
-  
-  lld_msv_dist_full[[i]]<-lld_msv_dist_i
-}
-lld_msv_dist_full_std <- lapply(lld_msv_dist_full, myfun<-function(x){x/max(x,na.rm = T)})
-lld_msv_dist_std_avg<-mergeDist(lld_msv_dist_full_std);
-
 save(lld_msv_dist, file = "01.cleanData/SV_lld/lld_msv_dist.RData")
 save(lld_msv_dist_std, file = "01.cleanData/SV_lld/lld_msv_dist_std.RData")
-save(lld_msv_dist_std_avg, file = "01.cleanData/SV_lld/lld_msv_dist_std_avg.RData")
-
 ```
-
 
 #### 4.5.3 300OB samples
 
@@ -500,51 +460,49 @@ for (i in c(1:nrow(Informative_species_information))){
 names(ob_msv_dist)<-paste('msv_',Informative_species_information$organism, sep = '')
 ob_msv_dist_std <- lapply(ob_msv_dist, myfun<-function(x){x/max(x,na.rm = T)})
 
-ob_msv_dist_full<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_i<-vsgv_ob[,grep(spe_name,colnames(vsgv_ob))]
-  dsgv_i<-dsgv_ob[,grep(spe_name,colnames(dsgv_ob))]
-  ob_msv_i<-cbind(vsgv_i,dsgv_i) %>%
-    na.omit(.)
-  
-  ob_msv_dist_i <- as.matrix(vegdist(as.data.frame(ob_msv_i),method = "canberra"))
-  ob_msv_dist_i <- ob_msv_dist_i[match(rownames(vsgv_ob), rownames(ob_msv_dist_i)),
-                                   match(rownames(vsgv_ob), colnames(ob_msv_dist_i))]
-  rownames(ob_msv_dist_i)<-rownames(vsgv_ob)
-  colnames(ob_msv_dist_i)<-rownames(vsgv_ob)
-  
-  ob_msv_dist_full[[i]]<-ob_msv_dist_i
-}
-ob_msv_dist_full_std <- lapply(ob_msv_dist_full, myfun<-function(x){x/max(x,na.rm = T)})
-ob_msv_dist_std_avg<-mergeDist(ob_msv_dist_full_std);
-
 save(ob_msv_dist, file = "01.cleanData/SV_300OB/ob_msv_dist.RData")
 save(ob_msv_dist_std, file = "01.cleanData/SV_300OB/ob_msv_dist_std.RData")
-save(ob_msv_dist_std_avg, file = "01.cleanData/SV_300OB/ob_msv_dist_std_avg.RData")
 ```
-
 
 ## 5 Clean species abundance data
 
 ```{r 5}
-s_abun<-prepData(abun, getLevel="S")
-s_abun<-shortenNames(s_abun, sep = "\\.",direction = 1)
+sv_spe_taxid<-info$NCBI_taxonomy_id
+sv_spe_taxid[sv_spe_taxid==245018]<-649756
 
-rownames(s_abun)<-str_replace_all(rownames(s_abun), '_metaphlan', '')
+# relative abundance of species detected with SVs in LLD
+lld_SV_abun_s[,-c(1:2)]<-apply(lld_SV_abun_s[,-c(1:2)], 2, myfun<-function(x){x/sum(x)})
+lld_s_abun <- sv_spe_taxid %>% 
+  match(., tax_relationship$V2) %>% 
+  tax_relationship$V1[.] %>% 
+  match(., lld_SV_abun_s$NCBI_tax_id) %>% 
+  lld_SV_abun_s[., -c(1:2)] %>% 
+  t %>%
+  as.data.frame
 
-## clean LLD abundance table
-lld_s_abun<-s_abun[match(intersect(str_replace_all(lld_id$LLD_bam_id, "fece_", "X"), rownames(s_abun)), rownames(s_abun)),]
-rownames(lld_s_abun)<-lld_id$LLD_GoNL_all_id[match(rownames(lld_s_abun), str_replace_all(lld_id$LLD_bam_id, "fece_", "X"))]
-
+colnames(lld_s_abun)<-info$organism
+rownames(lld_s_abun)<-str_replace_all(rownames(lld_s_abun), ".S.bracken", "")
+lld_s_abun<-lld_s_abun[match(intersect(str_replace_all(lld_id$LLD_bam_id, "fece_", ""),
+                                        rownames(lld_s_abun)),
+                              rownames(lld_s_abun)),]
+rownames(lld_s_abun)<-lld_id$LLD_GoNL_all_id[match(rownames(lld_s_abun), str_replace_all(lld_id$LLD_bam_id, "fece_", ""))]
 lld_s_abun<-lld_s_abun[match(rownames(lld_basic),rownames(lld_s_abun)),]
 rownames(lld_s_abun)<-rownames(lld_basic)
 
-## clean 300OB abundance table
-ob_s_abun<-s_abun[match(intersect(ob_id$G_id, rownames(s_abun)), rownames(s_abun)),]
+# relative abundance of species detected with SVs in 300-OB
+ob_SV_abun_s[,-c(1:2)]<-apply(ob_SV_abun_s[,-c(1:2)], 2, myfun<-function(x){x/sum(x)})
+ob_s_abun <- sv_spe_taxid %>% 
+  match(., tax_relationship$V2) %>% 
+  tax_relationship$V1[.] %>% 
+  match(., ob_SV_abun_s$NCBI_tax_id) %>% 
+  ob_SV_abun_s[., -c(1:2)] %>% 
+  t %>%
+  as.data.frame
+
+colnames(ob_s_abun)<-info$organism
+rownames(ob_s_abun)<-str_replace_all(rownames(ob_s_abun), ".S.bracken", "")
+
+ob_s_abun<-ob_s_abun[match(intersect(ob_id$G_id, rownames(ob_s_abun)), rownames(ob_s_abun)),]
 rownames(ob_s_abun)<-ob_id$ID[match(rownames(ob_s_abun), ob_id$G_id)]
 
 ob_s_abun<-ob_s_abun[match(rownames(ob_phen),rownames(ob_s_abun)),]
@@ -555,266 +513,13 @@ all_s_abun <- rbind(lld_s_abun, ob_s_abun)
 
 # outputs
 if(!dir.exists("01.cleanData/mbio_lld")){dir.create("01.cleanData/mbio_lld")}
-write.table(lld_s_abun, "01.cleanData/mbio_lld/20200801_LLD_metaphlan3_species_1135samples.tsv",sep = '\t')
+write.table(lld_s_abun, "01.cleanData/mbio_lld/LLD_SV_55species_abun_1135samples.tsv",sep = '\t')
 if(!dir.exists("01.cleanData/mbio_300OB")){dir.create("01.cleanData/mbio_300OB")}
-write.table(ob_s_abun, "01.cleanData/mbio_300OB/20200801_300OB_metaphlan3_species_302samples.tsv",sep = '\t')
+write.table(ob_s_abun, "01.cleanData/mbio_300OB/300OB_SV_55species_abun_302samples.tsv",sep = '\t')
 if(!dir.exists("01.cleanData/mbio_all")){dir.create("01.cleanData/mbio_all")}
-write.table(all_s_abun, "01.cleanData/mbio_all/20200801_LLD_300OB_metaphlan3_species_1437samples.tsv",sep = '\t')
+write.table(all_s_abun, "01.cleanData/mbio_all/LLD_300OB_SV_55species_abun_1437samples.tsv",sep = '\t')
 
-# sv species
-inter_spe<-intersect(Informative_species_information$Metaphlan3_name, colnames(all_s_abun))
-
-lld_s_abun_sv <- lld_s_abun[,match(inter_spe, colnames(lld_s_abun))]
-ob_s_abun_sv  <- ob_s_abun[,match(inter_spe, colnames(ob_s_abun))]
-all_s_abun_sv <- all_s_abun[,match(inter_spe, colnames(all_s_abun))]
-
-# outputs
-write.table(lld_s_abun_sv,"01.cleanData/mbio_lld/20200801_LLD_metaphlan3_species_sv_1135samples.tsv",sep = "\t")
-write.table(ob_s_abun_sv,"01.cleanData/mbio_300OB/20200801_300OB_metaphlan3_species_sv_302samples.tsv",sep = "\t")
-write.table(all_s_abun_sv,"01.cleanData/mbio_all/20200801_LLD_300OB_metaphlan3_species_sv_1437samples.tsv",sep = "\t")
-
-Informative_species_information$Abundance_available<-rep('No', nrow(Informative_species_information))
-Informative_species_information$Abundance_available[Informative_species_information$Metaphlan3_name %in% inter_spe]<-'Yes'
-
-write.table(Informative_species_information, "01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv", col.names = T, row.names = F, sep = "\t", quote = F)
-
-```
-
-## 6 Residuals of SV
-
-### 6.1 Get residual SV profiles
-
-```{r 6.1, eval=FALSE}
-all_s_abun_clr<-abundances(x=as.data.frame(na.omit(all_s_abun)), transform="clr") %>%as.data.frame
-all_s_abun_clr <- all_s_abun_clr[match(rownames(all_s_abun), rownames(all_s_abun_clr)),]
-rownames(all_s_abun_clr) <- rownames(all_s_abun)
-
-
-vsgv_residual<-NULL
-dsgv_residual<-NULL
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-4
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_i<-vsgv[,grep(spe_name,colnames(vsgv))]
-  dsgv_i<-dsgv[,grep(spe_name,colnames(dsgv))]
-  
-  if(Informative_species_information$Metaphlan3_name[i]%in%colnames(all_s_abun_clr)){
-    abun_i<-all_s_abun_clr[,Informative_species_information$Metaphlan3_name[i]]
-    
-    if(dim(vsgv_i)[2]>0){
-      vsgv_i_residual<-apply(vsgv_i, 2, get_residual_lm, x = abun_i)
-      vsgv_residual<-cbind(vsgv_residual,vsgv_i_residual)
-    }
-
-    dsgv_i_residual<-apply(dsgv_i, 2, get_residual_lr, x = abun_i)
-    dsgv_residual<-cbind(dsgv_residual,dsgv_i_residual)
-  }else{
-    vsgv_residual<-cbind(vsgv_residual,vsgv_i)
-    dsgv_residual<-cbind(dsgv_residual,dsgv_i)
-  }
-}
-
-## Split dataSet
-
-
-vsgv_residual_lld<-vsgv_residual[grep("LLD",rownames(vsgv_residual)),]
-dsgv_residual_lld<-dsgv_residual[grep("LLD",rownames(dsgv_residual)),]
-
-vsgv_residual_ob<-vsgv_residual[grep("LLD",rownames(vsgv_residual), invert = T),]
-dsgv_residual_ob<-dsgv_residual[grep("LLD",rownames(dsgv_residual), invert = T),]
-
-
-## Outputs
-if(!dir.exists("01.cleanData")){dir.create("01.cleanData")}
-
-if(!dir.exists("01.cleanData/SV_lld")){dir.create("01.cleanData/SV_lld")}
-write.table(dsgv_residual_lld,"01.cleanData/SV_lld/20200801_LLD_deletionStructuralVariation_residual_1135samples.tsv",sep = '\t')
-write.table(vsgv_residual_lld,"01.cleanData/SV_lld/20200801_LLD_variableStructuralVariation_residual_1135samples.tsv",sep = '\t')
-
-if(!dir.exists("01.cleanData/SV_300OB")){dir.create("01.cleanData/SV_300OB")}
-write.table(dsgv_residual_ob,"01.cleanData/SV_300OB/20200801_300OB_deletionStructuralVariation_residual_302samples.tsv",sep = '\t')
-write.table(vsgv_residual_ob,"01.cleanData/SV_300OB/20200801_300OB_variableStructuralVariation_residual_302samples.tsv",sep = '\t')
-
-if(!dir.exists("01.cleanData/SV_all")){dir.create("01.cleanData/SV_all")}
-write.table(dsgv_residual,"01.cleanData/SV_all/20200801_LLD_300OB_deletionStructuralVariation_residual_1437samples.tsv",sep = '\t')
-write.table(vsgv_residual,"01.cleanData/SV_all/20200801_LLD_300OB_variableStructuralVariation_residual_1437samples.tsv",sep = '\t')
-```
-
-### 6.2 Get distance matrices
-#### 6.2.1 All samples
-
-```{r 6.2.1, eval=FALSE}
-## msv_resi (vsv+dsv) distance
-all_msv_resi_dist<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-1
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_residual_i<-vsgv_residual[,grep(spe_name,colnames(vsgv_residual))]
-  dsgv_residual_i<-dsgv_residual[,grep(spe_name,colnames(dsgv_residual))]
-  all_msv_resi_i<-cbind(vsgv_residual_i,dsgv_residual_i) %>%
-    na.omit(.)
-  
-  all_msv_resi_dist_i <- as.matrix(vegdist(as.data.frame(all_msv_resi_i),method = "canberra"))
-  all_msv_resi_dist[[i]]<-all_msv_resi_dist_i
-}
-
-names(all_msv_resi_dist)<-paste('msv_resi_',Informative_species_information$organism, sep = '')
-all_msv_resi_dist_std <- lapply(all_msv_resi_dist, myfun<-function(x){x/max(x,na.rm = T)})
-
-all_msv_resi_dist_full<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_residual_i<-vsgv_residual[,grep(spe_name,colnames(vsgv_residual))]
-  dsgv_residual_i<-dsgv_residual[,grep(spe_name,colnames(dsgv_residual))]
-  all_msv_resi_i<-cbind(vsgv_residual_i,dsgv_residual_i) %>%
-    na.omit(.)
-  
-  all_msv_resi_dist_i <- as.matrix(vegdist(as.data.frame(all_msv_resi_i),method = "canberra"))
-  all_msv_resi_dist_i <- all_msv_resi_dist_i[match(rownames(vsgv_residual), rownames(all_msv_resi_dist_i)),
-                                   match(rownames(vsgv_residual), colnames(all_msv_resi_dist_i))]
-  rownames(all_msv_resi_dist_i)<-rownames(vsgv_residual)
-  colnames(all_msv_resi_dist_i)<-rownames(vsgv_residual)
-  
-  all_msv_resi_dist_full[[i]]<-all_msv_resi_dist_i
-}
-all_msv_resi_dist_full_std <- lapply(all_msv_resi_dist_full, myfun<-function(x){x/max(x,na.rm = T)})
-all_msv_resi_dist_std_avg<-mergeDist(all_msv_resi_dist_full_std);
-
-
-all_sv<-cbind(all_vsv, all_dsv)
-
-date()
-all_shared_sv_dis<- marker_n_mat #shared_sv_dis(all_sv)
-date()
-
-
-if(!dir.exists("01.cleanData/SV_all/distMat")){dir.create("01.cleanData/SV_all/distMat")}
-save(all_msv_resi_dist, file = "01.cleanData/SV_all/all_msv_resi_dist.RData")
-save(all_msv_resi_dist_std, file = "01.cleanData/SV_all/all_msv_resi_dist_std.RData")
-save(all_msv_resi_dist_std_avg, file = "01.cleanData/SV_all/all_msv_resi_dist_std_avg.RData")
-save(all_shared_sv_dis, file = "01.cleanData/SV_all/all_shared_sv_dis.RData")
-
-```
-
-#### 6.2.2 LLD samples
-
-```{r 6.2.2, eval=FALSE}
-## msv_resi (vsv+dsv) distance
-lld_msv_resi_dist<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_residual_i<-vsgv_residual_lld[,grep(spe_name,colnames(vsgv_residual_lld))]
-  dsgv_residual_i<-dsgv_residual_lld[,grep(spe_name,colnames(dsgv_residual_lld))]
-  lld_msv_resi_i<-cbind(vsgv_residual_i,dsgv_residual_i) %>%
-    na.omit(.)
-  
-  lld_msv_resi_dist_i <- as.matrix(vegdist(as.data.frame(lld_msv_resi_i),method = "canberra"))
-  lld_msv_resi_dist[[i]]<-lld_msv_resi_dist_i
-}
-
-names(lld_msv_resi_dist)<-paste('msv_resi_',Informative_species_information$organism, sep = '')
-lld_msv_resi_dist_std <- lapply(lld_msv_resi_dist, myfun<-function(x){x/max(x,na.rm = T)})
-
-lld_msv_resi_dist_full<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_residual_i<-vsgv_residual_lld[,grep(spe_name,colnames(vsgv_residual_lld))]
-  dsgv_residual_i<-dsgv_residual_lld[,grep(spe_name,colnames(dsgv_residual_lld))]
-  lld_msv_resi_i<-cbind(vsgv_residual_i,dsgv_residual_i) %>%
-    na.omit(.)
-  
-  lld_msv_resi_dist_i <- as.matrix(vegdist(as.data.frame(lld_msv_resi_i),method = "canberra"))
-  lld_msv_resi_dist_i <- lld_msv_resi_dist_i[match(rownames(vsgv_residual_lld), rownames(lld_msv_resi_dist_i)),
-                                   match(rownames(vsgv_residual_lld), colnames(lld_msv_resi_dist_i))]
-  rownames(lld_msv_resi_dist_i)<-rownames(vsgv_residual_lld)
-  colnames(lld_msv_resi_dist_i)<-rownames(vsgv_residual_lld)
-  
-  lld_msv_resi_dist_full[[i]]<-lld_msv_resi_dist_i
-}
-lld_msv_resi_dist_full_std <- lapply(lld_msv_resi_dist_full, myfun<-function(x){x/max(x,na.rm = T)})
-lld_msv_resi_dist_std_avg<-mergeDist(lld_msv_resi_dist_full_std);
-
-save(lld_msv_resi_dist, file = "01.cleanData/SV_lld/lld_msv_resi_dist.RData")
-save(lld_msv_resi_dist_std, file = "01.cleanData/SV_lld/lld_msv_resi_dist_std.RData")
-save(lld_msv_resi_dist_std_avg, file = "01.cleanData/SV_lld/lld_msv_resi_dist_std_avg.RData")
-
-```
-
-
-#### 6.2.3 300OB samples
-
-```{r 6.2.3, eval=FALSE}
-## msv_resi (vsv+dsv) distance
-ob_msv_resi_dist<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_residual_i<-vsgv_residual_ob[,grep(spe_name,colnames(vsgv_residual_ob))]
-  dsgv_residual_i<-dsgv_residual_ob[,grep(spe_name,colnames(dsgv_residual_ob))]
-  ob_msv_resi_i<-cbind(vsgv_residual_i,dsgv_residual_i) %>%
-    na.omit(.)
-  
-  ob_msv_resi_dist_i <- as.matrix(vegdist(as.data.frame(ob_msv_resi_i),method = "canberra"))
-  ob_msv_resi_dist[[i]]<-ob_msv_resi_dist_i
-}
-
-names(ob_msv_resi_dist)<-paste('msv_resi_',Informative_species_information$organism, sep = '')
-ob_msv_resi_dist_std <- lapply(ob_msv_resi_dist, myfun<-function(x){x/max(x,na.rm = T)})
-
-ob_msv_resi_dist_full<-NULL
-
-for (i in c(1:nrow(Informative_species_information))){
-  #i<-16
-  file_name<-str_replace_all(Informative_species_information$organism[i], "\\/", "\\.")
-  spe_name<-str_replace_all(Informative_species_information$organism[i],"\\[","\\\\\\[") %>% str_replace_all("\\]","\\\\\\]")
-  vsgv_residual_i<-vsgv_residual_ob[,grep(spe_name,colnames(vsgv_residual_ob))]
-  dsgv_residual_i<-dsgv_residual_ob[,grep(spe_name,colnames(dsgv_residual_ob))]
-  ob_msv_resi_i<-cbind(vsgv_residual_i,dsgv_residual_i) %>%
-    na.omit(.)
-  
-  ob_msv_resi_dist_i <- as.matrix(vegdist(as.data.frame(ob_msv_resi_i),method = "canberra"))
-  ob_msv_resi_dist_i <- ob_msv_resi_dist_i[match(rownames(vsgv_residual_ob), rownames(ob_msv_resi_dist_i)),
-                                   match(rownames(vsgv_residual_ob), colnames(ob_msv_resi_dist_i))]
-  rownames(ob_msv_resi_dist_i)<-rownames(vsgv_residual_ob)
-  colnames(ob_msv_resi_dist_i)<-rownames(vsgv_residual_ob)
-  
-  ob_msv_resi_dist_full[[i]]<-ob_msv_resi_dist_i
-}
-ob_msv_resi_dist_full_std <- lapply(ob_msv_resi_dist_full, myfun<-function(x){x/max(x,na.rm = T)})
-ob_msv_resi_dist_std_avg<-mergeDist(ob_msv_resi_dist_full_std);
-
-save(ob_msv_resi_dist, file = "01.cleanData/SV_300OB/ob_msv_resi_dist.RData")
-save(ob_msv_resi_dist_std, file = "01.cleanData/SV_300OB/ob_msv_resi_dist_std.RData")
-save(ob_msv_resi_dist_std_avg, file = "01.cleanData/SV_300OB/ob_msv_resi_dist_std_avg.RData")
-```
-
-
-#### 6.2.4 Abundance
-
-
-```{r 6.2.4}
-all_s_abun_rmna <-na.omit(all_s_abun) # all_abun_sv
-all_s_abun_rmna_dis<-vegdist(all_s_abun_rmna, method = 'bray', na.rm = T)  %>% as.matrix
-
-all_s_abun_dis <- all_s_abun_rmna_dis[match(rownames(all_s_abun), rownames(all_s_abun_rmna_dis)),
-                                           match(rownames(all_s_abun), colnames(all_s_abun_rmna_dis))]
-rownames(all_s_abun_dis)<-rownames(all_s_abun)
-colnames(all_s_abun_dis)<-rownames(all_s_abun)
-
-
-save(all_s_abun_dis, file = "01.cleanData/mbio_all/all_s_abun_dis.RData")
+mean(rowSums(all_s_abun,na.rm = T),na.rm = T) # Mean of total relative abundance of species detected with SVs: 0.825154
+rowSums(all_s_abun,na.rm = T)[rowSums(all_s_abun,na.rm = T)!=0] %>% min # Minimum of total relative abundance of species detected with SVs: 0.43729
+max(rowSums(all_s_abun,na.rm = T),na.rm = T) # Maximum of total relative abundance of species detected with SVs: 0.94705
 ```

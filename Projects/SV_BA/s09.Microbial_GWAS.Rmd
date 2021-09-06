@@ -1,0 +1,1413 @@
+---
+title: "Microbial GWAS (corrected for abundance)"
+author: "Daoming Wang"
+date: "2021/07/30"
+output:
+  html_document: 
+    theme: flatly
+    highlight: espresso
+    toc: true
+    toc_depth: 4
+    toc_float: true
+  word_document: default
+  pdf_document:
+    includes:
+      in_header: header.tex
+      keep_tex: yes
+      latex_engine: xelatex
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 Preparation
+
+### 1.1 Import
+
+Import packages and functions.
+
+```{r 1.1, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+source("functions.R")
+```
+
+### 1.2 Inputs
+
+Read input files.
+
+```{r 1.2, echo=TRUE}
+load("01.cleanData/SV_lld/dsgv_lld.RData")
+load("01.cleanData/SV_lld/vsgv_lld.RData")
+load("01.cleanData/SV_300OB/dsgv_ob.RData")
+load("01.cleanData/SV_300OB/vsgv_ob.RData")
+load("01.cleanData/SV_all/dsgv.RData")
+load("01.cleanData/SV_all/vsgv.RData")
+info    <- read.table("01.cleanData/SV_info/20200801_LLD_300OB_Informative_species_information.tsv",
+                      sep = "\t", header = T, stringsAsFactors = F)
+vsv_info<-read.table("01.cleanData/SV_info/20200801_LLD_300OB_vsgv_info_anno.tsv",
+                     sep = "\t",header = T,stringsAsFactors = F, quote = "")
+dsv_info<-read.table("01.cleanData/SV_info/20200801_LLD_300OB_dsgv_info_anno.tsv",
+                     sep = "\t",header = T,stringsAsFactors = F,quote = "")
+
+lld_ba <- read.table("01.cleanData/phen_lld/20200801_LLD_39BA_1135samples.tsv")
+lld_basic <- read.table("01.cleanData/phen_lld/20200801_LLD_basic_1135samples.tsv")
+ob_ba <- read.table("01.cleanData/phen_300OB/20200801_300OB_39BA_302samples.tsv")
+ob_basic <- read.table("01.cleanData/phen_300OB/20200801_300OB_basic_302samples.tsv")
+all_ba<-read.table("01.cleanData/phen_all/20200801_LLD_300OB_39BA_1437samples.tsv")
+all_covar<-read.table("01.cleanData/phen_all/20200801_LLD_covar_1437samples.tsv")
+all_basic<-read.table("01.cleanData/phen_all/20200801_LLD_basic_1437samples.tsv")
+
+lld_abun<-read.table("01.cleanData/mbio_lld/LLD_SV_55species_abun_1135samples.tsv", check.names = F) 
+ob_abun<-read.table("01.cleanData/mbio_300OB/300OB_SV_55species_abun_302samples.tsv", check.names = F) 
+all_abun<-read.table("01.cleanData/mbio_all/LLD_300OB_SV_55species_abun_1437samples.tsv", check.names = F)
+
+load("01.cleanData/SV_lld/lld_msv_pc_cum0.6.RData")
+load("01.cleanData/SV_300OB/ob_msv_pc_cum0.6.RData")
+load("01.cleanData/SV_all/msv_pc_cum0.6.RData")
+load("01.cleanData/SV_all/msv_pc_cum0.6_info.RData")
+```
+
+## 2 Associations between SVs and BAs
+
+### 2.1 Preparation
+
+```{r 2.1}
+if (!dir.exists("09.Microbial_GWAS")) {dir.create("09.Microbial_GWAS")}
+if (!dir.exists("09.Microbial_GWAS/RData")) {dir.create("09.Microbial_GWAS/RData")}
+
+## Prepare covariate table
+# lld
+lld_abun$Others<-1-rowSums(lld_abun)
+lld_abun_clr<-abundances(x=as.data.frame(na.omit(lld_abun)), transform="clr") %>%as.data.frame
+lld_abun_clr <- lld_abun_clr[match(rownames(lld_abun), rownames(lld_abun_clr)),]
+rownames(lld_abun_clr) <- rownames(lld_abun)
+
+#lld_covar<-cbind(lld_basic,lld_abun_clr)
+
+# 300OB
+ob_abun$Others<-1-rowSums(ob_abun)
+ob_abun_clr<-abundances(x=as.data.frame(na.omit(ob_abun)), transform="clr") %>%as.data.frame
+ob_abun_clr <- ob_abun_clr[match(rownames(ob_abun), rownames(ob_abun_clr)),]
+rownames(ob_abun_clr) <- rownames(ob_abun)
+
+#ob_covar<-cbind(ob_basic,ob_abun_clr)
+
+covar <- c('Gender','Age','BMI','Reads_number')
+```
+
+
+### 2.2 linear model 1
+
+Linear model with covariates: age, gender, BMI, read count and corresponding species relative abundance.
+
+```{r 2.2, eval = FALSE}
+## vsv
+lld_vsv_ba_lm_adjAbun_res<-lm_btw_mats_adjAbun(lld_ba,vsgv_lld,lld_basic,covar,lld_abun_clr,info, 9)
+save(lld_vsv_ba_lm_adjAbun_res, file = "09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbun_res.RData")
+
+ob_vsv_ba_lm_adjAbun_res<-lm_btw_mats_adjAbun(ob_ba,vsgv_ob,ob_basic,covar,ob_abun_clr,info,9)
+save(ob_vsv_ba_lm_adjAbun_res, file = "09.Microbial_GWAS/RData/ob_vsv_ba_lm_adjAbun_res.RData")
+
+# meta-analysis
+cbind_vsv_ba_lm_adjAbun_edge<-cbind(lld_vsv_ba_lm_adjAbun_res, ob_vsv_ba_lm_adjAbun_res)[,-c(16,17)]
+colnames(cbind_vsv_ba_lm_adjAbun_edge)<-c("BA","SV",
+                                paste("LLD.",colnames(cbind_vsv_ba_lm_adjAbun_edge)[3:15],sep = ""),
+                                paste("X300OB.",colnames(cbind_vsv_ba_lm_adjAbun_edge)[3:15],sep = ""))
+all_vsv_ba_lm_adjAbun_res <- my_batch_meta_lm(cbind_vsv_ba_lm_adjAbun_edge, c("LLD", "300OB"), c(3,16), c(4,17))
+save(all_vsv_ba_lm_adjAbun_res, file = "09.Microbial_GWAS/RData/all_vsv_ba_lm_adjAbun_res.RData")
+
+
+## dsv
+lld_dsv_ba_lm_adjAbun_res<-lm_btw_mats_adjAbun(lld_ba,dsgv_lld,lld_basic,covar,lld_abun_clr,info, 9)
+save(lld_dsv_ba_lm_adjAbun_res, file = "09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbun_res.RData")
+
+ob_dsv_ba_lm_adjAbun_res<-lm_btw_mats_adjAbun(ob_ba,dsgv_ob,ob_basic,covar,ob_abun_clr,info,9)
+save(ob_dsv_ba_lm_adjAbun_res, file = "09.Microbial_GWAS/RData/ob_dsv_ba_lm_adjAbun_res.RData")
+
+# meta-analysis
+cbind_dsv_ba_lm_adjAbun_edge<-cbind(lld_dsv_ba_lm_adjAbun_res, ob_dsv_ba_lm_adjAbun_res)[,-c(16,17)]
+colnames(cbind_dsv_ba_lm_adjAbun_edge)<-c("BA","SV",
+                                paste("LLD.",colnames(cbind_dsv_ba_lm_adjAbun_edge)[3:15],sep = ""),
+                                paste("X300OB.",colnames(cbind_dsv_ba_lm_adjAbun_edge)[3:15],sep = ""))
+all_dsv_ba_lm_adjAbun_res <- my_batch_meta_lm(cbind_dsv_ba_lm_adjAbun_edge, c("LLD", "300OB"), c(3,16), c(4,17))
+save(all_dsv_ba_lm_adjAbun_res, file = "09.Microbial_GWAS/RData/all_dsv_ba_lm_adjAbun_res.RData")
+```
+
+### 2.3 linear model 2
+
+Linear model with covariates: age, gender, BMI, read count, corresponding species relative abundance, and genetic structure PCs.
+
+```{r 2.3, eval=FALSE}
+## vsv
+lld_vsv_ba_lm_adjAbunPCs_res <- lm_btw_mats_adjAbunPCs(lld_ba,vsgv_lld,lld_basic,covar,lld_abun_clr,lld_msv_pc_cum0.6,info, 9)
+save(lld_vsv_ba_lm_adjAbunPCs_res, file = "09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbunPCs_res.RData")
+
+ob_vsv_ba_lm_adjAbunPCs_res <- lm_btw_mats_adjAbunPCs(ob_ba, vsgv_ob, ob_basic, covar, ob_abun_clr, ob_msv_pc_cum0.6, info, 9)
+save(ob_vsv_ba_lm_adjAbunPCs_res, file = "09.Microbial_GWAS/RData/ob_vsv_ba_lm_adjAbunPCs_res.RData")
+
+# meta-analysis
+cbind_vsv_ba_lm_adjAbunPCs_edge<-cbind(lld_vsv_ba_lm_adjAbunPCs_res, ob_vsv_ba_lm_adjAbunPCs_res)[,-c(16,17)]
+colnames(cbind_vsv_ba_lm_adjAbunPCs_edge)<-c("BA","SV",
+                                paste("LLD.",colnames(cbind_vsv_ba_lm_adjAbunPCs_edge)[3:15],sep = ""),
+                                paste("X300OB.",colnames(cbind_vsv_ba_lm_adjAbunPCs_edge)[3:15],sep = ""))
+all_vsv_ba_lm_adjAbunPCs_res <- my_batch_meta_lm(cbind_vsv_ba_lm_adjAbunPCs_edge, c("LLD", "300OB"), c(3,16), c(4,17))
+save(all_vsv_ba_lm_adjAbunPCs_res, file = "09.Microbial_GWAS/RData/all_vsv_ba_lm_adjAbunPCs_res.RData")
+
+## dsv
+lld_dsv_ba_lm_adjAbunPCs_res <- lm_btw_mats_adjAbunPCs(lld_ba,dsgv_lld,lld_basic,covar,lld_abun_clr,lld_msv_pc_cum0.6,info, 9)
+save(lld_dsv_ba_lm_adjAbunPCs_res, file = "09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbunPCs_res.RData")
+
+ob_dsv_ba_lm_adjAbunPCs_res <- lm_btw_mats_adjAbunPCs(ob_ba, dsgv_ob, ob_basic, covar, ob_abun_clr, ob_msv_pc_cum0.6, info, 9)
+save(ob_dsv_ba_lm_adjAbunPCs_res, file = "09.Microbial_GWAS/RData/ob_dsv_ba_lm_adjAbunPCs_res.RData")
+
+# meta-analysis
+cbind_dsv_ba_lm_adjAbunPCs_edge<-cbind(lld_dsv_ba_lm_adjAbunPCs_res, ob_dsv_ba_lm_adjAbunPCs_res)[,-c(16,17)]
+colnames(cbind_dsv_ba_lm_adjAbunPCs_edge)<-c("BA","SV",
+                                paste("LLD.",colnames(cbind_dsv_ba_lm_adjAbunPCs_edge)[3:15],sep = ""),
+                                paste("X300OB.",colnames(cbind_dsv_ba_lm_adjAbunPCs_edge)[3:15],sep = ""))
+all_dsv_ba_lm_adjAbunPCs_res <- my_batch_meta_lm(cbind_dsv_ba_lm_adjAbunPCs_edge, c("LLD", "300OB"), c(3,16), c(4,17))
+save(all_dsv_ba_lm_adjAbunPCs_res, file = "09.Microbial_GWAS/RData/all_dsv_ba_lm_adjAbunPCs_res.RData")
+```
+
+### 2.2 Merge results
+
+## 3 Results of Model 1 
+
+### 3.1 Clean results
+
+#### 3.1.1 vSV associations
+```{r 3.1.1}
+## vsv
+## load result data
+load("09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/ob_vsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/all_vsv_ba_lm_adjAbun_res.RData")
+
+## merge result tables
+vsv_ba_lm_adjAbun_res.edge<-all_vsv_ba_lm_adjAbun_res
+
+vsv_ba_lm_adjAbun_res.sig.edge <- 
+  vsv_ba_lm_adjAbun_res.edge[vsv_ba_lm_adjAbun_res.edge$Meta.fdr.p < 0.05 &
+                               vsv_ba_lm_adjAbun_res.edge$LLD.y_uniq_N>10 &
+                               vsv_ba_lm_adjAbun_res.edge$X300OB.y_uniq_N>10 &
+                               (vsv_ba_lm_adjAbun_res.edge$LLD.p < 0.05 &
+                                   vsv_ba_lm_adjAbun_res.edge$X300OB.p < 0.05 &
+                                   vsv_ba_lm_adjAbun_res.edge$LLD.Beta*vsv_ba_lm_adjAbun_res.edge$X300OB.Beta>0 &
+                                   vsv_ba_lm_adjAbun_res.edge$Meta.hetero.p>0.05),]
+
+vsv_ba_lm_adjAbun_res.sig.anno.edge<-left_join(vsv_ba_lm_adjAbun_res.sig.edge, vsv_info, by = c("SV" = "SV_Name"))
+write.table(vsv_ba_lm_adjAbun_res.sig.anno.edge,"09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+```
+
+#### 3.1.2 dSV associations
+
+```{r 3.1.2}
+## dsv
+## load result data
+load("09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/ob_dsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/all_dsv_ba_lm_adjAbun_res.RData")
+
+## merge result tables
+dsv_ba_lm_adjAbun_res.edge<-all_dsv_ba_lm_adjAbun_res
+
+dsv_ba_lm_adjAbun_res.sig.edge <- dsv_ba_lm_adjAbun_res.edge[dsv_ba_lm_adjAbun_res.edge$Meta.fdr.p < 0.05 &
+                                                               !is.na(dsv_ba_lm_adjAbun_res.edge$Meta.fdr.p) &
+                                                               dsv_ba_lm_adjAbun_res.edge$LLD.p < 0.05 &
+                                                               dsv_ba_lm_adjAbun_res.edge$X300OB.p < 0.05 &
+                                                               dsv_ba_lm_adjAbun_res.edge$LLD.Beta*dsv_ba_lm_adjAbun_res.edge$X300OB.Beta > 0 &
+                                                               dsv_ba_lm_adjAbun_res.edge$LLD.y_uniq_N>10 &
+                                                               dsv_ba_lm_adjAbun_res.edge$X300OB.y_uniq_N>10 &
+                                                 dsv_ba_lm_adjAbun_res.edge$Meta.hetero.p>0.05 ,]
+
+dsv_ba_lm_adjAbun_res.sig.anno.edge<-left_join(dsv_ba_lm_adjAbun_res.sig.edge, dsv_info, by = c("SV" = "SV_Name"))
+write.table(dsv_ba_lm_adjAbun_res.sig.anno.edge,"09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+```
+
+#### 3.1.3 Volcano plot
+
+```{r 3.1.3}
+# vsv
+vsv_ba_lm_adjAbun_res.edge$MetaSigAssoc<-rep('No', nrow(vsv_ba_lm_adjAbun_res.edge))
+
+vsv_ba_lm_adjAbun_res.edge$MetaSigAssoc[vsv_ba_lm_adjAbun_res.edge$Meta.fdr.p < 0.05]<-'Yes'
+vsv_ba_lm_adjAbun_res.edge.plot<-vsv_ba_lm_adjAbun_res.edge[vsv_ba_lm_adjAbun_res.edge$LLD.y_uniq_N>10 &
+                                                         vsv_ba_lm_adjAbun_res.edge$X300OB.y_uniq_N>10,]
+
+p_vsv_volcano<-ggplot(vsv_ba_lm_adjAbun_res.edge.plot,aes(Meta.beta, -log10(Meta.p), color=MetaSigAssoc))+
+  geom_point(alpha = 0.5,size = 0.5)+
+  xlab('Beta coefficient')+
+  ylab('-log10(P)')+
+  scale_color_manual(name   = NULL,
+                     breaks = c("Yes", "No"),
+                     labels = c("Associated    ", "Not associated"),
+                     values = c("#ff4040","#4f94cd"))+
+  scale_shape_discrete(name = NULL)+
+  theme_bw()+
+  theme(legend.position = "top",
+        legend.key = element_rect(fill = NA))
+
+# dsv
+dsv_ba_lm_adjAbun_res.edge$MetaSigAssoc<-rep('No', nrow(dsv_ba_lm_adjAbun_res.edge))
+
+dsv_ba_lm_adjAbun_res.edge$MetaSigAssoc[dsv_ba_lm_adjAbun_res.edge$Meta.fdr.p < 0.05 ]<-'Yes' 
+dsv_ba_lm_adjAbun_res.edge.plot<-dsv_ba_lm_adjAbun_res.edge[dsv_ba_lm_adjAbun_res.edge$LLD.y_uniq_N>10 &
+                                                         dsv_ba_lm_adjAbun_res.edge$X300OB.y_uniq_N>10,]
+
+p_dsv_volcano<-ggplot(dsv_ba_lm_adjAbun_res.edge.plot,aes(Meta.beta, -log10(Meta.p), color=MetaSigAssoc))+
+  geom_point(alpha = 0.5,size = 0.5)+
+  xlab('Beta coefficient')+
+  ylab('-log10(P)')+
+  scale_color_manual(name   = NULL,
+                     breaks = c("Yes", "No"),
+                     labels = c("Associated    ", "Not associated"),
+                     values = c("#ff4040","#4f94cd"))+
+  scale_shape_discrete(name = NULL)+
+  theme_bw()+
+  theme(legend.position = "top",
+        legend.key = element_rect(fill = NA))
+
+## plot
+p_title_volcano <- ggdraw() + 
+    draw_label(
+      ' ', # Volcano plot
+      fontface = 'bold', x = 0, hjust = 0,size = 10) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7))
+
+p_sv_ba_volcano<-plot_grid(
+    p_title_volcano, 
+    plot_grid(p_vsv_volcano,p_dsv_volcano,
+              rel_widths = c(1, 1),align = 'hv',
+              #labels = c("vSVs-BAs", "dSVs-BAs"),
+              ncol = 2,label_size	= 8,vjust = 0),
+    ncol = 1,
+    # rel_heights values control vertical title margins
+    rel_heights = c(0.1, 2)
+  )
+
+if(!dir.exists("09.Microbial_GWAS/")){dir.create("09.Microbial_GWAS/")}
+pdf("09.Microbial_GWAS/sv_adjAbun_ba_volcano.pdf", height = 4, width = 7)
+print(p_sv_ba_volcano)
+dev.off()
+```
+
+### 3.2 Replication
+
+#### 3.2.1 vSV
+
+```{r 3.2.1}
+## Correlation of effect size between LLD and 300OB
+vsv_ba_lm_adjAbun_res.sig.edge_r_density <- get_density(vsv_ba_lm_adjAbun_res.sig.edge$LLD.Beta, vsv_ba_lm_adjAbun_res.sig.edge$X300OB.Beta, n = 200)
+
+es_cor<-cor.test(vsv_ba_lm_adjAbun_res.sig.edge$LLD.Beta, vsv_ba_lm_adjAbun_res.sig.edge$X300OB.Beta,method = "spearman")
+text_r<-paste("R=",round(es_cor$estimate,digits = 2),
+              ", P<2.20e-16",
+              sep = "")
+
+p_vsv_ba_es<-ggplot(vsv_ba_lm_adjAbun_res.sig.edge) + 
+  geom_point(aes(LLD.Beta, X300OB.Beta),alpha = 0.4) +
+  annotate("text",x = c(-0.5), y = c(0.5), label = c(text_r),hjust = 0)+
+  geom_hline(yintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  geom_vline(xintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  xlab('Effect size in LLD')+
+  ylab('Effect size in 300OB')+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+
+## Correlation of effect size between LLD and 300OB
+vsv_ba_lm_adjAbun_res.sig.edge_p_density <- get_density(log10(vsv_ba_lm_adjAbun_res.sig.edge$LLD.p), log10(vsv_ba_lm_adjAbun_res.sig.edge$X300OB.p), n = 200)
+
+p_cor<-cor.test(log10(vsv_ba_lm_adjAbun_res.sig.edge$LLD.p), log10(vsv_ba_lm_adjAbun_res.sig.edge$X300OB.p),method = "spearman")
+text_p<-paste("R=",round(p_cor$estimate,digits = 2),
+              ", P=",formatC(p_cor$p.value, format = "e", digits = 2),
+              sep = "")
+
+p_vsv_ba_p<-ggplot(vsv_ba_lm_adjAbun_res.sig.edge) + 
+  geom_point(aes(LLD.p, X300OB.p),alpha = 0.4) +
+  annotate("text",x = c(1e-21), y = c(1e-3), label = c(text_p),hjust = 0)+
+  xlab('P-value in LLD')+
+  ylab('P-value in 300OB')+
+  scale_x_log10()+
+  scale_y_log10()+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+```
+
+#### 3.2.2 dSV
+
+```{r 3.2.2}
+## Correlation of effect size between LLD and 300OB
+dsv_ba_lm_adjAbun_res.sig.edge_r_density <- get_density(dsv_ba_lm_adjAbun_res.sig.edge$LLD.Beta, dsv_ba_lm_adjAbun_res.sig.edge$X300OB.Beta, n = 200)
+
+es_cor<-cor.test(dsv_ba_lm_adjAbun_res.sig.edge$LLD.Beta, dsv_ba_lm_adjAbun_res.sig.edge$X300OB.Beta,method = "spearman")
+text_r<-paste("R=",round(es_cor$estimate,digits = 2),
+              ", P<2.20e-16",
+              sep = "")
+
+p_dsv_ba_es<-ggplot(dsv_ba_lm_adjAbun_res.sig.edge) + 
+  geom_point(aes(LLD.Beta, X300OB.Beta),alpha = 0.4) +
+  annotate("text",x = c(-0.5), y = c(0.5), label = c(text_r),hjust = 0)+
+  geom_hline(yintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  geom_vline(xintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  xlab('Effect size in LLD')+
+  ylab('Effect size in 300OB')+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+
+## Correlation of effect size between LLD and 300OB
+dsv_ba_lm_adjAbun_res.sig.edge_p_density <- get_density(log10(dsv_ba_lm_adjAbun_res.sig.edge$LLD.p), log10(dsv_ba_lm_adjAbun_res.sig.edge$X300OB.p), n = 200)
+
+p_cor<-cor.test(log10(dsv_ba_lm_adjAbun_res.sig.edge$LLD.p), log10(dsv_ba_lm_adjAbun_res.sig.edge$X300OB.p),method = "spearman")
+text_p<-paste("R=",round(p_cor$estimate,digits = 2),
+              ", P=",formatC(p_cor$p.value, format = "e", digits = 2),
+              sep = "")
+
+p_dsv_ba_p<-ggplot(dsv_ba_lm_adjAbun_res.sig.edge) + 
+  geom_point(aes(LLD.p, X300OB.p),alpha = 0.4) +
+  annotate("text",x = c(1e-21), y = c(1e-3), label = c(text_p),hjust = 0)+
+  xlab('P-value in LLD')+
+  ylab('P-value in 300OB')+
+  scale_x_log10()+
+  scale_y_log10()+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+```
+
+#### 3.2.3 Combine figure
+
+```{R 3.2.3, fig.height = 7, fig.width = 7}
+## plot
+p_title_replic <- ggdraw() + 
+    draw_label(
+      'Replication',
+      fontface = 'bold', x = 0, hjust = 0) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7))
+
+p_sv_ba_replic<-plot_grid(
+    p_title_replic, 
+    plot_grid(p_vsv_ba_es,p_dsv_ba_es,p_vsv_ba_p,p_dsv_ba_p,
+              rel_widths = c(1, 1, 1, 1),align = 'hv',
+              labels = c("vSVs-BAs Effect size", "dSVs-BAs Effect size",
+                         "vSVs-BAs P-value", "dSVs-BAs P-value"),
+              ncol = 2,label_size	= 8,vjust = 0),
+    ncol = 1,
+    # rel_heights values control vertical title margins
+    rel_heights = c(0.1, 2)
+  )
+
+if(!dir.exists("09.Microbial_GWAS/")){dir.create("09.Microbial_GWAS/")}
+pdf("09.Microbial_GWAS/sv_ba_lm_adjAbun_scatter.pdf", height = 7, width = 7)
+print(p_sv_ba_replic)
+dev.off()
+
+print(p_sv_ba_replic)
+```
+
+### 3.3 Visualization
+#### 3.3.1 Combine vSV and dSV associations
+
+```{r 3.3.1}
+sv_ba_lm_adjAbun_res.sig.edge<-rbind(vsv_ba_lm_adjAbun_res.sig.edge,dsv_ba_lm_adjAbun_res.sig.edge)
+
+sv_ba_lm_adjAbun.sig.ba  <- sv_ba_lm_adjAbun_res.sig.edge$BA %>%
+  as.character(.) %>%
+  .[!duplicated(.)]
+sv_ba_lm_adjAbun.sig.sv <- sv_ba_lm_adjAbun_res.sig.edge$SV %>%
+  as.character(.) %>%
+  .[!duplicated(.)] %>%
+  sort(.,decreasing = F)
+
+
+## circos plot
+sv_ba_count<-NULL
+for (pheno in sv_ba_lm_adjAbun.sig.ba) {
+  #pheno <-"C4"
+  sv_ba_df<-sv_ba_lm_adjAbun_res.sig.edge[sv_ba_lm_adjAbun_res.sig.edge$BA==pheno,]$SV %>%
+    str_replace_all(.,"\\:\\d+_\\d+.*", "") %>%
+    table %>%
+    as.data.frame
+  colnames(sv_ba_df)<-c("Species", "Count")
+  sv_ba_df<-data.frame(BA = rep(pheno,nrow(sv_ba_df)), sv_ba_df)
+  sv_ba_count<-rbind(sv_ba_count,sv_ba_df)
+}
+
+sv_ba_count$Species<-info$Short_name[match(sv_ba_count$Species, info$organism)]
+sv_ba_count <- sv_ba_count[order(sv_ba_count$Count),]
+
+sv_ba_count_species_order<-sv_ba_count %>% group_by(Species) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+sv_ba_count_ba_order<-sv_ba_count %>% group_by(BA) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+
+sv_ba_count<-sv_ba_count[order(match(sv_ba_count$BA, sv_ba_count_ba_order$BA),decreasing = F),]
+
+sv_ba_count_species_order_str<-as.character(sv_ba_count_species_order$Species)
+sv_ba_count_ba_order_str<-as.character(sv_ba_count_ba_order$BA)
+
+pdf("09.Microbial_GWAS/sv_ba_lm_adjAbun.circos.pdf", width = 26, height = 26)
+circos.par(start.degree = 180, "clock.wise" = T) # ,xaxis.clock.wise = F
+chordDiagram(sv_ba_count,annotationTrack = "grid",
+             grid.col =  c(wes_palette("Darjeeling1", length(sv_ba_count_ba_order_str), type = "continuous"),
+                           rep('grey',length(sv_ba_count_species_order_str))),
+             order = c(rev(sv_ba_count_ba_order_str),
+                       sv_ba_count_species_order_str),
+             big.gap = 5,
+             preAllocateTracks = list(track.margin = c(0, uh(90, "mm")), 
+                                      track.height = max(strwidth(unlist(dimnames(sv_ba_count)))))
+             )
+circos.track(track.index = 1, panel.fun = function(x, y) {
+  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,cex = 2.5,
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
+}, bg.border = NA) # here set bg.border to NA is important
+
+dev.off()
+circos.clear()
+```
+
+
+### 3.4 Examples
+
+### 3.4.1 Heatmap of certain species
+```{r 3.4.1}
+all_sv_ba_lm_adjAbun<-rbind(all_vsv_ba_lm_adjAbun_res, all_dsv_ba_lm_adjAbun_res)
+all_sv_ba_lm_adjAbun$SV<-c(paste("vsv_",all_vsv_ba_lm_adjAbun_res$SV,sep = ""), paste("dsv_",all_dsv_ba_lm_adjAbun_res$SV,sep = ""))
+all_sv_ba_lm_adjAbun<-as.data.frame(all_sv_ba_lm_adjAbun)
+all_sv_ba_lm_adjAbun$Sign<-NA
+all_sv_ba_lm_adjAbun$Sign[all_sv_ba_lm_adjAbun$Meta.p < 0.05 &
+  !is.na(all_sv_ba_lm_adjAbun$Meta.p) &
+  all_sv_ba_lm_adjAbun$LLD.p < 0.05 &
+  all_sv_ba_lm_adjAbun$X300OB.p < 0.05 &
+  all_sv_ba_lm_adjAbun$LLD.y_uniq_N>10 &
+  all_sv_ba_lm_adjAbun$X300OB.y_uniq_N>10 &
+  !is.na(all_sv_ba_lm_adjAbun$Meta.hetero.p) &
+  all_sv_ba_lm_adjAbun$Meta.hetero.p>0.05] <- "*" 
+all_sv_ba_lm_adjAbun$Sign[all_sv_ba_lm_adjAbun$Meta.fdr.p < 0.05 &
+  !is.na(all_sv_ba_lm_adjAbun$Meta.fdr.p) &
+  all_sv_ba_lm_adjAbun$LLD.p < 0.05 &
+  all_sv_ba_lm_adjAbun$X300OB.p < 0.05 &
+  all_sv_ba_lm_adjAbun$LLD.y_uniq_N>10 &
+  all_sv_ba_lm_adjAbun$X300OB.y_uniq_N>10 &
+  !is.na(all_sv_ba_lm_adjAbun$Meta.hetero.p) &
+  all_sv_ba_lm_adjAbun$Meta.hetero.p>0.05] <- "☆" 
+all_sv_ba_lm_adjAbun$Sign[all_sv_ba_lm_adjAbun$Meta.bonferroni.p < 0.05 &
+  !is.na(all_sv_ba_lm_adjAbun$Meta.bonferroni.p) &
+  all_sv_ba_lm_adjAbun$LLD.p < 0.05 &
+  all_sv_ba_lm_adjAbun$X300OB.p < 0.05 &
+  all_sv_ba_lm_adjAbun$LLD.y_uniq_N>10 &
+  all_sv_ba_lm_adjAbun$X300OB.y_uniq_N>10 &
+  !is.na(all_sv_ba_lm_adjAbun$Meta.hetero.p) &
+  all_sv_ba_lm_adjAbun$Meta.hetero.p>0.05] <- "★"
+
+all_sv_ba_lm_adjAbun.r<- all_sv_ba_lm_adjAbun[,c("BA", "SV", "Meta.beta")] %>% spread("BA", "Meta.beta") %>% data.frame(row.names = "SV")
+all_sv_ba_lm_adjAbun.sign<- all_sv_ba_lm_adjAbun[,c("BA", "SV", "Sign")] %>% spread("BA", "Sign") %>% data.frame(row.names = "SV")
+
+plot.ba  <- sv_ba_lm_adjAbun_res.sig.edge$BA[grep("wexlerae", sv_ba_lm_adjAbun_res.sig.edge$SV)] %>%
+  as.character(.) %>%
+  .[!duplicated(.)]
+plot.sv <- sv_ba_lm_adjAbun_res.sig.edge$SV[grep("wexlerae", sv_ba_lm_adjAbun_res.sig.edge$SV)] %>%
+  as.character(.) %>%
+  .[!duplicated(.)] %>%
+  sort(.,decreasing = F)
+
+spe.sv_ba_lm_adjAbun.r<-all_sv_ba_lm_adjAbun.r[grep("wexlerae", rownames(all_sv_ba_lm_adjAbun.r)),]
+rownames(spe.sv_ba_lm_adjAbun.r)<-str_replace_all(rownames(spe.sv_ba_lm_adjAbun.r), "^.*sv_", "")
+spe.sv_ba_lm_adjAbun.sign<-all_sv_ba_lm_adjAbun.sign[grep("wexlerae", rownames(all_sv_ba_lm_adjAbun.sign)),]
+rownames(spe.sv_ba_lm_adjAbun.sign)<-str_replace_all(rownames(spe.sv_ba_lm_adjAbun.sign), "^.*sv_", "")
+
+sv_ba_lm_adjAbun.r.plot    <- spe.sv_ba_lm_adjAbun.r %>%
+  .[match(plot.sv,rownames(.)),match(plot.ba,colnames(.))]
+sv_ba_lm_adjAbun.r.plot[is.na(sv_ba_lm_adjAbun.r.plot)]<-0
+sv_ba_lm_adjAbun.sign.plot <- spe.sv_ba_lm_adjAbun.sign %>%
+  .[match(plot.sv,rownames(spe.sv_ba_lm_adjAbun.r)),
+    match(plot.ba,colnames(spe.sv_ba_lm_adjAbun.r))]
+
+rownames(sv_ba_lm_adjAbun.r.plot)<-str_replace_all(rownames(sv_ba_lm_adjAbun.r.plot), "Blautia wexlerae DSM 19850:", "")
+library(showtext)
+showtext_auto()
+i  <- 256
+myBreaks <- c(seq(min(sv_ba_lm_adjAbun.r.plot), 0, length.out=ceiling(i/2) + 1), 
+              seq(max(sv_ba_lm_adjAbun.r.plot)/i, max(sv_ba_lm_adjAbun.r.plot), length.out=floor(i/2)))
+pdf("09.Microbial_GWAS/B.wexlerae_sv_ba_lm_adjAbun.heatmap.pdf", width = 6, height = 10)
+ heatmap.2(as.matrix(sv_ba_lm_adjAbun.r.plot),
+          col=colorRampPalette(c("#02CBFB","#FFFFFF","#F20C34"))(i), breaks = myBreaks,
+          trace = "none", Rowv = F, Colv = F, dendrogram = "none",
+          density.info="none",
+          cexCol = 1, srtCol = 45, cexRow = 1,
+          cellnote = sv_ba_lm_adjAbun.sign.plot, notecol = "grey50",notecex = 1,
+          key.xlab = "Beta coefficient",
+          key.par=list(mar=c(4,4,18.5,4), cex.axis = 1, cex.lab = 1), 
+          lm=rbind( c(0, 4, 3), c(2, 1, 0 )), lhei = c(0.8, 1.5),lwid=c(0.5, 4, 2 ),key.title = NA,
+          margins=c(10,1) # ("margin.Y", "margin.X")
+)
+dev.off()
+```
+
+### 3.4.2 Scatter plots
+
+```{r 3.4.2}
+all_abun$Others<-1-rowSums(all_abun)
+all_abun_clr<-abundances(x=as.data.frame(na.omit(all_abun)), transform="clr") %>%as.data.frame
+all_abun_clr <- all_abun_clr[match(rownames(all_abun), rownames(all_abun_clr)),]
+rownames(all_abun_clr) <- rownames(all_abun)
+
+## Most significant association:Coprococcus.comes.ATCC.27758.2932_2935.2935_2937) and secondary primary BA ratio
+df<-data.frame(phen = all_ba$Secondary_primary_ratio, 
+               all_covar,
+               Cohort = all_basic$Cohort,
+               sv=vsgv$`Coprococcus comes ATCC 27758:2932_2935;2935_2937`,
+               abun = all_abun_clr$`Coprococcus comes ATCC 27758`,
+               msv_pc_cum0.6[,colnames(msv_pc_cum0.6)[grep("Coprococcus comes ATCC 27758",colnames(msv_pc_cum0.6))]]) %>% 
+  na.omit
+df_raw<-df
+df[,c(1,2,3,4,6,8,11,12:17)] <- apply(df[,c(1,2,3,4,6,8,11,12:17)], 2, qtrans) %>% as.data.frame
+df<-df[,c(1,2,3,4,6,8,12:17)]
+
+df_lm<- summary(lm(phen~.,data = df))
+
+df_density <- get_density(df_lm$residuals, df_raw$sv, n = 200)
+
+es_cor<-cor.test(df_lm$residuals, df_raw$sv, method = "spearman")
+text_r<-paste("C.comes:2932_2935;2935_2937","Beta=0.37, P=1.98E-28",sep = "\n")
+
+pdf("09.Microbial_GWAS/Example_C.comes_2932_Secondary_primary_ratio_adjAbunPCs.pdf", height = 4, width = 4.5)
+ggplot(df, aes(df_raw$sv, df_lm$residuals,color = df_raw$Cohort.1))+
+  geom_point(size = 3,alpha = 0.5)+
+  geom_smooth(method = 'lm', color = 'white', linetype = 'dashed')+
+  scale_color_manual(breaks = c("LLD","300OB"),
+                     labels = c("LLD", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  ggtitle(text_r)+
+  xlab("Normalized region coverage")+
+  ylab("Residuals of Secondary/primary BA ratio")+
+  theme_classic2()+
+  theme(legend.position = 'none',
+        plot.title = element_text(hjust = 0.5,size = 10))
+dev.off()
+
+## Most significant association in B.wexlerae: 2081 and DCA
+df<-data.frame(phen = all_ba$DCA,  ##
+               all_covar,
+               Cohort = all_basic$Cohort,
+               sv=vsgv$`Blautia wexlerae DSM 19850:2081_2082`, ##
+               abun = all_abun_clr$`Blautia wexlerae DSM 19850`,
+               msv_pc_cum0.6[,colnames(msv_pc_cum0.6)[grep("Blautia wexlerae DSM 19850",colnames(msv_pc_cum0.6))]]) %>%  ##
+  na.omit
+df_raw<-df
+df[,c(1,2,3,4,6,8,11,12:15)] <- apply(df[,c(1,2,3,4,6,8,11,12:15)], 2, qtrans) %>% 
+  as.data.frame
+df<-df[,c(1,2,3,4,6,8,12:15)]
+
+df_lm<- summary(lm(phen~.,data = df))
+
+df_density <- get_density(df_lm$residuals, df_raw$sv, n = 200)
+
+es_cor<-cor.test(df_lm$residuals, df_raw$sv, method = "spearman")
+text_r<-paste("B.wexlerae:2081_2082","Beta=-0.16, P=3.20E-7",sep = "\n") ##
+
+pdf("09.Microbial_GWAS/Example_B.wexlerae_2081_DCA_adjAbunPCs.pdf", height = 4, width = 4.5)
+ggplot(df, aes(df_raw$sv, df_lm$residuals,color = df_raw$Cohort.1))+
+  geom_point(size = 3,alpha = 0.5)+
+  geom_smooth(method = 'lm', color = 'white', linetype = 'dashed')+
+  scale_color_manual(breaks = c("LLD","300OB"),
+                     labels = c("LLD", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  ggtitle(text_r)+
+  xlab("Normalized region coverage")+
+  ylab("Residuals of DCA")+ ##
+  theme_classic2()+
+  theme(legend.position = 'none',
+        plot.title = element_text(hjust = 0.5,size = 10))
+
+dev.off()
+
+
+## Eubacterium ventriosum ATCC 27560:1512_1517 and Secondary/primary BA ratio
+df<-data.frame(phen = all_ba$Secondary_primary_ratio,  ##
+               all_covar,
+               Cohort = all_basic$Cohort,
+               sv=vsgv$`Eubacterium ventriosum ATCC 27560:1512_1517`, ##
+               abun = all_abun_clr$`Eubacterium ventriosum ATCC 27560`) %>% ##
+  na.omit
+df_raw<-df
+df[,c(1,2,3,4,6,8,11,12)] <- apply(df[,c(1,2,3,4,6,8,11,12)], 2, qtrans) %>% 
+  as.data.frame
+
+df_lm<- summary(lm(phen~Age+Gender+Cohort+BMI+Reads_number+abun,data = df))
+
+df_density <- get_density(df_lm$residuals, df$sv, n = 200)
+
+es_cor<-cor.test(df_lm$residuals, df$sv, method = "spearman")
+text_r<-paste("E.ventriosum:1512_1517","Beta=0.43, P=3.39E-8",sep = "\n") ##
+
+pdf("09.Microbial_GWAS/Example_E.ventriosum_1512_Secondary_primary_ratio.pdf", height = 4, width = 4.5) ##
+ggplot(df, aes(df_raw$sv, df_lm$residuals,color = Cohort.1))+
+  geom_point(size = 3,alpha = 0.5)+
+  geom_smooth(method = 'lm', color = 'white', linetype = 'dashed')+
+  scale_color_manual(breaks = c("LLD","300OB"),
+                     labels = c("LLD", "300OB"),
+                     values = mycolor2_blue_yellow)+
+  ggtitle(text_r)+
+  xlab("Normalized region coverage")+
+  ylab("Residuals of Secondary/primary BA ratio")+ ##
+  theme_classic2()+
+  theme(legend.position = 'none',
+        plot.title = element_text(hjust = 0.5,size = 10))
+
+dev.off()
+```
+
+ 
+
+## 4 Results of Model 2 
+
+### 4.1 Clean results
+
+#### 4.1.1 vSV associations
+```{r 4.1.1}
+## vsv
+## load result data
+load("09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/ob_vsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/all_vsv_ba_lm_adjAbunPCs_res.RData")
+
+## merge result tables
+vsv_ba_lm_adjAbunPCs_res.edge<-all_vsv_ba_lm_adjAbunPCs_res
+
+vsv_ba_lm_adjAbunPCs_res.sig.edge <- 
+  vsv_ba_lm_adjAbunPCs_res.edge[vsv_ba_lm_adjAbunPCs_res.edge$Meta.fdr.p < 0.05 &
+                               vsv_ba_lm_adjAbunPCs_res.edge$LLD.y_uniq_N>10 &
+                               vsv_ba_lm_adjAbunPCs_res.edge$X300OB.y_uniq_N>10 &
+                               (vsv_ba_lm_adjAbunPCs_res.edge$LLD.p < 0.05 &
+                                   vsv_ba_lm_adjAbunPCs_res.edge$X300OB.p < 0.05 &
+                                   vsv_ba_lm_adjAbunPCs_res.edge$LLD.Beta*vsv_ba_lm_adjAbunPCs_res.edge$X300OB.Beta>0 &
+                                   vsv_ba_lm_adjAbunPCs_res.edge$Meta.hetero.p>0.05),] %>% na.omit
+
+vsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-left_join(vsv_ba_lm_adjAbunPCs_res.sig.edge, vsv_info, by = c("SV" = "SV_Name"))
+write.table(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge,"09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+```
+
+#### 3.1.2 dSV associations
+
+```{r 3.1.2}
+## dsv
+## load result data
+load("09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/ob_dsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/all_dsv_ba_lm_adjAbunPCs_res.RData")
+
+## merge result tables
+dsv_ba_lm_adjAbunPCs_res.edge<-all_dsv_ba_lm_adjAbunPCs_res
+
+dsv_ba_lm_adjAbunPCs_res.sig.edge <- dsv_ba_lm_adjAbunPCs_res.edge[dsv_ba_lm_adjAbunPCs_res.edge$Meta.fdr.p < 0.05 &
+                                                               !is.na(dsv_ba_lm_adjAbunPCs_res.edge$Meta.fdr.p) &
+                                                               dsv_ba_lm_adjAbunPCs_res.edge$LLD.p < 0.05 &
+                                                               dsv_ba_lm_adjAbunPCs_res.edge$X300OB.p < 0.05 &
+                                                               dsv_ba_lm_adjAbunPCs_res.edge$LLD.Beta*dsv_ba_lm_adjAbunPCs_res.edge$X300OB.Beta > 0 &
+                                                               dsv_ba_lm_adjAbunPCs_res.edge$LLD.y_uniq_N>10 &
+                                                               dsv_ba_lm_adjAbunPCs_res.edge$X300OB.y_uniq_N>10 &
+                                                 dsv_ba_lm_adjAbunPCs_res.edge$Meta.hetero.p>0.05 ,]
+
+dsv_ba_lm_adjAbunPCs_res.sig.anno.edge<-left_join(dsv_ba_lm_adjAbunPCs_res.sig.edge, dsv_info, by = c("SV" = "SV_Name"))
+write.table(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge,"09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+```
+
+#### 3.1.3 Volcano plot
+
+```{r 3.1.3}
+# vsv
+vsv_ba_lm_adjAbunPCs_res.edge$MetaSigAssoc<-rep('No', nrow(vsv_ba_lm_adjAbunPCs_res.edge))
+
+vsv_ba_lm_adjAbunPCs_res.edge$MetaSigAssoc[vsv_ba_lm_adjAbunPCs_res.edge$Meta.fdr.p < 0.05]<-'Yes'
+vsv_ba_lm_adjAbunPCs_res.edge.plot<-vsv_ba_lm_adjAbunPCs_res.edge[vsv_ba_lm_adjAbunPCs_res.edge$LLD.y_uniq_N>10 &
+                                                         vsv_ba_lm_adjAbunPCs_res.edge$X300OB.y_uniq_N>10,]
+
+p_vsv_volcano<-ggplot(vsv_ba_lm_adjAbunPCs_res.edge.plot,aes(Meta.beta, -log10(Meta.p), color=MetaSigAssoc))+
+  geom_point(alpha = 0.5,size = 0.5)+
+  xlab('Beta coefficient')+
+  ylab('-log10(P)')+
+  scale_color_manual(name   = NULL,
+                     breaks = c("Yes", "No"),
+                     labels = c("Associated    ", "Not associated"),
+                     values = c("#ff4040","#4f94cd"))+
+  scale_shape_discrete(name = NULL)+
+  theme_bw()+
+  theme(legend.position = "top",
+        legend.key = element_rect(fill = NA))
+
+# dsv
+dsv_ba_lm_adjAbunPCs_res.edge$MetaSigAssoc<-rep('No', nrow(dsv_ba_lm_adjAbunPCs_res.edge))
+
+dsv_ba_lm_adjAbunPCs_res.edge$MetaSigAssoc[dsv_ba_lm_adjAbunPCs_res.edge$Meta.fdr.p < 0.05 ]<-'Yes' 
+dsv_ba_lm_adjAbunPCs_res.edge.plot<-dsv_ba_lm_adjAbunPCs_res.edge[dsv_ba_lm_adjAbunPCs_res.edge$LLD.y_uniq_N>10 &
+                                                         dsv_ba_lm_adjAbunPCs_res.edge$X300OB.y_uniq_N>10,]
+
+p_dsv_volcano<-ggplot(dsv_ba_lm_adjAbunPCs_res.edge.plot,aes(Meta.beta, -log10(Meta.p), color=MetaSigAssoc))+
+  geom_point(alpha = 0.5,size = 0.5)+
+  xlab('Beta coefficient')+
+  ylab('-log10(P)')+
+  scale_color_manual(name   = NULL,
+                     breaks = c("Yes", "No"),
+                     labels = c("Associated    ", "Not associated"),
+                     values = c("#ff4040","#4f94cd"))+
+  scale_shape_discrete(name = NULL)+
+  theme_bw()+
+  theme(legend.position = "top",
+        legend.key = element_rect(fill = NA))
+
+## plot
+p_title_volcano <- ggdraw() + 
+    draw_label(
+      ' ', # Volcano plot
+      fontface = 'bold', x = 0, hjust = 0,size = 10) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7))
+
+p_sv_ba_volcano<-plot_grid(
+    p_title_volcano, 
+    plot_grid(p_vsv_volcano,p_dsv_volcano,
+              rel_widths = c(1, 1),align = 'hv',
+              #labels = c("vSVs-BAs", "dSVs-BAs"),
+              ncol = 2,label_size	= 8,vjust = 0),
+    ncol = 1,
+    # rel_heights values control vertical title margins
+    rel_heights = c(0.1, 2)
+  )
+
+if(!dir.exists("09.Microbial_GWAS/")){dir.create("09.Microbial_GWAS/")}
+pdf("09.Microbial_GWAS/sv_adjAbunPCs_ba_volcano.pdf", height = 4, width = 7)
+print(p_sv_ba_volcano)
+dev.off()
+```
+
+### 3.2 Replication
+
+#### 3.2.1 vSV
+
+```{r 3.2.1}
+## Correlation of effect size between LLD and 300OB
+vsv_ba_lm_adjAbunPCs_res.sig.edge_r_density <- get_density(vsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.Beta, vsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.Beta, n = 200)
+
+es_cor<-cor.test(vsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.Beta, vsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.Beta,method = "spearman")
+text_r<-paste("R=",round(es_cor$estimate,digits = 2),
+              ", P<2.20e-16",
+              sep = "")
+
+p_vsv_ba_es<-ggplot(vsv_ba_lm_adjAbunPCs_res.sig.edge) + 
+  geom_point(aes(LLD.Beta, X300OB.Beta),alpha = 0.4) +
+  annotate("text",x = c(-0.5), y = c(0.5), label = c(text_r),hjust = 0)+
+  geom_hline(yintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  geom_vline(xintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  xlab('Effect size in LLD')+
+  ylab('Effect size in 300OB')+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+
+## Correlation of effect size between LLD and 300OB
+vsv_ba_lm_adjAbunPCs_res.sig.edge_p_density <- get_density(log10(vsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.p), log10(vsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.p), n = 200)
+
+p_cor<-cor.test(log10(vsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.p), log10(vsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.p),method = "spearman")
+text_p<-paste("R=",round(p_cor$estimate,digits = 2),
+              ", P=",formatC(p_cor$p.value, format = "e", digits = 2),
+              sep = "")
+
+p_vsv_ba_p<-ggplot(vsv_ba_lm_adjAbunPCs_res.sig.edge) + 
+  geom_point(aes(LLD.p, X300OB.p),alpha = 0.4) +
+  annotate("text",x = c(1e-21), y = c(1e-3), label = c(text_p),hjust = 0)+
+  xlab('P-value in LLD')+
+  ylab('P-value in 300OB')+
+  scale_x_log10()+
+  scale_y_log10()+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+```
+
+#### 3.2.2 dSV
+
+```{r 3.2.2}
+## Correlation of effect size between LLD and 300OB
+dsv_ba_lm_adjAbunPCs_res.sig.edge_r_density <- get_density(dsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.Beta, dsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.Beta, n = 200)
+
+es_cor<-cor.test(dsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.Beta, dsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.Beta,method = "spearman")
+text_r<-paste("R=",round(es_cor$estimate,digits = 2),
+              ", P<2.20e-16",
+              sep = "")
+
+p_dsv_ba_es<-ggplot(dsv_ba_lm_adjAbunPCs_res.sig.edge) + 
+  geom_point(aes(LLD.Beta, X300OB.Beta),alpha = 0.4) +
+  annotate("text",x = c(-0.5), y = c(0.5), label = c(text_r),hjust = 0)+
+  geom_hline(yintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  geom_vline(xintercept=0, linetype="dashed",  color = "red", size=1, alpha = 0.5)+
+  xlab('Effect size in LLD')+
+  ylab('Effect size in 300OB')+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+
+## Correlation of effect size between LLD and 300OB
+dsv_ba_lm_adjAbunPCs_res.sig.edge_p_density <- get_density(log10(dsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.p), log10(dsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.p), n = 200)
+
+p_cor<-cor.test(log10(dsv_ba_lm_adjAbunPCs_res.sig.edge$LLD.p), log10(dsv_ba_lm_adjAbunPCs_res.sig.edge$X300OB.p),method = "spearman")
+text_p<-paste("R=",round(p_cor$estimate,digits = 2),
+              ", P=",formatC(p_cor$p.value, format = "e", digits = 2),
+              sep = "")
+
+p_dsv_ba_p<-ggplot(dsv_ba_lm_adjAbunPCs_res.sig.edge) + 
+  geom_point(aes(LLD.p, X300OB.p),alpha = 0.4) +
+  annotate("text",x = c(1e-21), y = c(1e-3), label = c(text_p),hjust = 0)+
+  xlab('P-value in LLD')+
+  ylab('P-value in 300OB')+
+  scale_x_log10()+
+  scale_y_log10()+
+  scale_color_viridis()+
+  theme_bw()+
+  theme(legend.position = 'none')
+```
+
+#### 3.2.3 Combine figure
+
+```{R 3.2.3, fig.height = 7, fig.width = 7}
+## plot
+p_title_replic <- ggdraw() + 
+    draw_label(
+      'Replication',
+      fontface = 'bold', x = 0, hjust = 0) +
+    theme(
+      # add margin on the left of the drawing canvas,
+      # so title is aligned with left edge of first plot
+      plot.margin = margin(0, 0, 0, 7))
+
+p_sv_ba_replic<-plot_grid(
+    p_title_replic, 
+    plot_grid(p_vsv_ba_es,p_dsv_ba_es,p_vsv_ba_p,p_dsv_ba_p,
+              rel_widths = c(1, 1, 1, 1),align = 'hv',
+              labels = c("vSVs-BAs Effect size", "dSVs-BAs Effect size",
+                         "vSVs-BAs P-value", "dSVs-BAs P-value"),
+              ncol = 2,label_size	= 8,vjust = 0),
+    ncol = 1,
+    # rel_heights values control vertical title margins
+    rel_heights = c(0.1, 2)
+  )
+
+if(!dir.exists("09.Microbial_GWAS/")){dir.create("09.Microbial_GWAS/")}
+pdf("09.Microbial_GWAS/sv_ba_lm_adjAbunPCs_scatter.pdf", height = 7, width = 7)
+print(p_sv_ba_replic)
+dev.off()
+
+print(p_sv_ba_replic)
+```
+
+### 3.3 Visualization
+#### 3.3.1 Combine vSV and dSV associations
+
+```{r 3.3.1}
+sv_ba_lm_adjAbunPCs_res.sig.edge<-rbind(vsv_ba_lm_adjAbunPCs_res.sig.edge,dsv_ba_lm_adjAbunPCs_res.sig.edge)
+
+sv_ba_lm_adjAbunPCs.sig.ba  <- sv_ba_lm_adjAbunPCs_res.sig.edge$BA %>%
+  as.character(.) %>%
+  .[!duplicated(.)]
+sv_ba_lm_adjAbunPCs.sig.sv <- sv_ba_lm_adjAbunPCs_res.sig.edge$SV %>%
+  as.character(.) %>%
+  .[!duplicated(.)] %>%
+  sort(.,decreasing = F)
+
+
+## circos plot
+sv_ba_count<-NULL
+for (pheno in sv_ba_lm_adjAbunPCs.sig.ba) {
+  #pheno <-"C4"
+  sv_ba_df<-sv_ba_lm_adjAbunPCs_res.sig.edge[sv_ba_lm_adjAbunPCs_res.sig.edge$BA==pheno,]$SV %>%
+    str_replace_all(.,"\\:\\d+_\\d+.*", "") %>%
+    table %>%
+    as.data.frame
+  colnames(sv_ba_df)<-c("Species", "Count")
+  sv_ba_df<-data.frame(BA = rep(pheno,nrow(sv_ba_df)), sv_ba_df)
+  sv_ba_count<-rbind(sv_ba_count,sv_ba_df)
+}
+
+sv_ba_count$Species<-info$Short_name[match(sv_ba_count$Species, info$organism)]
+sv_ba_count <- sv_ba_count[order(sv_ba_count$Count),]
+
+sv_ba_count_species_order<-sv_ba_count %>% group_by(Species) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+sv_ba_count_ba_order<-sv_ba_count %>% group_by(BA) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+
+sv_ba_count<-sv_ba_count[order(match(sv_ba_count$BA, sv_ba_count_ba_order$BA),decreasing = F),]
+
+sv_ba_count_species_order_str<-as.character(sv_ba_count_species_order$Species)
+sv_ba_count_ba_order_str<-as.character(sv_ba_count_ba_order$BA)
+
+pdf("09.Microbial_GWAS/sv_ba_lm_adjAbunPCs.circos.pdf", width = 26, height = 26)
+circos.par(start.degree = 180, "clock.wise" = T) # ,xaxis.clock.wise = F
+chordDiagram(sv_ba_count,annotationTrack = "grid",
+             grid.col =  c(wes_palette("Darjeeling1", length(sv_ba_count_ba_order_str), type = "continuous"),
+                           rep('grey',length(sv_ba_count_species_order_str))),
+             order = c(rev(sv_ba_count_ba_order_str),
+                       sv_ba_count_species_order_str),
+             big.gap = 5,
+             preAllocateTracks = list(track.margin = c(0, uh(90, "mm")), 
+                                      track.height = max(strwidth(unlist(dimnames(sv_ba_count)))))
+             )
+circos.track(track.index = 1, panel.fun = function(x, y) {
+  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,cex = 2.5,
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
+}, bg.border = NA) # here set bg.border to NA is important
+
+dev.off()
+circos.clear()
+```
+
+
+## 5 Model 1 and Model 2
+
+### 5.1 Merge results of model 1 and model 2
+```{r 5.1}
+vsv_ba_lm_adjAbun_res.sig.anno.edge$Lineage_independent<-paste(
+  vsv_ba_lm_adjAbun_res.sig.anno.edge$BA,vsv_ba_lm_adjAbun_res.sig.anno.edge$SV) %in%
+  paste(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$BA,vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV )
+write.table(vsv_ba_lm_adjAbun_res.sig.anno.edge, "09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+
+dsv_ba_lm_adjAbun_res.sig.anno.edge$Lineage_independent<-paste(
+  dsv_ba_lm_adjAbun_res.sig.anno.edge$BA,dsv_ba_lm_adjAbun_res.sig.anno.edge$SV) %in%
+  paste(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$BA,dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV )
+write.table(dsv_ba_lm_adjAbun_res.sig.anno.edge, "09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+
+vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$Model1_sig<-paste(
+  vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$BA,vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV) %in%
+  paste(vsv_ba_lm_adjAbun_res.sig.anno.edge$BA,vsv_ba_lm_adjAbun_res.sig.anno.edge$SV )
+write.table(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge, "09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+
+dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$Model1_sig<-paste(
+  dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$BA,dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$SV) %in%
+  paste(dsv_ba_lm_adjAbun_res.sig.anno.edge$BA,dsv_ba_lm_adjAbun_res.sig.anno.edge$SV )
+write.table(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge, "09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+
+Model1_count<-table(vsv_ba_lm_adjAbun_res.sig.anno.edge$Lineage_independent)+table(dsv_ba_lm_adjAbun_res.sig.anno.edge$Lineage_independent)
+Model2_count<-table(vsv_ba_lm_adjAbunPCs_res.sig.anno.edge$Model1_sig)+table(dsv_ba_lm_adjAbunPCs_res.sig.anno.edge$Model1_sig)
+
+species_ba_count<-table(species_ba.table$sv.MetaSigAssoc,species_ba.table$abun.MetaSigAssoc)
+
+pdf("09.Microbial_GWAS/GWAS_model_sig_count.venn.pdf", width = 2, height = 2)
+draw.pairwise.venn(Model1_count[1]+Model1_count[2],
+                   Model2_count[1]+Model1_count[2],
+                   Model1_count[2], 
+                   category = c("Model 1", "Model 2"), lty = rep("blank",2), fill =c("#4472c4", "#00b050"), alpha = rep(0.5, 2), cat.pos = c(0, 0), cat.cex = c(0.5, 0.5),cat.dist = rep(0.025, 2), scaled = F)
+dev.off()
+ 
+Model1_count[1]+Model1_count[2]+Model2_count[1]
+```
+
+### 5.2 Circos plot
+
+```{r 5.2}
+vsv_ba_lm_adjAbun.sig.anno.final<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+dsv_ba_lm_adjAbun.sig.anno.final<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+vsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+dsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+
+
+
+sv_ba<-data.frame(BA=c(vsv_ba_lm_adjAbun.sig.anno.final$BA[!vsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       dsv_ba_lm_adjAbun.sig.anno.final$BA[!dsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       vsv_ba_lm_adjAbunPCs.sig.anno.final$BA,
+                       dsv_ba_lm_adjAbunPCs.sig.anno.final$BA),
+                  SV=c(vsv_ba_lm_adjAbun.sig.anno.final$SV[!vsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       dsv_ba_lm_adjAbun.sig.anno.final$SV[!dsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       vsv_ba_lm_adjAbunPCs.sig.anno.final$SV,
+                       dsv_ba_lm_adjAbunPCs.sig.anno.final$SV))
+
+
+sv_ba.ba  <- sv_ba$BA %>%
+  as.character(.) %>%
+  .[!duplicated(.)]
+sv_ba.sv <- sv_ba$SV %>%
+  as.character(.) %>%
+  .[!duplicated(.)] %>%
+  sort(.,decreasing = F)
+
+
+## circos plot
+sv_ba_count<-NULL
+for (pheno in sv_ba.ba) {
+  #pheno <-"C4"
+  sv_ba_df<-sv_ba[sv_ba$BA==pheno,]$SV %>%
+    str_replace_all(.,"\\:\\d+_\\d+.*", "") %>%
+    table %>%
+    as.data.frame
+  colnames(sv_ba_df)<-c("Species", "Count")
+  sv_ba_df<-data.frame(BA = rep(pheno,nrow(sv_ba_df)), sv_ba_df)
+  sv_ba_count<-rbind(sv_ba_count,sv_ba_df)
+}
+
+sv_ba_count$Species<-info$Short_name[match(sv_ba_count$Species, info$organism)]
+sv_ba_count <- sv_ba_count[order(sv_ba_count$Count),]
+
+sv_ba_count_species_order<-sv_ba_count %>% group_by(Species) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+sv_ba_count_ba_order<-sv_ba_count %>% group_by(BA) %>% summarise(sum(Count)) %>% .[order(.$`sum(Count)`, decreasing = T),]
+
+sv_ba_count<-sv_ba_count[order(match(sv_ba_count$BA, sv_ba_count_ba_order$BA),decreasing = F),]
+
+sv_ba_count_species_order_str<-as.character(sv_ba_count_species_order$Species)
+sv_ba_count_ba_order_str<-as.character(sv_ba_count_ba_order$BA)
+
+pdf("09.Microbial_GWAS/sv_ba.circos.pdf", width = 26, height = 26)
+circos.par(start.degree = 180, "clock.wise" = T) # ,xaxis.clock.wise = F
+chordDiagram(sv_ba_count,annotationTrack = "grid",
+             grid.col =  c(wes_palette("Darjeeling1", length(sv_ba_count_ba_order_str), type = "continuous"),
+                           rep('grey',length(sv_ba_count_species_order_str))),
+             order = c(rev(sv_ba_count_ba_order_str),
+                       sv_ba_count_species_order_str),
+             big.gap = 5,
+             preAllocateTracks = list(track.margin = c(0, uh(90, "mm")), 
+                                      track.height = max(strwidth(unlist(dimnames(sv_ba_count)))))
+             )
+circos.track(track.index = 1, panel.fun = function(x, y) {
+  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index,cex = 2.5,
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
+}, bg.border = NA) # here set bg.border to NA is important
+
+dev.off()
+circos.clear()
+```
+
+### 5.3 heatmap 
+
+#### 5.3.1 preparation
+
+```{r 5.3.1}
+load("09.Microbial_GWAS/RData/all_vsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/all_dsv_ba_lm_adjAbunPCs_res.RData")
+
+vsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+dsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+
+sv_ba_lm_adjAbunPCs_res.sig.edge<-rbind(vsv_ba_lm_adjAbunPCs.sig.anno.final,dsv_ba_lm_adjAbunPCs.sig.anno.final)
+
+all_sv_ba_lm_adjAbunPCs<-rbind(all_vsv_ba_lm_adjAbunPCs_res, all_dsv_ba_lm_adjAbunPCs_res)
+all_sv_ba_lm_adjAbunPCs$SV<-c(paste("vsv_",all_vsv_ba_lm_adjAbunPCs_res$SV,sep = ""), paste("dsv_",all_dsv_ba_lm_adjAbunPCs_res$SV,sep = ""))
+all_sv_ba_lm_adjAbunPCs<-as.data.frame(all_sv_ba_lm_adjAbunPCs)
+all_sv_ba_lm_adjAbunPCs$Sign<-NA
+all_sv_ba_lm_adjAbunPCs$Sign[all_sv_ba_lm_adjAbunPCs$Meta.p < 0.05 &
+  !is.na(all_sv_ba_lm_adjAbunPCs$Meta.p) &
+  all_sv_ba_lm_adjAbunPCs$LLD.p < 0.05 &
+  all_sv_ba_lm_adjAbunPCs$X300OB.p < 0.05 &
+  all_sv_ba_lm_adjAbunPCs$LLD.y_uniq_N>10 &
+  all_sv_ba_lm_adjAbunPCs$X300OB.y_uniq_N>10 &
+  !is.na(all_sv_ba_lm_adjAbunPCs$Meta.hetero.p) &
+  all_sv_ba_lm_adjAbunPCs$Meta.hetero.p>0.05] <- "*" 
+all_sv_ba_lm_adjAbunPCs$Sign[all_sv_ba_lm_adjAbunPCs$Meta.fdr.p < 0.05 &
+  !is.na(all_sv_ba_lm_adjAbunPCs$Meta.fdr.p) &
+  all_sv_ba_lm_adjAbunPCs$LLD.p < 0.05 &
+  all_sv_ba_lm_adjAbunPCs$X300OB.p < 0.05 &
+  all_sv_ba_lm_adjAbunPCs$LLD.y_uniq_N>10 &
+  all_sv_ba_lm_adjAbunPCs$X300OB.y_uniq_N>10 &
+  !is.na(all_sv_ba_lm_adjAbunPCs$Meta.hetero.p) &
+  all_sv_ba_lm_adjAbunPCs$Meta.hetero.p>0.05] <- "☆" 
+all_sv_ba_lm_adjAbunPCs$Sign[all_sv_ba_lm_adjAbunPCs$Meta.bonferroni.p < 0.05 &
+  !is.na(all_sv_ba_lm_adjAbunPCs$Meta.bonferroni.p) &
+  all_sv_ba_lm_adjAbunPCs$LLD.p < 0.05 &
+  all_sv_ba_lm_adjAbunPCs$X300OB.p < 0.05 &
+  all_sv_ba_lm_adjAbunPCs$LLD.y_uniq_N>10 &
+  all_sv_ba_lm_adjAbunPCs$X300OB.y_uniq_N>10 &
+  !is.na(all_sv_ba_lm_adjAbunPCs$Meta.hetero.p) &
+  all_sv_ba_lm_adjAbunPCs$Meta.hetero.p>0.05] <- "★"
+
+all_sv_ba_lm_adjAbunPCs.r<- all_sv_ba_lm_adjAbunPCs[,c("BA", "SV", "Meta.beta")] %>% spread("BA", "Meta.beta") %>% data.frame(row.names = "SV")
+all_sv_ba_lm_adjAbunPCs.sign<- all_sv_ba_lm_adjAbunPCs[,c("BA", "SV", "Sign")] %>% spread("BA", "Sign") %>% data.frame(row.names = "SV")
+```
+
+#### 5.3.2 C.comes
+Assoications between SVs of C.comes and BAs significant in both model 1 and model 2.
+
+```{r 5.3.2}
+plot.ba  <- sv_ba_lm_adjAbunPCs_res.sig.edge$BA[grep("comes", sv_ba_lm_adjAbunPCs_res.sig.edge$SV)] %>%
+  as.character(.) %>%
+  .[!duplicated(.)]
+plot.sv <- sv_ba_lm_adjAbunPCs_res.sig.edge$SV[grep("comes", sv_ba_lm_adjAbunPCs_res.sig.edge$SV)] %>%
+  as.character(.) %>%
+  .[!duplicated(.)] %>%
+  sort(.,decreasing = F)
+
+spe.sv_ba_lm_adjAbunPCs.r<-all_sv_ba_lm_adjAbunPCs.r[grep("comes", rownames(all_sv_ba_lm_adjAbunPCs.r)),]
+rownames(spe.sv_ba_lm_adjAbunPCs.r)<-str_replace_all(rownames(spe.sv_ba_lm_adjAbunPCs.r), "^.*sv_", "")
+spe.sv_ba_lm_adjAbunPCs.sign<-all_sv_ba_lm_adjAbunPCs.sign[grep("comes", rownames(all_sv_ba_lm_adjAbunPCs.sign)),]
+rownames(spe.sv_ba_lm_adjAbunPCs.sign)<-str_replace_all(rownames(spe.sv_ba_lm_adjAbunPCs.sign), "^.*sv_", "")
+
+sv_ba_lm_adjAbunPCs.r.plot    <- spe.sv_ba_lm_adjAbunPCs.r %>%
+  .[match(plot.sv,rownames(.)),match(plot.ba,colnames(.))]
+sv_ba_lm_adjAbunPCs.r.plot[is.na(sv_ba_lm_adjAbunPCs.r.plot)]<-0
+sv_ba_lm_adjAbunPCs.sign.plot <- spe.sv_ba_lm_adjAbunPCs.sign %>%
+  .[match(plot.sv,rownames(spe.sv_ba_lm_adjAbunPCs.r)),
+    match(plot.ba,colnames(spe.sv_ba_lm_adjAbunPCs.r))]
+
+rownames(sv_ba_lm_adjAbunPCs.r.plot)<-str_replace_all(rownames(sv_ba_lm_adjAbunPCs.r.plot), "Coprococcus comes ATCC 27758:", "")
+library(showtext)
+showtext_auto()
+i  <- 256
+#myBreaks <- c(seq(min(sv_ba_lm_adjAbunPCs.r.plot), 0, length.out=ceiling(i/2) + 1), 
+#             seq(max(sv_ba_lm_adjAbunPCs.r.plot)/i, max(sv_ba_lm_adjAbunPCs.r.plot), length.out=floor(i/2)))
+myBreaks <- c(seq(-0.4, 0, length.out=ceiling(i/2) + 1), 
+             seq(0.4/i, 0.4, length.out=floor(i/2)))
+pdf("09.Microbial_GWAS/C.comes_sv_ba_lm_adjAbunPCs.heatmap.pdf", width = 4.5, height = 6)
+ heatmap.2(as.matrix(sv_ba_lm_adjAbunPCs.r.plot),
+          col=colorRampPalette(c("#02CBFB","#FFFFFF","#F20C34"))(i), breaks = myBreaks,
+          trace = "none", Rowv = F, Colv = F, dendrogram = "none",
+          density.info="none",
+          cexCol = 1, srtCol = 45, cexRow = 1,
+          cellnote = sv_ba_lm_adjAbunPCs.sign.plot, notecol = "grey50",notecex = 1,
+          key.xlab = "Beta coefficient",
+          key.par=list(mar=c(4,4,9.5,4), cex.axis = 1, cex.lab = 1), # bottom,left,top,right
+          lm=rbind( c(0, 4, 3), c(2, 1, 0 )), lhei = c(0.8, 1.5),lwid=c(0.5, 4, 2 ),key.title = NA,
+          margins=c(10,1) # ("margin.Y", "margin.X")
+)
+dev.off()
+```
+
+#### 5.3.3 B.wexlerae
+Assoications between SVs of B.wexlerae and BAs significant in both model 1 and model 2.
+
+```{r 5.3.2}
+plot.ba  <- sv_ba_lm_adjAbunPCs_res.sig.edge$BA[grep("wexlerae", sv_ba_lm_adjAbunPCs_res.sig.edge$SV)] %>%
+  as.character(.) %>%
+  .[!duplicated(.)]
+plot.sv <- sv_ba_lm_adjAbunPCs_res.sig.edge$SV[grep("wexlerae", sv_ba_lm_adjAbunPCs_res.sig.edge$SV)] %>%
+  as.character(.) %>%
+  .[!duplicated(.)] %>%
+  sort(.,decreasing = F)
+
+spe.sv_ba_lm_adjAbunPCs.r<-all_sv_ba_lm_adjAbunPCs.r[grep("wexlerae", rownames(all_sv_ba_lm_adjAbunPCs.r)),]
+rownames(spe.sv_ba_lm_adjAbunPCs.r)<-str_replace_all(rownames(spe.sv_ba_lm_adjAbunPCs.r), "^.*sv_", "")
+spe.sv_ba_lm_adjAbunPCs.sign<-all_sv_ba_lm_adjAbunPCs.sign[grep("wexlerae", rownames(all_sv_ba_lm_adjAbunPCs.sign)),]
+rownames(spe.sv_ba_lm_adjAbunPCs.sign)<-str_replace_all(rownames(spe.sv_ba_lm_adjAbunPCs.sign), "^.*sv_", "")
+
+sv_ba_lm_adjAbunPCs.r.plot    <- spe.sv_ba_lm_adjAbunPCs.r %>%
+  .[match(plot.sv,rownames(.)),match(plot.ba,colnames(.))]
+sv_ba_lm_adjAbunPCs.r.plot[is.na(sv_ba_lm_adjAbunPCs.r.plot)]<-0
+sv_ba_lm_adjAbunPCs.sign.plot <- spe.sv_ba_lm_adjAbunPCs.sign %>%
+  .[match(plot.sv,rownames(spe.sv_ba_lm_adjAbunPCs.r)),
+    match(plot.ba,colnames(spe.sv_ba_lm_adjAbunPCs.r))]
+
+rownames(sv_ba_lm_adjAbunPCs.r.plot)<-str_replace_all(rownames(sv_ba_lm_adjAbunPCs.r.plot), "Blautia wexlerae DSM 19850:", "")
+library(showtext)
+showtext_auto()
+i  <- 256
+myBreaks <- c(seq(-0.4, 0, length.out=ceiling(i/2) + 1), 
+             seq(0.4/i, 0.4, length.out=floor(i/2)))
+pdf("09.Microbial_GWAS/B.wexlerae_sv_ba_lm_adjAbunPCs.heatmap.pdf", width = 4, height = 4)
+ heatmap.2(as.matrix(sv_ba_lm_adjAbunPCs.r.plot),
+          col=colorRampPalette(c("#02CBFB","#FFFFFF","#F20C34"))(i), breaks = myBreaks,
+          trace = "none", Rowv = F, Colv = F, dendrogram = "none",
+          density.info="none",
+          cexCol = 1, srtCol = 45, cexRow = 1,
+          cellnote = sv_ba_lm_adjAbunPCs.sign.plot, notecol = "grey50",notecex = 1,
+          key.xlab = "Beta coefficient",
+          key.par=list(mar=c(3.5,3,4.5,3), cex.axis = 1, cex.lab = 1), # bottom,left,top,right
+          lm=rbind( c(0, 4, 3), c(2, 1, 0 )), lhei = c(0.8, 1.5),lwid=c(0.5, 4, 2 ),key.title = NA,
+          margins=c(10,1) # ("margin.Y", "margin.X")
+)
+dev.off()
+```
+
+## 6 Heterogeneitic assoiations
+### 6.1 Model 1
+#### 6.1.1 vSV
+
+```{r 6.1.1}
+## load result data
+load("09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/ob_vsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/all_vsv_ba_lm_adjAbun_res.RData")
+
+## merge result tables
+vsv_ba_lm_adjAbun_res.edge<-all_vsv_ba_lm_adjAbun_res
+
+vsv_ba_lm_adjAbun_res.hetero.edge <- 
+  vsv_ba_lm_adjAbun_res.edge[vsv_ba_lm_adjAbun_res.edge$LLD.y_uniq_N>10 &
+                               vsv_ba_lm_adjAbun_res.edge$X300OB.y_uniq_N>10 &
+                               vsv_ba_lm_adjAbun_res.edge$Meta.hetero.p<0.05 &
+                               (vsv_ba_lm_adjAbun_res.edge$LLD.fdr.p<0.05 | 
+                                  vsv_ba_lm_adjAbun_res.edge$X300OB.fdr.p<0.05),]
+
+vsv_ba_lm_adjAbun_res.sig.hetero.anno.edge<-left_join(vsv_ba_lm_adjAbun_res.hetero.edge, vsv_info, by = c("SV" = "SV_Name"))
+write.table(vsv_ba_lm_adjAbun_res.sig.hetero.anno.edge,"09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.hetero.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+
+```
+
+#### 6.1.2 dSV
+
+```{r 6.1.2}
+## load result data
+load("09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/ob_dsv_ba_lm_adjAbun_res.RData")
+load("09.Microbial_GWAS/RData/all_dsv_ba_lm_adjAbun_res.RData")
+
+## merge result tables
+dsv_ba_lm_adjAbun_res.edge<-all_dsv_ba_lm_adjAbun_res
+
+dsv_ba_lm_adjAbun_res.hetero.edge <- 
+  dsv_ba_lm_adjAbun_res.edge[dsv_ba_lm_adjAbun_res.edge$LLD.y_uniq_N>10 &
+                               dsv_ba_lm_adjAbun_res.edge$X300OB.y_uniq_N>10 &
+                               dsv_ba_lm_adjAbun_res.edge$Meta.hetero.p<0.05 &
+                               !is.na(dsv_ba_lm_adjAbun_res.edge$LLD.fdr.p<0.05) &
+                               !is.na(dsv_ba_lm_adjAbun_res.edge$X300OB.fdr.p<0.05) &
+                               (dsv_ba_lm_adjAbun_res.edge$LLD.fdr.p<0.05 | 
+                                  dsv_ba_lm_adjAbun_res.edge$X300OB.fdr.p<0.05 ),]
+
+
+dsv_ba_lm_adjAbun_res.sig.hetero.anno.edge<-left_join(dsv_ba_lm_adjAbun_res.hetero.edge, dsv_info, by = c("SV" = "SV_Name"))
+write.table(dsv_ba_lm_adjAbun_res.sig.hetero.anno.edge,"09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.hetero.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+```
+
+### 6.2 Model 2
+#### 6.2.1 vSV
+
+```{r 6.2.1}
+## load result data
+load("09.Microbial_GWAS/RData/lld_vsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/ob_vsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/all_vsv_ba_lm_adjAbunPCs_res.RData")
+
+## merge result tables
+vsv_ba_lm_adjAbunPCs_res.edge<-all_vsv_ba_lm_adjAbunPCs_res
+
+vsv_ba_lm_adjAbunPCs_res.hetero.edge <- 
+  vsv_ba_lm_adjAbunPCs_res.edge[vsv_ba_lm_adjAbunPCs_res.edge$LLD.y_uniq_N>10 &
+                               vsv_ba_lm_adjAbunPCs_res.edge$X300OB.y_uniq_N>10 &
+                               vsv_ba_lm_adjAbunPCs_res.edge$Meta.hetero.p<0.05 &
+                               (vsv_ba_lm_adjAbunPCs_res.edge$LLD.fdr.p<0.05 | 
+                                  vsv_ba_lm_adjAbunPCs_res.edge$X300OB.fdr.p<0.05),] %>% na.omit
+
+vsv_ba_lm_adjAbunPCs_res.sig.hetero.anno.edge<-left_join(vsv_ba_lm_adjAbunPCs_res.hetero.edge, vsv_info, by = c("SV" = "SV_Name"))
+write.table(vsv_ba_lm_adjAbunPCs_res.sig.hetero.anno.edge,"09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.hetero.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+
+```
+
+#### 6.2.2 dSV
+
+```{r 6.2.2}
+## load result data
+load("09.Microbial_GWAS/RData/lld_dsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/ob_dsv_ba_lm_adjAbunPCs_res.RData")
+load("09.Microbial_GWAS/RData/all_dsv_ba_lm_adjAbunPCs_res.RData")
+
+## merge result tables
+dsv_ba_lm_adjAbunPCs_res.edge<-all_dsv_ba_lm_adjAbunPCs_res
+
+dsv_ba_lm_adjAbunPCs_res.hetero.edge <- 
+  dsv_ba_lm_adjAbunPCs_res.edge[dsv_ba_lm_adjAbunPCs_res.edge$LLD.y_uniq_N>10 &
+                               dsv_ba_lm_adjAbunPCs_res.edge$X300OB.y_uniq_N>10 &
+                               dsv_ba_lm_adjAbunPCs_res.edge$Meta.hetero.p<0.05 &
+                               !is.na(dsv_ba_lm_adjAbunPCs_res.edge$LLD.fdr.p<0.05) &
+                               !is.na(dsv_ba_lm_adjAbunPCs_res.edge$X300OB.fdr.p<0.05) &
+                               (dsv_ba_lm_adjAbunPCs_res.edge$LLD.fdr.p<0.05 | 
+                                  dsv_ba_lm_adjAbunPCs_res.edge$X300OB.fdr.p<0.05 ),]
+
+
+dsv_ba_lm_adjAbunPCs_res.sig.hetero.anno.edge<-left_join(dsv_ba_lm_adjAbunPCs_res.hetero.edge, dsv_info, by = c("SV" = "SV_Name"))
+write.table(dsv_ba_lm_adjAbunPCs_res.sig.hetero.anno.edge,"09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.hetero.anno.tsv",sep = "\t",col.names = T, row.names = F, quote = F)
+```
+
+
+
+## 7 Prioritize SVs 
+
+```{r 7}
+vsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+dsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+
+sv_ba_lm_adjAbunPCs.sig.anno.final<-rbind(vsv_ba_lm_adjAbunPCs.sig.anno.final, dsv_ba_lm_adjAbunPCs.sig.anno.final)
+sv_ba_lm_adjAbunPCs.sig.anno.final$SV_type<-c(rep("vSV", nrow(vsv_ba_lm_adjAbunPCs.sig.anno.final)),
+                                              rep("dSV", nrow(dsv_ba_lm_adjAbunPCs.sig.anno.final)))
+sv_ba_lm_adjAbunPCs.sig.anno.final.bothSig<-sv_ba_lm_adjAbunPCs.sig.anno.final[sv_ba_lm_adjAbunPCs.sig.anno.final$Model1_sig==T,]
+
+ba_assoc_sv<-sv_ba_lm_adjAbunPCs.sig.anno.final.bothSig$SV_ID %>% unique %>% sort # SV N = 45
+
+ba_assoc_sv_B.wex<-ba_assoc_sv[grep("^1121115", ba_assoc_sv)]
+ba_assoc_sv_C.com<-ba_assoc_sv[grep("^470146", ba_assoc_sv)]
+ba_assoc_sv_B.wex_C.com<-c(ba_assoc_sv_B.wex, ba_assoc_sv_C.com) # SV N=18
+
+BA_gene_SV<-c("1121115.PRJNA195783:2081_2082", 
+              "470146.PRJNA20525:963_964",
+              "470146.PRJNA20525:964_965;972_973;2925_2927;2928_2929",
+              "470146.PRJNA20525:966_967",
+              "470146.PRJNA20525:968_970",
+              "470146.PRJNA20525:2932_2935;2935_2937",
+              "470146.PRJNA20525:2939_2941;2941_2942"
+              )
+ba_assoc_sv_B.wex_C.com_prio<-ba_assoc_sv_B.wex_C.com[-match(BA_gene_SV,ba_assoc_sv_B.wex_C.com)] # SV N = 11
+write.table(ba_assoc_sv_B.wex_C.com_prio,"09.Microbial_GWAS/prioritized_SVs_B.wex_C.com.tsv",col.names = F, row.names = F,quote = F)
+
+ba_assoc_sv_B.wex_prio<-ba_assoc_sv_B.wex[-match("1121115.PRJNA195783:2081_2082",ba_assoc_sv_B.wex)] # SV N = 5
+write.table(ba_assoc_sv_B.wex_prio,"09.Microbial_GWAS/prioritized_SVs_B.wex_.tsv",col.names = F, row.names = F,quote = F)
+
+
+
+```
+
+
+## 8 Association number 
+
+```{r 8}
+vsv_ba_lm_adjAbun.sig.anno.final<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbun.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+dsv_ba_lm_adjAbun.sig.anno.final<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbun.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+vsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/vsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+dsv_ba_lm_adjAbunPCs.sig.anno.final<-read.table("09.Microbial_GWAS/dsv_ba_lm_adjAbunPCs.sig.anno.final.tsv", header = T, sep = "\t", check.names = F)
+
+sv_ba<-data.frame(BA=c(vsv_ba_lm_adjAbun.sig.anno.final$BA[!vsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       dsv_ba_lm_adjAbun.sig.anno.final$BA[!dsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       vsv_ba_lm_adjAbunPCs.sig.anno.final$BA,
+                       dsv_ba_lm_adjAbunPCs.sig.anno.final$BA),
+                  SV=c(vsv_ba_lm_adjAbun.sig.anno.final$SV[!vsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       dsv_ba_lm_adjAbun.sig.anno.final$SV[!dsv_ba_lm_adjAbun.sig.anno.final$Lineage_independent],
+                       vsv_ba_lm_adjAbunPCs.sig.anno.final$SV,
+                       dsv_ba_lm_adjAbunPCs.sig.anno.final$SV))
+assoc_N<-str_replace_all(sv_ba$SV,"\\:\\d+_\\d+.*", "") %>% table 
+
+spe_abun_prev <- data.frame(Species = colnames(all_abun),
+                            Abundance_mean = colMeans(all_abun, na.rm = T),
+                            Prevalence = colSums(all_abun!=0, na.rm = T)/1437)
+spe_abun_prev$SV_prevalence<-info$Total_samples_number[match(spe_abun_prev$Species,info$organism)]
+spe_abun_prev$association_N <- assoc_N[match(spe_abun_prev$Species,names(assoc_N))] %>% as.numeric
+
+cor.test(spe_abun_prev$Abundance_mean,spe_abun_prev$association_N ,method = "spearman") # p-value = 0.000253, R=0.5670258 
+p_cor<-cor.test(spe_abun_prev$SV_prevalence,spe_abun_prev$association_N ,method = "spearman")
+text_p<-paste("R=",round(p_cor$estimate,digits = 2),
+              "\nP=",formatC(p_cor$p.value, format = "e", digits = 2),
+              sep = "")
+
+p_pre_ass<-ggplot(spe_abun_prev,aes(SV_prevalence, association_N))+
+  geom_point(aes(size = 100*spe_abun_prev$Abundance_mean, color = spe_abun_prev$association_N), alpha = 0.7)+
+  geom_smooth(method = "lm", color = "white", alpha = 0.2,size = 0.5)+
+  annotate("text",x = 100, y = 120, label = c(text_p),hjust = 0)+
+  xlab("Prevalence")+
+  ylab("Number of associations")+
+  scale_color_gradientn(colours = wes_palette("Zissou1", 100, type = "continuous")) + 
+  theme(plot.subtitle = element_text(vjust = 1), 
+        plot.caption = element_text(vjust = 1), 
+        axis.line.x =  element_line(),
+        axis.line.y = element_line(),
+        legend.position="none",
+        legend.key = element_rect(fill = NA), 
+        panel.grid.major = element_line(colour = "gray90",linetype = "dashed",size = 0.25),
+        panel.grid.minor = element_line(colour = NA), 
+        panel.background = element_rect(fill = NA))
+
+print(p_pre_ass)
+
+pdf("09.Microbial_GWAS/association_number_prevalence.pdf",width = 4,height = 4)
+print(p_pre_ass)
+dev.off()
+
+write.table(spe_abun_prev, "09.Microbial_GWAS/spe_abun_prev.tsv", col.names = T, row.names = F, sep = "\t", quote = F)
+```

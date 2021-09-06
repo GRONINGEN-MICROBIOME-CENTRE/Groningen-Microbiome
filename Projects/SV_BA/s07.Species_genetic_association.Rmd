@@ -1,7 +1,7 @@
 ---
 title: "Species genetic association"
 author: "Daoming Wang"
-date: "2020/10/22"
+date: "2021/7/22"
 output:
   html_document: 
     theme: flatly
@@ -17,10 +17,8 @@ output:
       latex_engine: xelatex
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#knitr::opts_chunk$set(warning=FALSE, message=FALSE)
 ```
 
 ## 1 Preparation
@@ -43,31 +41,26 @@ lld_basic <- read.table("01.cleanData/phen_lld/20200801_LLD_basic_1135samples.ts
 ob_ba <- read.table("01.cleanData/phen_300OB/20200801_300OB_39BA_302samples.tsv")
 ob_basic <- read.table("01.cleanData/phen_300OB/20200801_300OB_basic_302samples.tsv")
 
-lld_abun<-read.table("01.cleanData/mbio_lld/20200801_LLD_metaphlan3_species_1135samples.tsv") 
-ob_abun<-read.table("01.cleanData/mbio_300OB/20200801_300OB_metaphlan3_species_302samples.tsv") 
-all_abun<-read.table("01.cleanData/mbio_all/20200801_LLD_300OB_metaphlan3_species_1437samples.tsv")
-
-lld_sv_abun<-read.table("01.cleanData/mbio_lld/20200801_LLD_metaphlan3_species_sv_1135samples.tsv")
-ob_sv_abun<-read.table("01.cleanData/mbio_300OB/20200801_300OB_metaphlan3_species_sv_302samples.tsv")
-
-
+lld_abun<-read.table("01.cleanData/mbio_lld/LLD_SV_55species_abun_1135samples.tsv", check.names = F) 
+ob_abun<-read.table("01.cleanData/mbio_300OB/300OB_SV_55species_abun_302samples.tsv", check.names = F) 
+all_abun<-read.table("01.cleanData/mbio_all/LLD_300OB_SV_55species_abun_1437samples.tsv", check.names = F)
 
 load("01.cleanData/SV_all/all_msv_dist_std.RData")
 load("01.cleanData/SV_lld/lld_msv_dist_std.RData")
 load("01.cleanData/SV_300OB/ob_msv_dist_std.RData")
-
 ```
 
 ## 2 Species-level association
 
-### 2.1 Association between genetic makeup and BAs
+### 2.1 Prepare abundance table
 
-```{r 2.1,eval=F}
+```{r 2.1}
 if (!dir.exists("07.Species_genetic_association")) {dir.create("07.Species_genetic_association")}
 if (!dir.exists("07.Species_genetic_association/RData")) {dir.create("07.Species_genetic_association/RData")}
 
 ## Prepare covariate table
 # all
+all_abun$Others<-1-rowSums(all_abun)
 all_abun_clr<-abundances(x=as.data.frame(na.omit(all_abun)), transform="clr") %>%as.data.frame
 all_abun_clr <- all_abun_clr[match(rownames(all_abun), rownames(all_abun_clr)),]
 rownames(all_abun_clr) <- rownames(all_abun)
@@ -75,6 +68,7 @@ rownames(all_abun_clr) <- rownames(all_abun)
 all_covar<-cbind(all_basic,all_abun_clr)
 
 # lld
+lld_abun$Others<-1-rowSums(lld_abun)
 lld_abun_clr<-abundances(x=as.data.frame(na.omit(lld_abun)), transform="clr") %>%as.data.frame
 lld_abun_clr <- lld_abun_clr[match(rownames(lld_abun), rownames(lld_abun_clr)),]
 rownames(lld_abun_clr) <- rownames(lld_abun)
@@ -82,12 +76,17 @@ rownames(lld_abun_clr) <- rownames(lld_abun)
 lld_covar<-cbind(lld_basic,lld_abun_clr)
 
 # 300OB
+ob_abun$Others<-1-rowSums(ob_abun)
 ob_abun_clr<-abundances(x=as.data.frame(na.omit(ob_abun)), transform="clr") %>%as.data.frame
 ob_abun_clr <- ob_abun_clr[match(rownames(ob_abun), rownames(ob_abun_clr)),]
 rownames(ob_abun_clr) <- rownames(ob_abun)
 
 ob_covar<-cbind(ob_basic,ob_abun_clr)
+```
 
+### 2.2 Association between genetic makeup and BAs
+
+```{r 2.2,eval=F}
 covar1 <- c('Gender','Age','BMI','Reads_number')
 covar2 <- c('Gender','Age','BMI','Reads_number','Cohort')
 
@@ -104,6 +103,9 @@ ob_adonis_res  <- my_adonis_terms_adjAbun(ob_msv_dist_std, ob_ba, ob_covar, cova
 save(ob_adonis_res, file = "07.Species_genetic_association/RData/ob_adonis_res.RData")
 
 ## meta-analysis
+load("07.Species_genetic_association/RData/all_adonis_res.RData")
+load("07.Species_genetic_association/RData/lld_adonis_res.RData")
+load("07.Species_genetic_association/RData/ob_adonis_res.RData")
 all_adonis_res.table <- all_adonis_res$table
 lld_adonis_res.table <- lld_adonis_res$table
 ob_adonis_res.table  <- ob_adonis_res$table
@@ -116,34 +118,22 @@ colnames(cbind_adonis_res.table)<-c("Species","BA",
                                     paste("X300OB.",colnames(cbind_adonis_res.table)[3:7],sep = ""))
 adonis_res <- my_batch_meta_p(cbind_adonis_res.table, c("LLD", "300OB"), c(10,15), c(9,14))
 save(adonis_res, file = "07.Species_genetic_association/RData/adonis_res.RData")
-
 ```
 
 
-### 2.2 Association between abundance and BAs
+### 2.3 Association between abundance and BAs
 
-```{r 2.2, eval=F}
-# lld
-lld_sv_abun_clr<-abundances(x=as.data.frame(na.omit(lld_sv_abun)), transform="clr") %>% as.data.frame
-lld_sv_abun_clr <- lld_sv_abun_clr[match(rownames(lld_sv_abun), rownames(lld_sv_abun_clr)),]
-rownames(lld_sv_abun_clr) <- rownames(lld_sv_abun)
-
-# 300OB
-ob_sv_abun_clr<-abundances(x=as.data.frame(na.omit(ob_sv_abun)), transform="clr") %>%as.data.frame
-ob_sv_abun_clr <- ob_sv_abun_clr[match(rownames(ob_sv_abun), rownames(ob_sv_abun_clr)),]
-rownames(ob_sv_abun_clr) <- rownames(ob_sv_abun)
-
-lld_sv_abun_ba_lm_res <- lm_btw_mats(lld_ba,lld_sv_abun_clr,lld_covar,covar1, y_mat = 0)
-ob_sv_abun_ba_lm_res  <- lm_btw_mats(ob_ba, ob_sv_abun_clr,  ob_covar,covar1, y_mat = 0)
+```{r 2.3, eval=F}
+lld_sv_abun_ba_lm_res <- lm_btw_mats(lld_ba,lld_abun_clr[,-56],lld_covar,covar1)
+ob_sv_abun_ba_lm_res  <- lm_btw_mats(ob_ba, ob_abun_clr[,-56], ob_covar, covar1)
 
 # meta-analysis
-cbind_sv_abun_ba_lm_edge<-cbind(lld_sv_abun_ba_lm_res$table, ob_sv_abun_ba_lm_res$table)[,-c(10,11)]
-colnames(cbind_sv_abun_ba_lm_edge)<-c("Species","BA",
-                                paste("LLD.",colnames(cbind_sv_abun_ba_lm_edge)[3:9],sep = ""),
-                                paste("X300OB.",colnames(cbind_sv_abun_ba_lm_edge)[3:9],sep = ""))
-all_sv_abun_ba_lm_res <- my_batch_meta_lm(cbind_sv_abun_ba_lm_edge, c("LLD", "300OB"), c(3,10), c(4,11))
+cbind_sv_abun_ba_lm_edge<-cbind(lld_sv_abun_ba_lm_res, ob_sv_abun_ba_lm_res)[,-c(15,16)]
+colnames(cbind_sv_abun_ba_lm_edge)<-c("BA","Species",
+                                paste("LLD.",colnames(cbind_sv_abun_ba_lm_edge)[3:14],sep = ""),
+                                paste("X300OB.",colnames(cbind_sv_abun_ba_lm_edge)[3:14],sep = ""))
+all_sv_abun_ba_lm_res <- my_batch_meta_lm(cbind_sv_abun_ba_lm_edge, c("LLD", "300OB"), c(3,15), c(4,16))
 save(all_sv_abun_ba_lm_res, file = "07.Species_genetic_association/RData/all_sv_abun_ba_lm_res.RData")
-
 ```
 
 ## 3 Visualization
@@ -156,8 +146,8 @@ load("07.Species_genetic_association/RData/all_sv_abun_ba_lm_res.RData")
 
 ## merge tables
 adonis_res.table<-adonis_res$table
-all_sv_abun_ba_lm_res.table <- all_sv_abun_ba_lm_res$table
-all_sv_abun_ba_lm_res.table$Species<-info$Short_name[match(all_sv_abun_ba_lm_res.table$Species, info$Metaphlan3_name)]
+all_sv_abun_ba_lm_res.table <- all_sv_abun_ba_lm_res
+all_sv_abun_ba_lm_res.table$Species<-info$Short_name[match(all_sv_abun_ba_lm_res.table$Species, info$organism)]
 
 sv_assoc_id<-paste(adonis_res.table$Species, adonis_res.table$BA,sep = "_")
 abun_assoc_id<-paste(all_sv_abun_ba_lm_res.table$Species, all_sv_abun_ba_lm_res.table$BA, sep = "_")
@@ -179,7 +169,8 @@ species_ba.sig.table<-species_ba.table[,c("Species", "BA",
                                           "All.R2","Meta.p","Meta.fdr.p",
                                           "Abun.LLD.Beta","Abun.LLD.p",
                                           "Abun.X300OB.Beta","Abun.X300OB.p" ,
-                                          "Abun.Meta.beta" ,"Abun.Meta.p" ,"Abun.Meta.hetero.p",
+                                          "Abun.Meta.beta" ,"Abun.Meta.p","Abun.Meta.hetero.p","Abun.Meta.fdr.p" ,
+                                          
                                           "sv.MetaSigAssoc","abun.MetaSigAssoc" 
                                           )] %>%
   .[.$sv.MetaSigAssoc=="Yes" | .$abun.MetaSigAssoc == "Yes",]
@@ -226,10 +217,6 @@ dev.off()
 ### 3.3 Associations between abundance and BAs
 
 ```{r 3.3}
-
-ggplot(species_ba.table, aes(Abun.Meta.beta, -log10(Abun.Meta.p)))+
-  geom_point()
-
 p_abun_volcano<-ggplot(species_ba.table,aes(Abun.Meta.beta, -log10(Abun.Meta.p), color=abun.MetaSigAssoc))+
   geom_point(alpha = 0.5,size = 1)+
   xlab('Beta')+
@@ -252,8 +239,6 @@ dev.off()
 ### 3.4 Venn diagram
 
 ```{r 3.4}
-
-
 species_ba_count<-table(species_ba.table$sv.MetaSigAssoc,species_ba.table$abun.MetaSigAssoc)
 pdf("07.Species_genetic_association/species_ba_count.venn.pdf", width = 2, height = 2)
 draw.pairwise.venn(species_ba_count[2,1]+species_ba_count[2,2],
@@ -270,23 +255,20 @@ dev.off()
 ## matrix
 # p 
 adonis_res.fdr<-adonis_res$fdr
-all_sv_abun_ba_lm_res.fdr<-all_sv_abun_ba_lm_res$fdr
-
-rownames(all_sv_abun_ba_lm_res.fdr)<-info$Short_name[match(rownames(all_sv_abun_ba_lm_res.fdr),
-                                                           info$Metaphlan3_name)]
-all_sv_abun_ba_lm_res.fdr<-all_sv_abun_ba_lm_res.fdr[match(rownames(adonis_res.fdr),
-                                                           rownames(all_sv_abun_ba_lm_res.fdr)),]
-rownames(all_sv_abun_ba_lm_res.fdr)<-rownames(adonis_res.fdr)
+all_sv_abun_ba_lm_res.fdr<-all_sv_abun_ba_lm_res.table[,c("Abun.BA", "Abun.Species", "Abun.Meta.fdr.p")] %>%
+  spread("Abun.BA", "Abun.Meta.fdr.p")
+all_sv_abun_ba_lm_res.fdr<-data.frame(all_sv_abun_ba_lm_res.fdr, row.names = "Abun.Species")
+all_sv_abun_ba_lm_res.fdr<-all_sv_abun_ba_lm_res.fdr[match(rownames(adonis_res.fdr),rownames(all_sv_abun_ba_lm_res.fdr)),
+                                                     match(colnames(adonis_res.fdr),colnames(all_sv_abun_ba_lm_res.fdr))]
 
 # color
 species_ba.color<-matrix(0, nrow = nrow(adonis_res.fdr), ncol = ncol(adonis_res.fdr))
 rownames(species_ba.color)<-rownames(adonis_res.fdr)
 colnames(species_ba.color)<-colnames(adonis_res.fdr)
 
-species_ba.color[adonis_res.fdr<0.05&all_sv_abun_ba_lm_res.fdr<0.05&!is.na(all_sv_abun_ba_lm_res.fdr)]<- 1#"red"
-species_ba.color[adonis_res.fdr>0.05&all_sv_abun_ba_lm_res.fdr<0.05&!is.na(all_sv_abun_ba_lm_res.fdr)]<- 2 #"yellow"
-species_ba.color[adonis_res.fdr<0.05&all_sv_abun_ba_lm_res.fdr>0.05&!is.na(all_sv_abun_ba_lm_res.fdr)]<- 3 #"blue"
-species_ba.color[adonis_res.fdr<0.05&is.na(all_sv_abun_ba_lm_res.fdr)]<- 4 #"black"
+species_ba.color[adonis_res.fdr<0.05&all_sv_abun_ba_lm_res.fdr<0.05&!is.na(all_sv_abun_ba_lm_res.fdr)]<- 1#"red", both assoc
+species_ba.color[adonis_res.fdr>0.05&all_sv_abun_ba_lm_res.fdr<0.05&!is.na(all_sv_abun_ba_lm_res.fdr)]<- 2 #"yellow", abundance assoc
+species_ba.color[adonis_res.fdr<0.05&all_sv_abun_ba_lm_res.fdr>0.05&!is.na(all_sv_abun_ba_lm_res.fdr)]<- 3 #"blue", genetic assoc
 
 ## get plot tables
 species_ba.sig.table<-species_ba.table[species_ba.table$Meta.fdr.p<0.05 |
@@ -304,10 +286,9 @@ species_ba.plot.spe <- species_ba.sig.table$Species %>%
 species_ba.color.plot    <- species_ba.color %>%
   .[match(species_ba.plot.spe,rownames(.)),match(species_ba.plot.ba,colnames(.))]
 
-
 pdf("07.Species_genetic_association/specie_bas.heatmap.pdf", width = 9, height = 8)
 heatmap.2(species_ba.color.plot, 
-          col=colorRampPalette(c("#f9f9f9","#ff0101","#fff001", "#0101fd", "#30303a"))(5), # white,red,yellow,blue,black
+          col=colorRampPalette(c("#f9f9f9","#ff0101","#fff001", "#0101fd"))(4), # white,red,yellow,blue
           trace = "none", Rowv = F, Colv = F, dendrogram = "none",
           density.info="none",
           cexCol = 1, srtCol = 45, cexRow = 1,
@@ -319,7 +300,6 @@ heatmap.2(species_ba.color.plot,
 dev.off()
 
 ```
-
 
 ### 3.6 Species pcoa
 ```{r 3.6}
@@ -391,11 +371,9 @@ p_spe_ba_pcoa<-ggplot(species_dis_input.pcoa,aes(X1,X2, color = qtrans(ba_vec_in
 
 p_spe_ba_pcoa
 
-pdf("07.Species_genetic_association/B.wexlerae_CA_p.genetics1.pdf",width = 4, height = 3)
+pdf("07.Species_genetic_association/B.wexlerae_CA_p.genetics.pdf",width = 4, height = 3)
 print(p_spe_ba_pcoa)
 dev.off()
-
-
 
 ##################################
 species_short_name<-"B.wexlerae"
@@ -434,11 +412,6 @@ p_spe_ba_pcoa
 pdf("07.Species_genetic_association/B.wexlerae_CA_dehydro_deconju_ratio.genetics.pdf",width = 4, height = 3)
 print(p_spe_ba_pcoa)
 dev.off()
-
-
-
-
-
 
 ##################################
 
@@ -479,11 +452,7 @@ pdf("07.Species_genetic_association/F.prausnitzii_UDCA_p.genetics.pdf",width = 4
 print(p_spe_ba_pcoa)
 dev.off()
 
-
-
 ############
-
-
 species_short_name<-"F.prausnitzii"
 species_dis<-all_msv_dist_std[[paste("msv_",info$organism[match(species_short_name,info$Short_name)],sep = "")]]
 
@@ -521,11 +490,7 @@ pdf("07.Species_genetic_association/F.prausnitzii_GUDCA_p.genetics.pdf",width = 
 print(p_spe_ba_pcoa)
 dev.off()
 
-
-
 ############
-
-
 species_short_name<-"Oscillibacter sp"
 species_dis<-all_msv_dist_std[[paste("msv_",info$organism[match(species_short_name,info$Short_name)],sep = "")]]
 
@@ -562,24 +527,4 @@ p_spe_ba_pcoa
 pdf("07.Species_genetic_association/F.prausnitzii_GUDCA_p.genetics.pdf",width = 4, height = 3)
 print(p_spe_ba_pcoa)
 dev.off()
-
-
-
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
