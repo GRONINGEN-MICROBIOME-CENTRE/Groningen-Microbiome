@@ -1,16 +1,11 @@
+Title: Structural variation calling for metagenomic data
 Author: Daoming Wang
-
 E-mail: wangdaoming94@outlook.com
-
 Date: Nov 2019
-
- 
 
 # 1. Abstract
 
 Just like human genome, there are also lots of different types of genetic variants in microbial genomes, including SNPs, CNVs, and SVs etc, which contribute to the phenotypic diversity of microbial strains. Many bioinformatic tools have been devised to digging these variants, of which, SGVFinder is a tool which enabled the discovery of SVs from shot-gun metagenomic sequencing data of environmental microbiome. Two classes have been defined for the metagenomic SVs: deletion SVs and variable SVs. SGVFinder will not work on a single sample, and large cohort-level samples is better for it.
-
-
 
 # 2. Preparation
 
