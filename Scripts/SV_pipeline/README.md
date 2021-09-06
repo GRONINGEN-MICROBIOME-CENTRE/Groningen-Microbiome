@@ -1,6 +1,9 @@
 Title: Structural variation calling for metagenomic data
+
 Author: Daoming Wang
+
 E-mail: wangdaoming94@outlook.com
+
 Date: Nov 2019
 
 # 1. Abstract
