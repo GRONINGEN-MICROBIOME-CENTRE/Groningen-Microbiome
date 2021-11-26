@@ -12,4 +12,4 @@ Resources
 
 *Scripts* folder contains useful tools for microbiome analysis (commonly used scripts)
 
-
+*Workshops* folder contains scripts for common metagenomic functions (workshops given by Alex Kurilshikov)
