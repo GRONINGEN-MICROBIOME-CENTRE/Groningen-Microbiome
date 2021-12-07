@@ -1,3 +1,7 @@
+#workshop on alpha and beta diversity
+#author: Alex Kurilshikov
+#first commit: 07.12.2021
+
 # load data 
 
 metaphlan =read.table("alex_stuff/clean/data/microbe/metaphlan_raw.txt",header=T,as.is = T,sep="\t")
