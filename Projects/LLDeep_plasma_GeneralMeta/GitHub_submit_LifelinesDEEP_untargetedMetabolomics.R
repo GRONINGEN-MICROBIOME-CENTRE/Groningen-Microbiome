@@ -133,10 +133,10 @@ library(mediation)
 #mediation
 colnames(data)=c("X","Y","M")
 model.m=lm(M~X,data)
-model.y=lm(Y~X+M,data)
+model.y=lm(Y~X+M+X*M,data)
 summary=summary(mediate(model.m ,model.y,treat = "X", mediator = "M",boot = T,sims = 1000))
 #inverse mediation
 colnames(data)=c("X","M","Y")
 model.m=lm(M~X,data)
-model.y=lm(Y~X+M,data)
+model.y=lm(Y~X+M+X*M,data)
 summary=summary(mediate(model.m ,model.y,treat = "X", mediator = "M",boot = T,sims = 1000))
