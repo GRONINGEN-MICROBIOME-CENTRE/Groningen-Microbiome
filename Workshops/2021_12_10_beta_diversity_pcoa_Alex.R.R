@@ -1,4 +1,7 @@
 # load data 
+#workshop on beta diversity and pcoa plots
+#author: Alex Kurilshikov
+#first commit: 14.12.2021
 
 metaphlan =read.table("alex_stuff/clean/data/microbe/metaphlan_raw.txt",header=T,as.is = T,sep="\t")
 pheno = read.table("alex_stuff/clean/data/phenotypes/allPhenotypes_clear.txt",header=T,as.is = T,sep="\t")
