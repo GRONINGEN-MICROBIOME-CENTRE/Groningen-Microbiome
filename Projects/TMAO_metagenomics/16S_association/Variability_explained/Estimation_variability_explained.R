@@ -1,0 +1,168 @@
+###Estimation of variability explained by covariates, microbiome and genetics
+set.seed(111)
+library(glmnet)
+library(caret)
+library(tidyverse)
+
+setwd("~/Resilio Sync/Transfer/PhD/TMAO_16S/")
+  Count_table =  "LLD_rarefDefault.taxonomyTable.txt.gz"
+  Linking_table = "coupling_pheno_16s.txt"
+  Covariates = "Cov_file.tsv"
+  Phenos = "Pheno_LLD.tsv"
+  ##########
+  
+  Count_table = read_tsv(Count_table) #Rows are individuals, columns are Bacteria
+  Linking_table = read_tsv(Linking_table, col_names=F) 
+  Covariates = read_tsv(Covariates)
+  Phenos = read_tsv(Phenos)
+  Phenos %>% mutate(TMAO.Choline = TMAO/Choline , TMAO.Betaine = TMAO/Betaine , 
+                    TMAO.Butyrobetaine = TMAO/`y-butyrobetaine`, TMAO.Carnitine = TMAO/`L-Carnitine`,
+                    Butyrobetain.Carnitine =  `y-butyrobetaine`/`L-Carnitine` ) -> Phenos
+read_tsv("Manuscript/Additional_material/Summary_stats_All.tsv") ->Stats
+
+Choose_replicate = function(Linking_table){
+  #Random choice if Same individual's microbiome has been sequenced more than once
+  to_remove = vector()
+  for (Entry in unique(Linking_table$X1[duplicated(Linking_table$X1)])){
+    Linking_table %>% filter(X1 == Entry) %>% sample_n(1) -> Choice
+    Linking_table %>% filter(X1 == Entry) %>% filter(!X2 == Choice$X2) -> Out
+    to_remove = c(to_remove, Out$X2)
+  }
+  Linking_table %>% filter(!X2 %in% to_remove) -> Filtered_table
+  return(Filtered_table)
+}
+
+Filter_unclassified = function(Count_table){
+  #NOTAX is the notation for the classifier unclassified samples
+  Remove_columns = colnames(Count_table)[grepl("NOTAX", colnames(Count_table))]
+  Count_table %>% select(-Remove_columns) %>% select(-rootrank.Root) -> Count_table
+  return(Count_table)
+}
+
+
+
+#Format 16S table
+Count_table = Filter_unclassified(Count_table)
+Linking_table = Choose_replicate(Linking_table)
+colnames(Linking_table) = c("ID", "SampleID")
+left_join(Count_table, Linking_table) %>% drop_na() %>% select(-SampleID) -> Count_table2
+Count_table2 %>% select(ID, Stats$Bug) -> Count_table2 #Keep only bugs in meta-analysis (present in both cohorts)
+
+
+#Format Genetics table
+Get_genetic_table = function(Metabolite){
+  Path_file = paste(c("/Users/sergio/Resilio Sync/Transfer/PhD/TMAO_16S/Variance_explained/Data_genetics/", Metabolite, ".tsv"), collapse = "")
+  ID_info = read_tsv("/Users/sergio/Resilio Sync/Transfer/PhD/TMAO_16S/Variance_explained/Data_genetics/ID_genetics.tsv", col_names=F)
+  read_tsv(Path_file, col_names=F) -> Matrix_genetics
+  colnames(Matrix_genetics) = c("ID", ID_info$X1)
+  Matrix_genetics[,2:dim(Matrix_genetics)[2]] %>% apply(2,  function(x){ as.numeric(as.factor(x)) })  %>% t() %>% as.data.frame() %>% rownames_to_column("ID") %>% as_tibble()  -> Matrix_genetics2
+  colnames(Matrix_genetics2) = c("ID", Matrix_genetics$ID )
+  return(Matrix_genetics2)
+}
+
+
+
+#Match tables
+Covariates %>% drop_na() -> Covariates2
+Phenos %>% drop_na() -> Phenos2
+Count_table2 %>% arrange(ID) %>% filter(ID %in% Covariates2$ID) %>% filter(ID %in% Phenos2$ID) -> Count_table2
+Covariates2 %>% filter(ID %in% Count_table2$ID) %>% arrange(ID) -> Covariates2
+Phenos2 %>% filter(ID %in% Count_table2$ID) %>% select(-Butyrobetain.Carnitine) %>% mutate(TMAO.Deoxycarnitine = TMAO.Butyrobetaine, Deoxycarnitine = `y-butyrobetaine`) %>% 
+  select(! c(TMAO.Butyrobetaine, `y-butyrobetaine`) ) %>% arrange(ID) -> Phenos2
+#Match genetics
+
+
+#Transform data
+#Microbiome transformation
+Geom_mean = function(x){
+  exp(mean(log(x)))
+}
+CLR = function(D){
+  log(D / Geom_mean(D) )
+  
+}
+Compute_CLR_taxonomy = function(Data, Taxonomy = "genus"){
+  paste( c(Taxonomy, "."), collapse="" ) -> Ta
+  colnames(select(Data, -c(ID))) -> Taxa
+  Taxa[grepl(Ta, Taxa)] -> Taxa
+  Data %>% select( c("ID", Taxa) ) -> Data_taxonomy
+  
+  #computation of a different pseudocoount per taxa.
+  CLR( apply( select(Data_taxonomy, -ID), 2, as.numeric)  + 1 ) %>% as_tibble()  %>% mutate(ID = Data_taxonomy$ID, .before=1) -> Data_taxonomy
+  return(Data_taxonomy)
+}  
+All_taxonomy = Compute_CLR_taxonomy(Count_table2, Taxonomy = "genus")
+for (i in c("phylum", "class", "order", "family")){
+  Compute_CLR_taxonomy(Count_table2, Taxonomy = i) -> Transformed_data
+  cbind(All_taxonomy, select(Transformed_data, -ID)) %>% as_tibble() -> All_taxonomy
+} 
+#Metabolite transformation
+apply(select(Phenos2, -ID), 2, function(x){ qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) } ) %>% as_tibble() %>% mutate(ID = Phenos2$ID, .before=1) -> Phenos3
+
+
+
+Model_metabolite = function( Data,Metabolite_n = "TMAO" ){
+  Data %>% select(-ID) -> Data
+  Data %>% drop_na() -> Data
+  Formula = as.formula(paste(c(Metabolite_n, " ~ ."), collapse=""))
+  model = train( Formula, data = Data , method = "glmnet", rControl = trainControl("cv", number = 10), tuneLength = 10)  
+  Model_name = paste(c("./Variance_explained/Model_fitted_", Metabolite_n, ".rds"), collapse="" )
+  saveRDS(model, Model_name)
+}
+
+Predict_by_layers = function(Model, Covariates = Covariates2, Genetics, Microbiome = All_taxonomy, Metabolite = Phenos3$TMAO){
+  #All categories should have an "ID" column
+  left_join(left_join(Covariates, Genetics), Microbiome) -> Regressors
+  layers = tibble()
+  for (i in  c("Cov", "Gene", "Micr")){
+    Regressors_0s = Regressors
+      if (i == "Cov"){
+        To_0 = colnames(Regressors)[ colnames(Regressors) %in% colnames(Covariates)  == F]
+      }else if (i == "Gene" ){
+        To_0 = colnames(Regressors)[grepl( c(colnames(Covariates), colnames(Genetics) ) , colnames(Regressors)) == F]          
+      } else { 
+        To_0 = c() 
+      }
+      Regressors_0s[, To_0 ] = 0
+      model %>% predict(select(Regressors_0s, -ID)) -> y_hat
+      Variance = R2( y_hat, Metabolite )
+      rbind(layers, tibble(Layer = i, R2 = Variance ) ) -> layers
+  }
+  
+}
+All_taxonomy = All_taxonomy[!duplicated(All_taxonomy),]
+
+
+################TRAINING##########
+###Just run with the training cohorts, or with a train/test split if no training cohort available#########
+set.seed(888)
+colnames(Phenos3)[5] = "Carnitine"
+for (Met in c("TMAO","Betaine" ,"Choline", "Carnitine", "Deoxycarnitine", "TMAO.Choline","TMAO.Betaine","TMAO.Carnitine", "TMAO.Deoxycarnitine") ){
+  print(Met)
+  Genetics_table = Get_genetic_table(Met)
+  #Check if left_join is doing it by ID
+  D = left_join(left_join(left_join(All_taxonomy, Covariates2, by="ID" ), select(Phenos3, c("ID", Met)) , by="ID"), Genetics_table, by="ID")
+  Model_metabolite(Data= D , Metabolite_n = Met  )
+}
+
+###########R2 estimation in test cohort###################
+Results_all_metabolites = tibble()
+for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO.Choline", "TMAO.Carnitine", "TMAO.Deoxycarnitine", "TMAO.Betaine" ) ){
+  readRDS(file = paste(c("Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
+  Genetics_table = Get_genetic_table(Met)
+  #Check if left_join is doing it by ID
+  left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3) %>% drop_na() -> For_prediction
+  
+  Predict_by_layers(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met))) -> Results_metabolite
+  Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
+  rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
+}
+Results_all_metabolites %>% mutate(Layer = factor(Layer, levels = c("Micr", "Gene", "Cov") )) -> Results_all_metabolites
+Results_all_metabolites %>% spread(Layer, R2) %>% mutate( Micr = Micr - Gene, Gene = Gene-Cov  ) %>% gather(Layer, R2, Micr:Cov, factor_key=TRUE) %>%
+ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_brewer(palette = "Accent") 
+
+
+
+
+
+

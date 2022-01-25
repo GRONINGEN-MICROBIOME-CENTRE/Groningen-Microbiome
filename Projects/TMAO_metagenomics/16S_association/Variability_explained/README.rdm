@@ -1,0 +1,34 @@
+# Required R packages
+library(glmnet)
+library(caret)
+library(tidyverse)
+# Script Input
+- Count_table : 16S table of microbial counts (from MiBiogen consortium). Rows represent samples, columns represent taxa. SampleID as ID column. 
+- Linking_table : To translated count_table IDs in case are encoded
+- Covariates : Table with Age, Gender, BMI (and any other covariate to be included in model. Warning: For layer R2 calculation it will only use covariates available in the training data). ID column is named ID.
+- Phenos : Table with metabolites. ID column is called ID
+- Genotype files : Get_genetic_table function will be used on a given path to get Genotype tables. Genotype tables do not have column names or sample ID. Samples ID are therefore added from ID_info (path to this file need to be adjusted). This file should be in the same order than genotype file. Genotype file has a different column per person, while rows are genomic positions. 
+Generating Genotype files and ID file:
+1. Get GWAS summary files from LLS and 300OB. Get all positions with P<1x10e-5.
+2. Extract positions from Plink genotype files. E.g extracting from binaries (bed, bin, fam):
+plink --bfile {F} --extract {variants} --recode vcf --out {O}
+Where F is the location of the binaries, variants is a file with the IDs of the variants found in (1) and O is the output location
+3. Use bcftools to format the genotypes
+bcftools query -f '%CHROM:%POS:%REF:%ALT\\t[ %GT\\t]\n'  {vcf} > {Out}
+Where vcf is the vcf file produced in (2), and Out the genotype file used in the script
+4. Extract IDs from the vcf file, you can do this with bcftools.
+bcftools query -l {vcf}
+
+
+This script CLR-transformed microbial taxonomy data, it does this per taxonomic level independently. Adds 1 pseudocount to allow log-transformations.
+
+
+Model_metabolite is used for training the models. It uses elastic net regression via glmnet. Caret is used for the training of the model, using a 10-fold cross validelastic net. Parameters alpha and lambda are optimized between a list of 10 combinations.
+
+Predict_by_layers is used for getting nested R2 estimations. First layer fits only covariates. The second includes genetics (+covariates). The third includes all three layers (covariates, taxonomy, genetics). For doing this sequential R2 estimation, al covariates that do not belong to the layer of interest are set to 0. For the actual R2 added by each layer of information, the nested R2s are substracted.
+
+
+
+
+  
+  
