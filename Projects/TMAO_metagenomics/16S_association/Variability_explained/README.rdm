@@ -4,7 +4,7 @@ library(caret)
 library(tidyverse)
 # Script Input
 - Count_table : 16S table of microbial counts (from MiBiogen consortium). Rows represent samples, columns represent taxa. SampleID as ID column. 
-- Linking_table : To translated count_table IDs in case are encoded
+- Linking_table : To translatee count_table IDs in case they are encoded
 - Covariates : Table with Age, Gender, BMI (and any other covariate to be included in model. Warning: For layer R2 calculation it will only use covariates available in the training data). ID column is named ID.
 - Phenos : Table with metabolites. ID column is called ID
 - Genotype files : Get_genetic_table function will be used on a given path to get Genotype tables. Genotype tables do not have column names or sample ID. Samples ID are therefore added from ID_info (path to this file need to be adjusted). This file should be in the same order than genotype file. Genotype file has a different column per person, while rows are genomic positions. 
@@ -20,7 +20,7 @@ Where vcf is the vcf file produced in (2), and Out the genotype file used in the
 bcftools query -l {vcf}
 
 
-This script CLR-transformed microbial taxonomy data, it does this per taxonomic level independently. Adds 1 pseudocount to allow log-transformations.
+This script uses CLR-transformed microbial taxonomy data, it does this per taxonomic level independently. Adds 1 pseudocount to allow log-transformations.
 
 
 Model_metabolite is used for training the models. It uses elastic net regression via glmnet. Caret is used for the training of the model, using a 10-fold cross validelastic net. Parameters alpha and lambda are optimized between a list of 10 combinations.
