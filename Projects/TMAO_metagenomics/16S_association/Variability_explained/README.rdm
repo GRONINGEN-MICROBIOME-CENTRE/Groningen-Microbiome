@@ -14,7 +14,7 @@ Generating Genotype files and ID file:
 plink --bfile {F} --extract {variants} --recode vcf --out {O}
 Where F is the location of the binaries, variants is a file with the IDs of the variants found in (1) and O is the output location
 3. Use bcftools to format the genotypes
-bcftools query -f '%CHROM:%POS:%REF:%ALT\\t[ %GT\\t]\n'  {vcf} > {Out}
+bcftools query -f '%CHROM:%POS:%REF:%ALT\t[ %GT\t]\n'  {vcf} > {Out}
 Where vcf is the vcf file produced in (2), and Out the genotype file used in the script
 4. Extract IDs from the vcf file, you can do this with bcftools.
 bcftools query -l {vcf}
