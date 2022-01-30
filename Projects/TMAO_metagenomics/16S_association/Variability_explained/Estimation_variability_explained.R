@@ -57,6 +57,7 @@ Get_genetic_table = function(Metabolite){
   colnames(Matrix_genetics) = c("ID", ID_info$X1)
   Matrix_genetics[,2:dim(Matrix_genetics)[2]] %>% apply(2,  function(x){ as.numeric(as.factor(x)) })  %>% t() %>% as.data.frame() %>% rownames_to_column("ID") %>% as_tibble()  -> Matrix_genetics2
   colnames(Matrix_genetics2) = c("ID", Matrix_genetics$ID )
+  Matrix_genetics2 %>% mutate(ID = as.character(ID)) -> Matrix_genetics2
   return(Matrix_genetics2)
 }
 
@@ -66,10 +67,9 @@ Get_genetic_table = function(Metabolite){
 Covariates %>% drop_na() -> Covariates2
 Phenos %>% drop_na() -> Phenos2
 Count_table2 %>% arrange(ID) %>% filter(ID %in% Covariates2$ID) %>% filter(ID %in% Phenos2$ID) -> Count_table2
-Covariates2 %>% filter(ID %in% Count_table2$ID) %>% arrange(ID) -> Covariates2
+Covariates2 %>% filter(ID %in% Count_table2$ID) %>% arrange(ID) %>% mutate(ID = as.character(ID)) -> Covariates2
 Phenos2 %>% filter(ID %in% Count_table2$ID) %>% select(-Butyrobetain.Carnitine) %>% mutate(TMAO.Deoxycarnitine = TMAO.Butyrobetaine, Deoxycarnitine = `y-butyrobetaine`) %>% 
-  select(! c(TMAO.Butyrobetaine, `y-butyrobetaine`) ) %>% arrange(ID) -> Phenos2
-#Match genetics
+  select(! c(TMAO.Butyrobetaine, `y-butyrobetaine`) ) %>% arrange(ID) %>% mutate(ID = as.character(ID)) -> Phenos2
 
 
 #Transform data
@@ -117,18 +117,18 @@ Predict_by_layers = function(Model, Covariates = Covariates2, Genetics, Microbio
   for (i in  c("Cov", "Gene", "Micr")){
     Regressors_0s = Regressors
       if (i == "Cov"){
-        To_0 = colnames(Regressors)[ colnames(Regressors) %in% colnames(Covariates)  == F]
+        To_0 = colnames(Regressors)[ (colnames(Regressors) %in% colnames(Covariates))  == F]
       }else if (i == "Gene" ){
-        To_0 = colnames(Regressors)[grepl( c(colnames(Covariates), colnames(Genetics) ) , colnames(Regressors)) == F]          
+        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == F]          
       } else { 
         To_0 = c() 
       }
       Regressors_0s[, To_0 ] = 0
-      model %>% predict(select(Regressors_0s, -ID)) -> y_hat
+      Model %>% predict(select(Regressors_0s, -ID)) -> y_hat
       Variance = R2( y_hat, Metabolite )
       rbind(layers, tibble(Layer = i, R2 = Variance ) ) -> layers
   }
-  
+  return(layers)
 }
 All_taxonomy = All_taxonomy[!duplicated(All_taxonomy),]
 
@@ -144,11 +144,12 @@ for (Met in c("TMAO","Betaine" ,"Choline", "Carnitine", "Deoxycarnitine", "TMAO.
   D = left_join(left_join(left_join(All_taxonomy, Covariates2, by="ID" ), select(Phenos3, c("ID", Met)) , by="ID"), Genetics_table, by="ID")
   Model_metabolite(Data= D , Metabolite_n = Met  )
 }
-
+#Phenos3 %>% mutate(Carnitine = `L-Carnitine`) -> Phenos3
 ###########R2 estimation in test cohort###################
 Results_all_metabolites = tibble()
 for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO.Choline", "TMAO.Carnitine", "TMAO.Deoxycarnitine", "TMAO.Betaine" ) ){
-  readRDS(file = paste(c("Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
+  print(Met)
+  readRDS(file = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
   Genetics_table = Get_genetic_table(Met)
   #Check if left_join is doing it by ID
   left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3) %>% drop_na() -> For_prediction
