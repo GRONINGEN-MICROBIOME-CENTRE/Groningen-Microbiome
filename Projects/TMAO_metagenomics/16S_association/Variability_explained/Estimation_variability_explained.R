@@ -18,7 +18,15 @@ setwd("~/Resilio Sync/Transfer/PhD/TMAO_16S/")
   Phenos %>% mutate(TMAO.Choline = TMAO/Choline , TMAO.Betaine = TMAO/Betaine , 
                     TMAO.Butyrobetaine = TMAO/`y-butyrobetaine`, TMAO.Carnitine = TMAO/`L-Carnitine`,
                     Butyrobetain.Carnitine =  `y-butyrobetaine`/`L-Carnitine` ) -> Phenos
+  Diet = read_tsv("20150722_Diet__1135patients.txt")
+  colnames(Diet)[1] = "ID"
+  
 read_tsv("Manuscript/Additional_material/Summary_stats_All.tsv") ->Stats
+read_csv("Diet/LLS_IOP1-FFQ-Codebook_Foodgroups_20210628.csv") -> Stats_diet
+
+Diet %>% dplyr::select(c("ID", filter(Stats_diet, LLD_present=="TRUE")$X6)) -> Diet
+colnames(Diet)
+
 
 Choose_replicate = function(Linking_table){
   #Random choice if Same individual's microbiome has been sequenced more than once
@@ -38,6 +46,7 @@ Filter_unclassified = function(Count_table){
   Count_table %>% select(-Remove_columns) %>% select(-rootrank.Root) -> Count_table
   return(Count_table)
 }
+normalization_inversranknorm = function(Metabolite_measurement){ Metabolite_measurement = qnorm((rank(Metabolite_measurement,na.last="keep")-0.5)/sum(!is.na(Metabolite_measurement))) }
 
 
 
@@ -97,7 +106,8 @@ for (i in c("phylum", "class", "order", "family")){
   cbind(All_taxonomy, select(Transformed_data, -ID)) %>% as_tibble() -> All_taxonomy
 } 
 #Metabolite transformation
-apply(select(Phenos2, -ID), 2, function(x){ qnorm((rank(x,na.last="keep")-0.5)/sum(!is.na(x))) } ) %>% as_tibble() %>% mutate(ID = Phenos2$ID, .before=1) -> Phenos3
+apply(select(Phenos2, -ID), 2, normalization_inversranknorm) %>% as_tibble() %>% mutate(ID = Phenos2$ID, .before=1) -> Phenos3
+apply(dplyr::select(Diet, -ID), 2, FUN=normalization_inversranknorm) %>% as_tibble() %>% mutate(ID=Diet$ID) -> Diet
 
 
 
@@ -105,21 +115,23 @@ Model_metabolite = function( Data,Metabolite_n = "TMAO" ){
   Data %>% select(-ID) -> Data
   Data %>% drop_na() -> Data
   Formula = as.formula(paste(c(Metabolite_n, " ~ ."), collapse=""))
-  model = train( Formula, data = Data , method = "glmnet", rControl = trainControl("cv", number = 10), tuneLength = 10)  
+  model = train( Formula, data = Data , method = "glmnet", trControl = trainControl("cv", number = 10), tuneLength = 10)  
   Model_name = paste(c("./Variance_explained/Model_fitted_", Metabolite_n, ".rds"), collapse="" )
   saveRDS(model, Model_name)
 }
 
-Predict_by_layers = function(Model, Covariates = Covariates2, Genetics, Microbiome = All_taxonomy, Metabolite = Phenos3$TMAO){
+Predict_by_layers = function(Model, Covariates = Covariates2, Genetics, Microbiome = All_taxonomy, Diet_i = Diet, Metabolite = Phenos3$TMAO){
   #All categories should have an "ID" column
-  left_join(left_join(Covariates, Genetics), Microbiome) -> Regressors
+  left_join(left_join(left_join(Covariates, Genetics), Microbiome), Diet) -> Regressors
   layers = tibble()
-  for (i in  c("Cov", "Gene", "Micr")){
+  for (i in  c("Cov", "Gene", "Micr", "Diet")){
     Regressors_0s = Regressors
       if (i == "Cov"){
         To_0 = colnames(Regressors)[ (colnames(Regressors) %in% colnames(Covariates))  == F]
       }else if (i == "Gene" ){
-        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == F]          
+        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == F]
+      } else if (i == "Mic" ){
+        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Diet_i) )) == T]
       } else { 
         To_0 = c() 
       }
@@ -141,7 +153,7 @@ for (Met in c("TMAO","Betaine" ,"Choline", "Carnitine", "Deoxycarnitine", "TMAO.
   print(Met)
   Genetics_table = Get_genetic_table(Met)
   #Check if left_join is doing it by ID
-  D = left_join(left_join(left_join(All_taxonomy, Covariates2, by="ID" ), select(Phenos3, c("ID", Met)) , by="ID"), Genetics_table, by="ID")
+  D = left_join(left_join(left_join(left_join(All_taxonomy, Covariates2, by="ID" ), select(Phenos3, c("ID", Met)) , by="ID"), Genetics_table, by="ID"), Diet, by="ID")
   Model_metabolite(Data= D , Metabolite_n = Met  )
 }
 #Phenos3 %>% mutate(Carnitine = `L-Carnitine`) -> Phenos3
@@ -152,9 +164,9 @@ for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO
   readRDS(file = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
   Genetics_table = Get_genetic_table(Met)
   #Check if left_join is doing it by ID
-  left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3) %>% drop_na() -> For_prediction
+  left_join(left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3), Diet) %>% drop_na() -> For_prediction
   
-  Predict_by_layers(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met))) -> Results_metabolite
+  Predict_by_layers(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met)), Diet_i = filter(Diet, ID %in% For_prediction$ID)) -> Results_metabolite
   Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
   rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
 }
