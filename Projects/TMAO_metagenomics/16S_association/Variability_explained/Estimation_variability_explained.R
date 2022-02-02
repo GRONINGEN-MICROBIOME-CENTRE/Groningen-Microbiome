@@ -159,7 +159,7 @@ for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO
   rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
 }
 Results_all_metabolites %>% mutate(Layer = factor(Layer, levels = c("Micr", "Gene", "Cov") )) -> Results_all_metabolites
-Results_all_metabolites %>% spread(Layer, R2) %>% mutate( Micr = Micr - Gene, Gene = Gene-Cov  ) %>% gather(Layer, R2, Micr:Cov, factor_key=TRUE) %>%
+Results_all_metabolites %>% spread(Layer, R2) %>% mutate( Micr = ifelse(Micr - Gene > 0,Micr - Gene, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, Micr:Cov, factor_key=TRUE) %>%
 ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_brewer(palette = "Accent") 
 
 
