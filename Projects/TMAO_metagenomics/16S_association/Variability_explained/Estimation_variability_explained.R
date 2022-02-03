@@ -116,7 +116,7 @@ Model_metabolite = function( Data,Metabolite_n = "TMAO" ){
   Data %>% drop_na() -> Data
   Formula = as.formula(paste(c(Metabolite_n, " ~ ."), collapse=""))
   model = train( Formula, data = Data , method = "glmnet", trControl = trainControl("cv", number = 10), tuneLength = 10)  
-  Model_name = paste(c("./Variance_explained/Model_fitted_", Metabolite_n, ".rds"), collapse="" )
+  Model_name = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Metabolite_n, ".rds"), collapse="" )
   saveRDS(model, Model_name)
 }
 
@@ -170,9 +170,10 @@ for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO
   Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
   rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
 }
-Results_all_metabolites %>% mutate(Layer = factor(Layer, levels = c("Micr", "Gene", "Cov") )) -> Results_all_metabolites
-Results_all_metabolites %>% spread(Layer, R2) %>% mutate( Micr = ifelse(Micr - Gene > 0,Micr - Gene, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, Micr:Cov, factor_key=TRUE) %>%
-ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_brewer(palette = "Accent") 
+Colors = c("light blue", "purple", "salmon", "grey")
+Results_all_metabolites %>% mutate(Layer = factor(Layer, levels = c("Diet","Micr", "Gene", "Cov") )) -> Results_all_metabolites
+Results_all_metabolites %>% spread(Layer, R2) %>% mutate(Diet = ifelse(Diet - Micr > 0,Diet - Micr, 0) ,Micr = ifelse(Micr - Gene > 0,Micr - Gene, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, Diet:Cov, factor_key=TRUE) %>%
+ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity", col="black") + theme_bw() + scale_fill_manual(values = Colors)
 
 
 
