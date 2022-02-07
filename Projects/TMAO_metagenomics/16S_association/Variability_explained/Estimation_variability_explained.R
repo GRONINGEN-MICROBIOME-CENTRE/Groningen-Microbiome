@@ -22,9 +22,17 @@ setwd("~/Resilio Sync/Transfer/PhD/TMAO_16S/")
   colnames(Diet)[1] = "ID"
   
 read_tsv("Manuscript/Additional_material/Summary_stats_All.tsv") ->Stats
+readxl::read_excel("Stats_diet_all.xlsx",sheet=2) -> Stats_diet_all
 read_csv("Diet/LLS_IOP1-FFQ-Codebook_Foodgroups_20210628.csv") -> Stats_diet
+Stats_diet %>% filter(X6 %in% c(casefold(Stats_diet_all$...2), "dairy","how_often_yoghurt_milk_based_puddings", "fruits" )) -> Stats_diet2
 
-Diet %>% dplyr::select(c("ID", filter(Stats_diet, LLD_present=="TRUE")$X6)) -> Diet
+casefold(unique(as_vector(Stats_diet_all[,2])) )
+Stats_diet2
+
+Diet
+
+#Diet %>% dplyr::select(c("ID", filter(Stats_diet, LLD_present=="TRUE")$X6)) -> Diet
+Diet %>% dplyr::select(c("ID", casefold(unique(as_vector(Stats_diet[,2])) ))) -> Diet
 colnames(Diet)
 
 
