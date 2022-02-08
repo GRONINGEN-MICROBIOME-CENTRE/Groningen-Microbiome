@@ -9,6 +9,8 @@
 
 - (optional) tidyr
 
+- (optional) ellipse
+
 ### following data will be used:
 
 - sample01_metaphlan.txt, sample02_metaphlan.txt, sample03_metaphlan.txt : examples of single-sample microbiome data (part I of workshop)
