@@ -1,5 +1,5 @@
 ### R. Gacesa (UMCG)
-## Microbiome data analysis workshop 2021
+## Microbiome data analysis workshop 2022
 
 ### workshop will be done in R, following packages are required:
 
