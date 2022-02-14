@@ -24,16 +24,15 @@ setwd("~/Resilio Sync/Transfer/PhD/TMAO_16S/")
 read_tsv("Manuscript/Additional_material/Summary_stats_All.tsv") ->Stats
 readxl::read_excel("Stats_diet_all.xlsx",sheet=2) -> Stats_diet_all
 read_csv("Diet/LLS_IOP1-FFQ-Codebook_Foodgroups_20210628.csv") -> Stats_diet
-Stats_diet %>% filter(X6 %in% c(casefold(Stats_diet_all$...2), "dairy","how_often_yoghurt_milk_based_puddings", "fruits" )) -> Stats_diet2
+Stats_diet %>% 
+  filter(X6 %in% c(casefold(Stats_diet_all$...2), "dairy","how_often_yoghurt_milk_based_puddings", "fruits" )) -> Stats_diet2
 
-casefold(unique(as_vector(Stats_diet_all[,2])) )
-Stats_diet2
+Diet  %>% dplyr::select(c("ID", Stats_diet2$X6)) %>%
+  mutate(dairy_products = dairy,  yoghurt = how_often_yoghurt_milk_based_puddings, fruit = fruits  ) %>% select(-c("dairy", "how_often_yoghurt_milk_based_puddings", "fruits")) -> Diet
 
-Diet
 
-#Diet %>% dplyr::select(c("ID", filter(Stats_diet, LLD_present=="TRUE")$X6)) -> Diet
-Diet %>% dplyr::select(c("ID", casefold(unique(as_vector(Stats_diet[,2])) ))) -> Diet
-colnames(Diet)
+#Diet %>% dplyr::select(c("ID", casefold(unique(as_vector(Stats_diet[,2])) ))) -> Diet
+#colnames(Diet)
 
 
 Choose_replicate = function(Linking_table){
@@ -122,8 +121,16 @@ apply(dplyr::select(Diet, -ID), 2, FUN=normalization_inversranknorm) %>% as_tibb
 Model_metabolite = function( Data,Metabolite_n = "TMAO" ){
   Data %>% select(-ID) -> Data
   Data %>% drop_na() -> Data
-  Formula = as.formula(paste(c(Metabolite_n, " ~ ."), collapse=""))
-  model = train( Formula, data = Data , method = "glmnet", trControl = trainControl("cv", number = 10), tuneLength = 10)  
+  Data  %>% select(-Metabolite_n) %>% apply(2,  scale) %>% as_tibble() %>% mutate(Metabolite = as_vector(select(Data, Metabolite_n)) ) -> Data
+  
+  Formula = as.formula("Metabolite ~ .")
+  #Parallel modelling
+  library(doParallel)
+  cl <- makePSOCKcluster(10)
+  registerDoParallel(cl)
+  model = train( Formula, data = Data , method = "glmnet", trControl = trainControl("repeatedcv", number = 10, repeats = 5), tuneLength = 10, allowParallel=TRUE)  
+  stopCluster(cl)
+  
   Model_name = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Metabolite_n, ".rds"), collapse="" )
   saveRDS(model, Model_name)
 }
@@ -150,6 +157,34 @@ Predict_by_layers = function(Model, Covariates = Covariates2, Genetics, Microbio
   }
   return(layers)
 }
+Predict_by_layers2 = function(Model, Covariates = Covariates2, Genetics, Microbiome = All_taxonomy, Diet_i = Diet, Metabolite = Phenos3$TMAO){
+  #All categories should have an "ID" column
+  left_join(left_join(left_join(Covariates, Genetics), Microbiome), Diet) -> Regressors
+  select(Regressors, -ID) %>% apply(2,  scale) %>% as_tibble() %>% mutate(ID = Regressors$ID ) -> Regressors
+  layers = tibble()
+  for (i in  c("Cov", "Gene", "Micr", "Diet")){
+    Regressors_0s = Regressors
+    if (i == "Cov"){
+      To_0 = colnames(Regressors)[ (colnames(Regressors) %in% colnames(Covariates))  == F]
+    }else if (i == "Gene" ){
+      To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == F]
+    } else if (i == "Diet" ){
+      To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Microbiome) )) == T]
+    } else { 
+      To_0 = c() 
+    }
+    Regressors_0s[, To_0 ] = 0
+    Model %>% predict(select(Regressors_0s, -ID)) -> y_hat
+    Variance = R2( y_hat, Metabolite )
+    rbind(layers, tibble(Layer = i, R2 = Variance ) ) -> layers
+  }
+  return(layers)
+}
+
+
+
+
+
 All_taxonomy = All_taxonomy[!duplicated(All_taxonomy),]
 
 
@@ -167,24 +202,39 @@ for (Met in c("TMAO","Betaine" ,"Choline", "Carnitine", "Deoxycarnitine", "TMAO.
 #Phenos3 %>% mutate(Carnitine = `L-Carnitine`) -> Phenos3
 ###########R2 estimation in test cohort###################
 Results_all_metabolites = tibble()
+Coefficients_models = tibble()
+All_coefficients = tibble()
 for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO.Choline", "TMAO.Carnitine", "TMAO.Deoxycarnitine", "TMAO.Betaine" ) ){
   print(Met)
   readRDS(file = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
+  coef(Model$finalModel, Model$bestTune$lambda) %>% as.matrix() %>% as.data.frame() %>% as.data.frame() %>% rownames_to_column("Feature") %>% as_tibble() -> Model_coeff
+  Model_coeff %>% mutate(Metabolite = Met) -> Model_coeff
+  rbind(All_coefficients, Model_coeff) -> All_coefficients
   Genetics_table = Get_genetic_table(Met)
   #Check if left_join is doing it by ID
   left_join(left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3), Diet) %>% drop_na() -> For_prediction
   
-  Predict_by_layers(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met)), Diet_i = filter(Diet, ID %in% For_prediction$ID)) -> Results_metabolite
+  Predict_by_layers2(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met)), Diet_i = filter(Diet, ID %in% For_prediction$ID)) -> Results_metabolite
   Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
   rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
 }
-Colors = c("light blue", "purple", "salmon", "grey")
-Results_all_metabolites %>% mutate(Layer = factor(Layer, levels = c("Diet","Micr", "Gene", "Cov") )) -> Results_all_metabolites
-Results_all_metabolites %>% spread(Layer, R2) %>% mutate(Diet = ifelse(Diet - Micr > 0,Diet - Micr, 0) ,Micr = ifelse(Micr - Gene > 0,Micr - Gene, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, Diet:Cov, factor_key=TRUE) %>%
-ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity", col="black") + theme_bw() + scale_fill_manual(values = Colors)
+
+#Model coeff
+All_coefficients %>% spread(Metabolite, `1`) -> All_coefficients
+write_tsv(All_coefficients, "Variance_explained/Coefficients.tsv")
+
+#If diet on top
+#Colors = c("light blue", "purple", "salmon", "grey")
+#Results_all_metabolites  %>%
+#   spread(Layer, R2) %>% mutate(Diet = ifelse(Diet - Micr > 0,Diet - Micr, 0) ,Micr = ifelse(Micr - Gene > 0,Micr - Gene, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
+#  mutate(Layer = factor(Layer, levels = c("Diet","Micr", "Gene", "Cov") )) %>% 
+#ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity", col="black") + theme_bw() + scale_fill_manual(values = Colors)
 
 
-
-
-
+#If micr on top
+Colors = c("purple", "light blue", "salmon", "grey")
+Results_all_metabolites %>% 
+  spread(Layer, R2) %>% mutate(Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0) ,Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
+  mutate(Layer = factor(Layer, levels = c("Micr","Diet", "Gene", "Cov") )) %>%
+  ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity", col="black") + theme_bw() + scale_fill_manual(values = Colors)
 
