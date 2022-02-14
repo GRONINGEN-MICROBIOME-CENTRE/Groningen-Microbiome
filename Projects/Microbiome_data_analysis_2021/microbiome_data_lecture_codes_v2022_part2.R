@@ -1,12 +1,12 @@
 # ======================================================
 # ======================================================
 # ======================================================
-# MICROBIOME WORKSHOP
+# MICROBIOME WORKSHOP, exercise 2
 # ======================================================
 # ======================================================
 # ======================================================
 
-setwd('D:/UMCG/2021_microbiome_data_lecture/')
+setwd('~/2022_Teaching/codes/')
 
 # load libraries
 # ===========================
@@ -31,6 +31,7 @@ head(inDF)
 # > a) extract species (by grepping for |s__); Note: this also removes UNKNOWN 
 inDFs <- inDF[grep('\\|s__',inDF$Taxon),]
 specRichness <- nrow(inDFs)
+length(inDFs$Taxon)
 print(specRichness)
 # > b) extract genera: subset for genera then remove species
 inDFg <- inDF[grep('\\|g__',inDF$Taxon),]

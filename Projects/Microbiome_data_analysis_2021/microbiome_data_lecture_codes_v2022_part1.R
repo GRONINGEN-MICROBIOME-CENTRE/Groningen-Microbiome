@@ -1,6 +1,6 @@
 # ===============================================================================
 # ===============================================================================
-# R. Gacesa, UMCG (2021)
+# R. Gacesa, UMCG (2022)
 #
 # Microbiome data analysis student workshop
 # ===============================================================================
@@ -16,7 +16,7 @@
 # ======================================================
 # ======================================================
 
-setwd('D:/UMCG/2021_microbiome_data_lecture/')
+setwd('~/2022_Teaching/codes/')
 
 # load libraries
 # ===========================
@@ -32,7 +32,7 @@ library(tidyr)
 
 # > 0) load microbiome data (sample02)
 # ======================================
-inDF <- read.table(file = 'sample02_metaphlan.txt',sep='\t',header=F)
+inDF <- read.table(file = 'sample02_metaphlan.txt',sep='\t',header=F,stringsAsFactors = F)
 colnames(inDF) <- c("Taxon","TaxID","Rel.Abundance","Coverage","Aligned.Reads")
 head(inDF)
 

@@ -1,6 +1,6 @@
 # ===============================================================================
 # ===============================================================================
-# R. Gacesa, UMCG (2021)
+# R. Gacesa, UMCG (2022)
 #
 # Microbiome data analysis student workshop
 # ===============================================================================
@@ -18,18 +18,18 @@
 #  PART IV:
 #  > case-control analysis of microbiome taxa between healthy and disease
 #  
-#
 # ======================================================
 # ======================================================
 # ======================================================
 
-setwd('D:/UMCG/2021_microbiome_data_lecture/')
+setwd('~/2022_Teaching/codes/')
 
 # load libraries
 # ===========================
 library(vegan)
 library(ggplot2)
 library(tidyr)
+library(ellipse)
 
 # =====================================================================================================================
 # =====================================================================================================================
@@ -102,6 +102,7 @@ wilcox.test(inDFm$DIV.species.is[inDFm$Diagnosis=="Disease"],inDFm$DIV.species.i
 ggplot(inDFm, aes(y=DIV.species,x=Biomarker)) + geom_point() + geom_smooth(method = "lm")
 # > is it linked to disease?
 ggplot(inDFm, aes(y=Biomarker,x=Diagnosis,col=Diagnosis)) + geom_violin() + geom_boxplot(width=0.2,outlier.alpha = F) + geom_jitter(width = 0.1,height = 0)
+wilcox.test(inDFm$Biomarker[inDFm$Diagnosis=="Disease"],inDFm$Biomarker[inDFm$Diagnosis=="HC"])
 # > BMI
 ggplot(inDFm, aes(y=DIV.species,x=BMI)) + geom_point() + geom_smooth(method = "lm")
 ggplot(inDFm, aes(y=DIV.species,x=BMI,col=Diagnosis)) + geom_point() + geom_smooth(method = "lm")
@@ -118,12 +119,13 @@ colsSpecies <- grep('s__',colnames(inDFm))
 bc12 <- vegan::vegdist(inDFm[1:2,colsSpecies],method = "bray")
 print(bc12)
 
-
 # a) calculate distance matrix of Bray-Curtis dissimilarity between samples on species level
 # ======================================================
 rownames(inDFm) <- inDFm$ID
 colsSpecies <- grep('s__',colnames(inDFm))
 bcSpec <- vegan::vegdist(inDFm[,colsSpecies],method = "bray")
+# how does it look?
+as.matrix(bcSpec)[1:5,1:5]
 # b) perform PCoA on it
 pcoaMat <- cmdscale(bcSpec, eig = T, k=3)
 variance <- head(eigenvals(pcoaMat)/sum(eigenvals(pcoaMat)))
@@ -146,7 +148,9 @@ ggplot(pcoaDF,aes(x=PC1,y=PC2,col=Diagnosis)) +
         theme_classic() + 
         geom_point(data=centroids,shape=4,stroke=3.5,size=6,aes(x=centroids$PC1,y=centroids$PC2),alpha=1) + 
         xlab(paste0('PC 1,',' (',var_pc1,'% variance)')) + 
-        ylab(paste0('PC 2,',' (',var_pc2,'% variance)'))
+        ylab(paste0('PC 2,',' (',var_pc2,'% variance)')) + 
+        stat_ellipse()
+  
 
 # f) plot 2nd and 3rd principal coordinates
 # ======================================================
@@ -156,14 +160,14 @@ ggplot(pcoaDF,aes(x=PC2,y=PC3,col=Diagnosis)) +
   theme_classic() + 
   geom_point(data=centroids,shape=4,stroke=3.5,size=6,aes(x=centroids$PC2,y=centroids$PC3),alpha=1) + 
   xlab(paste0('PC 2,',' (',var_pc2,'% variance)')) + 
-  ylab(paste0('PC 3,',' (',var_pc3,'% variance)'))
+  ylab(paste0('PC 3,',' (',var_pc3,'% variance)')) + 
+  stat_ellipse()
 
 
 # iv) quantifying the variance explained by disease variable
 # (Permutational Multivariate Analysis of Variance Using Distance Matrices)
 # ======================================================
 adonis(bcSpec ~ inDFm$Diagnosis,permutations = 1000)
-
 
 # v) advanced/optional: biplot: quantification of factors shaping PCoA plots
 # ===================================================================
