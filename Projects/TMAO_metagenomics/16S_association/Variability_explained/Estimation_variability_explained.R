@@ -4,6 +4,11 @@ library(glmnet)
 library(caret)
 library(tidyverse)
 
+options(collapse_mask = "manip") 
+library(collapse)
+
+select = dplyr::select
+mutate = dplyr::mutate 
 setwd("~/Resilio Sync/Transfer/PhD/TMAO_16S/")
   Count_table =  "LLD_rarefDefault.taxonomyTable.txt.gz"
   Linking_table = "coupling_pheno_16s.txt"
@@ -12,7 +17,7 @@ setwd("~/Resilio Sync/Transfer/PhD/TMAO_16S/")
   ##########
   
   Count_table = read_tsv(Count_table) #Rows are individuals, columns are Bacteria
-  Linking_table = read_tsv(Linking_table, col_names=F) 
+  Linking_table = read_tsv(Linking_table, col_names=FALSE) 
   Covariates = read_tsv(Covariates)
   Phenos = read_tsv(Phenos)
   Phenos %>% mutate(TMAO.Choline = TMAO/Choline , TMAO.Betaine = TMAO/Betaine , 
@@ -25,10 +30,10 @@ read_tsv("Manuscript/Additional_material/Summary_stats_All.tsv") ->Stats
 readxl::read_excel("Stats_diet_all.xlsx",sheet=2) -> Stats_diet_all
 read_csv("Diet/LLS_IOP1-FFQ-Codebook_Foodgroups_20210628.csv") -> Stats_diet
 Stats_diet %>% 
-  filter(X6 %in% c(casefold(Stats_diet_all$...2), "dairy","how_often_yoghurt_milk_based_puddings", "fruits" )) -> Stats_diet2
+  filter(X6 %in% c(casefold(Stats_diet_all$...2), "dairy", "fruits" )) -> Stats_diet2
 
 Diet  %>% dplyr::select(c("ID", Stats_diet2$X6)) %>%
-  mutate(dairy_products = dairy,  yoghurt = how_often_yoghurt_milk_based_puddings, fruit = fruits  ) %>% select(-c("dairy", "how_often_yoghurt_milk_based_puddings", "fruits")) -> Diet
+  mutate(dairy_products = dairy, fruit = fruits  ) %>% select(-c("dairy",  "fruits")) -> Diet
 
 
 #Diet %>% dplyr::select(c("ID", casefold(unique(as_vector(Stats_diet[,2])) ))) -> Diet
@@ -50,7 +55,7 @@ Choose_replicate = function(Linking_table){
 Filter_unclassified = function(Count_table){
   #NOTAX is the notation for the classifier unclassified samples
   Remove_columns = colnames(Count_table)[grepl("NOTAX", colnames(Count_table))]
-  Count_table %>% select(-Remove_columns) %>% select(-rootrank.Root) -> Count_table
+  Count_table %>% dplyr::select(-Remove_columns) %>% dplyr::select(-rootrank.Root) -> Count_table
   return(Count_table)
 }
 normalization_inversranknorm = function(Metabolite_measurement){ Metabolite_measurement = qnorm((rank(Metabolite_measurement,na.last="keep")-0.5)/sum(!is.na(Metabolite_measurement))) }
@@ -68,8 +73,8 @@ Count_table2 %>% select(ID, Stats$Bug) -> Count_table2 #Keep only bugs in meta-a
 #Format Genetics table
 Get_genetic_table = function(Metabolite){
   Path_file = paste(c("/Users/sergio/Resilio Sync/Transfer/PhD/TMAO_16S/Variance_explained/Data_genetics/", Metabolite, ".tsv"), collapse = "")
-  ID_info = read_tsv("/Users/sergio/Resilio Sync/Transfer/PhD/TMAO_16S/Variance_explained/Data_genetics/ID_genetics.tsv", col_names=F)
-  read_tsv(Path_file, col_names=F) -> Matrix_genetics
+  ID_info = read_tsv("/Users/sergio/Resilio Sync/Transfer/PhD/TMAO_16S/Variance_explained/Data_genetics/ID_genetics.tsv", col_names=FALSE)
+  read_tsv(Path_file, col_names=FALSE) -> Matrix_genetics
   colnames(Matrix_genetics) = c("ID", ID_info$X1)
   Matrix_genetics[,2:dim(Matrix_genetics)[2]] %>% apply(2,  function(x){ as.numeric(as.factor(x)) })  %>% t() %>% as.data.frame() %>% rownames_to_column("ID") %>% as_tibble()  -> Matrix_genetics2
   colnames(Matrix_genetics2) = c("ID", Matrix_genetics$ID )
@@ -142,11 +147,11 @@ Predict_by_layers = function(Model, Covariates = Covariates2, Genetics, Microbio
   for (i in  c("Cov", "Gene", "Micr", "Diet")){
     Regressors_0s = Regressors
       if (i == "Cov"){
-        To_0 = colnames(Regressors)[ (colnames(Regressors) %in% colnames(Covariates))  == F]
+        To_0 = colnames(Regressors)[ (colnames(Regressors) %in% colnames(Covariates))  == FALSE]
       }else if (i == "Gene" ){
-        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == F]
+        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == FALSE]
       } else if (i == "Mic" ){
-        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Diet_i) )) == T]
+        To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Diet_i) )) == TRUE]
       } else { 
         To_0 = c() 
       }
@@ -165,11 +170,11 @@ Predict_by_layers2 = function(Model, Covariates = Covariates2, Genetics, Microbi
   for (i in  c("Cov", "Gene", "Micr", "Diet")){
     Regressors_0s = Regressors
     if (i == "Cov"){
-      To_0 = colnames(Regressors)[ (colnames(Regressors) %in% colnames(Covariates))  == F]
+      To_0 = colnames(Regressors)[ (colnames(Regressors) %in% colnames(Covariates))  == FALSE]
     }else if (i == "Gene" ){
-      To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == F]
+      To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Genetics),colnames(Covariates)) ) == FALSE]
     } else if (i == "Diet" ){
-      To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Microbiome) )) == T]
+      To_0 = colnames(Regressors)[ (colnames(Regressors) %in%  c(colnames(Microbiome) )) == TRUE]
     } else { 
       To_0 = c() 
     }
