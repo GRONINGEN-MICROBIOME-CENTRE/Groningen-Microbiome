@@ -239,7 +239,7 @@ write_tsv(All_coefficients, "Variance_explained/Coefficients.tsv")
 #If micr on top
 Colors = c("purple", "light blue", "salmon", "grey")
 Results_all_metabolites %>% 
-  spread(Layer, R2) %>% mutate(Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0) ,Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
+  spread(Layer, R2) %>% mutate(Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0), Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0)  , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
   mutate(Layer = factor(Layer, levels = c("Micr","Diet", "Gene", "Cov") )) %>%
   ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity", col="black") + theme_bw() + scale_fill_manual(values = Colors)
 
