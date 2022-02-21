@@ -223,23 +223,51 @@ for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO
   Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
   rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
 }
-
 #Model coeff
 All_coefficients %>% spread(Metabolite, `1`) -> All_coefficients
 write_tsv(All_coefficients, "Variance_explained/Coefficients.tsv")
 
-#If diet on top
-#Colors = c("light blue", "purple", "salmon", "grey")
-#Results_all_metabolites  %>%
-#   spread(Layer, R2) %>% mutate(Diet = ifelse(Diet - Micr > 0,Diet - Micr, 0) ,Micr = ifelse(Micr - Gene > 0,Micr - Gene, 0) , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
-#  mutate(Layer = factor(Layer, levels = c("Diet","Micr", "Gene", "Cov") )) %>% 
-#ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity", col="black") + theme_bw() + scale_fill_manual(values = Colors)
-
-
-#If micr on top
 Colors = c("purple", "light blue", "salmon", "grey")
 Results_all_metabolites %>% 
   spread(Layer, R2) %>% mutate(Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0), Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0)  , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
   mutate(Layer = factor(Layer, levels = c("Micr","Diet", "Gene", "Cov") )) %>%
-  ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity", col="black") + theme_bw() + scale_fill_manual(values = Colors)
+  ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_manual(values = Colors)
+
+
+#Check if boostrap changes the findings
+
+Layered_variability_call = function( Covariates2, All_taxonomy, Phenos3, Diet ){
+  Results_all_metabolites = tibble()
+  for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO.Choline", "TMAO.Carnitine", "TMAO.Deoxycarnitine", "TMAO.Betaine" ) ){
+    readRDS(file = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
+    Genetics_table = Get_genetic_table(Met)
+    #Check if left_join is doing it by ID
+    left_join(left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3), Diet) %>% drop_na() -> For_prediction
+  
+    Predict_by_layers2(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met)), Diet_i = filter(Diet, ID %in% For_prediction$ID)) -> Results_metabolite
+    Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
+    rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
+  }
+  Results_all_metabolites %>% 
+    spread(Layer, R2) %>% mutate(Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0), Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0)  , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
+    mutate(Layer = factor(Layer, levels = c("Micr","Diet", "Gene", "Cov") )) %>%
+    ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_manual(values = Colors) -> P
+  print(P)
+  return(Results_all_metabolites)
+}
+Boostraps = tibble()
+for (i in seq(10)){
+  sample(Covariates2$ID, length(Covariates2$ID)*0.8) -> Bootstrap
+  Covariates2 %>% filter(ID %in% Bootstrap) -> Covs_boot
+  Layered_variability_call(Covs_boot, All_taxonomy, Phenos3, Diet) ->  Results_all_metabolites2
+  rbind(Boostraps, Results_all_metabolites2) -> Boostraps 
+
+}
+Boostraps %>% dplyr::group_by(Layer, Metabolite) %>% dplyr::summarise( R2 = mean(R2) ) -> Boostraps_all
+Boostraps_all %>%
+  spread(Layer, R2) %>% mutate(Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0), Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0)  , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
+  mutate(Layer = factor(Layer, levels = c("Micr","Diet", "Gene", "Cov") )) %>%
+  ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_manual(values = Colors)
+
+
 
