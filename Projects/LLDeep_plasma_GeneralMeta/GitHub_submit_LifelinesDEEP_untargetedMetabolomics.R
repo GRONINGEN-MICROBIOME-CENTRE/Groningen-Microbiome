@@ -1,5 +1,5 @@
 ####main codes for Lifelines plasma untargeted metabolomics study (GeneralMetabolomics platform) 
-###for questions, please contact LianminChen (lianminchen@yeah.net)
+###for questions, please contact LianminChen (lianminchen@yeah.net or lianminchen@njmu.edu.cn)
 
 
 ############################################################  statistics  #############################################################
