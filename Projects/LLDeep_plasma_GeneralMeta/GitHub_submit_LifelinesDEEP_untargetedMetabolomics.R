@@ -365,7 +365,6 @@ manhattan.plot<-function(chr, pos, pvalue,
     }
   }
   rm(annotate)
-  
   #reduce number of points plotted
   if(should.thin) {
     thinned <- unique(data.frame(
@@ -400,7 +399,6 @@ manhattan.plot<-function(chr, pos, pvalue,
       axis.default(side=side,...);
     }
   }
-  
   #make sure the y-lim covers the range (plus a bit more to look nice)
   prepanel.chr<-function(x,y,...) { 
     A<-list();
