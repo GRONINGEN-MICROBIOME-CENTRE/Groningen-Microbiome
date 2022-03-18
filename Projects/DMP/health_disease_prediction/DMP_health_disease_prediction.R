@@ -86,7 +86,6 @@ model.health = cv.glmnet(x=train.x,
                          y = train.y[,"MED.DISEASES.None.No.Diseases"],
                          nfold = 10,
                          alpha = 0.5,
-                         penalty.factor = c(0,0,0,rep(1,ncol(train.x)-3)),
                          family = "binomial")
 
 # use models to predict results on training and test sets
