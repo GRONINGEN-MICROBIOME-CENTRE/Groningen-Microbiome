@@ -1,0 +1,9 @@
+#Scripts for single-cell RNA-seq associations with Telome length.
+#Processed Single-cell data used for assocaiton can be downloaded from: 
+https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/
+
+Scripts:
+- xxxx
+- Downstream_SC_DE.R: Check if the significantly associated genes are enriched in subtelomeric regions. 
+
+

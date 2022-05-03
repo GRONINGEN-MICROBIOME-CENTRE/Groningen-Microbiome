@@ -131,11 +131,11 @@ Model_metabolite = function( Data,Metabolite_n = "TMAO" ){
   Formula = as.formula("Metabolite ~ .")
   #Parallel modelling
   library(doParallel)
-  cl <- makePSOCKcluster(10)
+  cl <- makePSOCKcluster(5)
   registerDoParallel(cl)
   model = train( Formula, data = Data , method = "glmnet", trControl = trainControl("repeatedcv", number = 10, repeats = 5), tuneLength = 10, allowParallel=TRUE)  
   stopCluster(cl)
-  
+  #If warning messages, check: model$resample %>% as_tibble()
   Model_name = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Metabolite_n, ".rds"), collapse="" )
   saveRDS(model, Model_name)
 }
@@ -191,8 +191,15 @@ Predict_by_layers2 = function(Model, Covariates = Covariates2, Genetics, Microbi
 
 
 All_taxonomy = All_taxonomy[!duplicated(All_taxonomy),]
-
-
+All_variants = tibble()
+for (Met in c("TMAO","Betaine" ,"Choline", "Carnitine", "Deoxycarnitine", "TMAO.Choline","TMAO.Betaine","TMAO.Carnitine", "TMAO.Deoxycarnitine") ){
+  print(Met)
+  Genetics_table = Get_genetic_table(Met)
+  Genetics = tibble(Variants = colnames(select(Genetics_table, -ID) ), Metabolite=Met)
+  All_variants = rbind(All_variants, Genetics)
+  }  
+All_variants %>% dplyr::group_by(Metabolite) %>% dplyr::summarise(N = n())
+write_tsv(All_variants, "~/Documents/Variants_per_metabolite.tsv")
 ################TRAINING##########
 ###Just run with the training cohorts, or with a train/test split if no training cohort available#########
 set.seed(888)
@@ -206,36 +213,47 @@ for (Met in c("TMAO","Betaine" ,"Choline", "Carnitine", "Deoxycarnitine", "TMAO.
 }
 #Phenos3 %>% mutate(Carnitine = `L-Carnitine`) -> Phenos3
 ###########R2 estimation in test cohort###################
-Results_all_metabolites = tibble()
-Coefficients_models = tibble()
-All_coefficients = tibble()
-for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO.Choline", "TMAO.Carnitine", "TMAO.Deoxycarnitine", "TMAO.Betaine" ) ){
-  print(Met)
-  readRDS(file = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
-  coef(Model$finalModel, Model$bestTune$lambda) %>% as.matrix() %>% as.data.frame() %>% as.data.frame() %>% rownames_to_column("Feature") %>% as_tibble() -> Model_coeff
-  Model_coeff %>% mutate(Metabolite = Met) -> Model_coeff
-  rbind(All_coefficients, Model_coeff) -> All_coefficients
-  Genetics_table = Get_genetic_table(Met)
-  #Check if left_join is doing it by ID
-  left_join(left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3), Diet) %>% drop_na() -> For_prediction
+Test_model = function( Covariates2, All_taxonomy, Phenos3, Diet, Cohort_train = "LLD" ){
+  Results_all_metabolites = tibble()
+  Coefficients_models = tibble()
+  All_coefficients = tibble()
+  for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO.Choline", "TMAO.Carnitine", "TMAO.Deoxycarnitine", "TMAO.Betaine" ) ){
+    print(Met)
+    if (Cohort_train == "LLD"){
+    readRDS(file = paste(c("~/Documents/GitHub/Groningen-Microbiome/Projects/TMAO_metagenomics/16S_association/Variability_explained/Models/Model_fitted_", Met,".rds"), collapse= "")) -> Model
+    } else { 
+    readRDS(file = paste0("/Users/sergio/Resilio Sync/Transfer/PhD/TMAO_16S/Variance_explained/Models_Rotterdam/Model_fitted_Rotterdam_Study_",Met,".rds" ) ) -> Model
+    }
+    coef(Model$finalModel, Model$bestTune$lambda) %>% as.matrix() %>% as.data.frame() %>% as.data.frame() %>% rownames_to_column("Feature") %>% as_tibble() -> Model_coeff
+    Model_coeff %>% mutate(Metabolite = Met) -> Model_coeff
+    rbind(All_coefficients, Model_coeff) -> All_coefficients
+    Genetics_table = Get_genetic_table(Met)
+    left_join(left_join(left_join(left_join(Covariates2, Genetics_table), All_taxonomy), Phenos3), Diet) %>% drop_na() -> For_prediction
   
-  Predict_by_layers2(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met)), Diet_i = filter(Diet, ID %in% For_prediction$ID)) -> Results_metabolite
-  Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
-  rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
-}
-#Model coeff
-All_coefficients %>% spread(Metabolite, `1`) -> All_coefficients
-write_tsv(All_coefficients, "Variance_explained/Coefficients.tsv")
+    Predict_by_layers2(Model = Model, Covariates = filter(Covariates2, ID %in% For_prediction$ID), Genetics = filter(Genetics_table, ID %in% For_prediction$ID)  , Microbiome = filter(All_taxonomy, ID %in% For_prediction$ID) , Metabolite= as_vector(select( For_prediction, Met)), Diet_i = filter(Diet, ID %in% For_prediction$ID)) -> Results_metabolite
+    Results_metabolite %>% mutate(Metabolite = Met) -> Results_metabolite
+    rbind(Results_all_metabolites, Results_metabolite) -> Results_all_metabolites
+  }
+  #Model coeff
+  All_coefficients %>% spread(Metabolite, `1`) -> All_coefficients
+  write_tsv(All_coefficients, paste0("Variance_explained/Coefficients_",Cohort_train,".tsv"))
 
-Colors = c("purple", "light blue", "salmon", "grey")
-Results_all_metabolites %>% 
-  spread(Layer, R2) %>% mutate(Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0), Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0)  , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
-  mutate(Layer = factor(Layer, levels = c("Micr","Diet", "Gene", "Cov") )) %>%
-  ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_manual(values = Colors)
+  Colors = c("purple", "light blue", "salmon", "grey")
+  Results_all_metabolites %>% mutate(R2 = ifelse(is.na(R2), 0, R2 )) %>%
+    spread(Layer, R2) %>% mutate(Micr = ifelse(Micr - Diet > 0,Micr - Diet, 0), Diet = ifelse(Diet - Gene > 0,Diet - Gene, 0)  , Gene = ifelse(Gene-Cov > 0, Gene-Cov, 0)  ) %>% gather(Layer, R2, 2:5, factor_key=TRUE) %>%
+    mutate(Layer = factor(Layer, levels = c("Micr","Diet", "Gene", "Cov") )) %>%
+    ggplot(aes(x=R2, y=Metabolite, fill=Layer)) + geom_bar(position = "stack", stat = "identity") + theme_bw() + scale_fill_manual(values = Colors) + 
+    theme(text = element_text(size=20),legend.position="none") + ylab("") -> PLOT
+  ggsave(paste0("Variance_explained/PlotR2_",Cohort_train,".pdf" ) ,PLOT, width = 12, height = 15, units = "cm" )
+  print(PLOT)
+  return(Results_all_metabolites)
+}
+
+Test_model(Covariates2, All_taxonomy, Phenos3, Diet, Cohort_train = "LLD") -> LLD_R2
+Test_model(Covariates2, All_taxonomy, Phenos3, Diet, Cohort_train = "RS") -> RS_R2
 
 
 #Check if boostrap changes the findings
-
 Layered_variability_call = function( Covariates2, All_taxonomy, Phenos3, Diet ){
   Results_all_metabolites = tibble()
   for (Met in c("TMAO", "Choline", "Carnitine", "Deoxycarnitine", "Betaine", "TMAO.Choline", "TMAO.Carnitine", "TMAO.Deoxycarnitine", "TMAO.Betaine" ) ){
@@ -271,3 +289,72 @@ Boostraps_all %>%
 
 
 
+##Comparing regularized coefficients with meta-analysis
+
+read_tsv("Variance_explained/Coefficients_RS.tsv") %>%gather(Metabolite, s1, 2:10) %>% drop_na() -> Coefficients_RS
+read_tsv("Variance_explained/Coefficients_LLD.tsv") %>%gather(Metabolite, s1, 2:10) %>% drop_na() -> Coefficients_LLD
+read_tsv("Manuscript/Additional_material/Summary_stats_All.tsv") -> Bug_MA
+files <- list.files(path="/Users/sergio/Resilio Sync/Transfer/PhD/TMAO_16S/Variance_explained/Signiciant_Genetics/", pattern="*.txt", full.names=TRUE, recursive=FALSE)
+Genetic_variants = tibble()
+for (file in files){ Name = str_split(file, "/")[[1]] -> y ; N =y[length(y)] ; read.table(file,header = T) %>% as_tibble() %>% mutate(Metabolite = N) -> y2 ; rbind(Genetic_variants, y2)->Genetic_variants }
+Genetic_variants$Metabolite =  sapply(Genetic_variants$Metabolite,function(x){ str_replace(str_replace(x,"_LLS_300OB_sugg10e-05_forSergio.txt", ""), "METAANALYSIS_", "") } )
+
+left_join(Coefficients_RS, Coefficients_LLD, by=c("Feature", "Metabolite"), suffix=c("_RS", "_LLD")) -> Combined
+Combined %>% mutate(Coefficient_RS.train = s1_RS, Coefficient_LLD.train = s1_LLD ) %>% select(Feature, Metabolite, Coefficient_RS.train, Coefficient_LLD.train ) -> Combined_save
+Combined_save %>% mutate(Layer = ifelse( Feature %in% Bug_MA$Bug, "Microbiome", ifelse(grepl(":", Feature), "Genetics", ifelse(Feature %in% c("Age", "Gender", "BMI"), "Anthropometrics", ifelse(Feature == "(Intercept)", "Intercept", "Diet" ) ) )) ) -> Combined_save
+write_tsv(Combined_save, "Manuscript/Additional_material/ElasticNet_coefficients.tsv")
+
+Combined_save %>% mutate( Selection = ifelse( Coefficient_RS.train == 0 & Coefficient_LLD.train == 0, "Not_selected", ifelse( Coefficient_RS.train != 0 & Coefficient_LLD.train == 0, "RS", ifelse( Coefficient_RS.train == 0 & Coefficient_LLD.train != 0, "LLD", "Both")))) -> Combined_save
+Combined_save %>% mutate(Selection = factor(Selection, c("Not_selected","RS", "LLD", "Both") )) %>% filter(! Layer=="Intercept") %>% ggplot(aes(x=Layer, fill=Selection)) + geom_bar(position = "fill") + theme_bw() + coord_flip() + facet_wrap(~Metabolite, ncol = 3) + scale_fill_manual(values=c("grey", "light blue", "dark blue", "purple" ))
+###Microbial Similarity analysis###
+
+Combined %>% filter(Feature %in% Bug_MA$Bug) -> Bugs
+
+Bug_MA %>% select(Bug, Metabolite, MetaP, Treatment_effect, Heterogeneity_Q,Heterogeneity_Pvalue, Beta_LLD, Beta_Rott, Pvalue_LLD, Pvalue_Rott, meta_FDR ) -> Bug_MA
+colnames(Bug_MA)[1] = "Feature"
+
+left_join(Bugs, Bug_MA) -> Bacteria_comparison
+Bacteria_comparison %>% ggplot(aes(x=s1_RS, y=s1_LLD, col =-log10(MetaP), shape=Heterogeneity_Pvalue<0.05 )) +
+geom_point() + theme_bw() + facet_wrap(~Metabolite)
+#It is more likely you are picked up if is significantly associated to each cohort, it is heterogenous and there is no effect of the meta-analysis stats
+glm( Present ~ log10(Pvalue_Rott) + Heterogeneity_Q + Treatment_effect  ,mutate(Bacteria_comparison, Present= ifelse( s1_RS == 0, 0,1)), family=binomial()) %>% summary()
+glm( Present ~ log10(Pvalue_LLD) + Heterogeneity_Q + Treatment_effect  ,mutate(Bacteria_comparison, Present= ifelse( s1_LLD == 0, 0,1)), family=binomial()) %>% summary()
+#Check what happened with the significant Meta-analysis findings
+Bacteria_comparison %>% dplyr::group_by(s1_LLD ==0,meta_FDR < 0.1 ) %>%
+  dplyr::summarise(n())
+Bacteria_comparison %>% dplyr::group_by(s1_RS ==0, meta_FDR < 0.1 ) %>%
+  dplyr::summarise(n())
+#Relation between Coefficients in regularizaiton and not-regularized models
+Bacteria_comparison %>% ggplot(aes(x=Beta_LLD, y=Beta_Rott, shape=meta_FDR<0.1, col=(s1_LLD != 0 |  s1_RS != 0)  )) + geom_point() + theme_bw()
+Bacteria_comparison %>% ggplot(aes(x=Beta_LLD, y=s1_LLD, shape=meta_FDR<0.1)) + geom_point() + theme_bw()
+Bacteria_comparison %>% ggplot(aes(x=Beta_Rott, y=s1_RS, shape=meta_FDR<0.1)) + geom_point() + theme_bw()
+#Check selected microbes
+Bacteria_comparison %>% dplyr::group_by(Metabolite, s1_LLD != 0, s1_RS != 0 ) %>%
+  dplyr::summarise(N = n()) %>% mutate( Match_group = paste0("LLD.",`s1_LLD != 0`,"-","RS.",`s1_RS != 0`) )  %>%
+  filter(! Match_group == "LLD.FALSE-RS.FALSE" ) %>%
+  ggplot(aes(x=Metabolite, y=N, fill=Match_group)) + geom_bar(stat = "identity") +coord_flip()
+#Phylogenetic analysis?
+Bacteria_comparison$Feature 
+
+
+###Genetics ###
+Combined$Metabolite = tolower(Combined$Metabolite)
+Genetic_variants$Metabolite = tolower(Genetic_variants$Metabolite)
+Combined %>% filter(! Feature %in% Bugs$Feature ) %>% filter(grepl(":", Feature)) -> Combined_genetics
+Combined_genetics$Feature = sapply(Combined_genetics$Feature, function(x){ str_replace(str_replace_all(str_replace_all(x, "`",""), ":", "_" ), "_", ":") } ) 
+left_join()
+Genetic_variants %>% filter(! MarkerName %in% Combined_genetics$Feature) -> Change
+Change$MarkerName %>% sapply(function(x){ y = str_split(x, "_")[[1]] ; paste0(y[1],"_",y[3],"_",y[2]) }) -> Changed_marker
+Genetic_variants$MarkerName[Genetic_variants$MarkerName %in% Change$MarkerName] = Changed_marker
+Genetic_variants %>% filter( MarkerName %in% Combined_genetics$Feature) %>% mutate(Feature = MarkerName) %>% select(-MarkerName) -> Variants_matching
+Variants_matching$Metabolite %>% sapply(function(x){ str_replace(x, "_", "." )} ) ->Variants_matching$Metabolite
+
+left_join(Combined_genetics, Variants_matching, by=c("Feature", "Metabolite")) -> Genetics_comparison
+  
+Combined_genetics %>% dplyr::group_by(Metabolite, s1_LLD != 0, s1_RS != 0 ) %>%
+  dplyr::summarise(N = n()) %>% mutate( Match_group = paste0("LLD.",`s1_LLD != 0`,"-","RS.",`s1_RS != 0`) )  %>%
+  filter(! Match_group == "LLD.FALSE-RS.FALSE" ) %>%
+  ggplot(aes(x=Metabolite, y=N, fill=Match_group)) + geom_bar(stat = "identity") +coord_flip()
+
+Genetics_comparison %>% ggplot(aes(x=s1_RS, y=s1_LLD, col =-log10(P.value), shape=HetPVal<0.05 )) +
+  geom_point() + theme_bw() + facet_wrap(~Metabolite, scales = "free")
