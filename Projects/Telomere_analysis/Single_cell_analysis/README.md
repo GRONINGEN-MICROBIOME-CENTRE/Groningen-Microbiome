@@ -38,7 +38,7 @@ git sparse-checkout set Projects/Telomere_analysis/Single_cell_analysis
 cd Projects/Telomere_analysis/Single_cell_analysis/
 ```
 
-*Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory. 
+*Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome repository](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome). 
 
 ### Test Data
 We have provided a **cell-type-specific example dataset** for each of the **two approaches**: CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246), together with some other inputs required to run the sc-DEA with TL [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R). These files are hosted in the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
@@ -122,7 +122,7 @@ A tsv file that has in the:
 └── top3genes.approach_I.tab
 
 #### Top N single-cell differentially expressed genes (DEGs)
-Since the scDEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). 
+Since the sc.-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). 
 
 A tsv file that has in the:
 * 1st column: Top N gene names. 
@@ -150,23 +150,67 @@ A tsv file that has in the:
 | TAGAP |   
 
 
-## Running the [add-on script](QC_statistics.R)
-*Of note*: The functions called in the [add-on script](QC_statistics.R) are defined in an [external script](scripts/QC_functions.R).
+## Running the sc-DEA with TL
+*Of note*: The functions used in *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
-**1.** If you have not done it yet, the first step would be to clone this repository and change your current working directory.    
+**1.** If you have not done it yet, the first step would be to clone the objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome repository](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome). 
 ```
-git clone https://github.com/aidarripoll/wg1-qc_filtering.git  
-cd wg1-qc_filtering
+git clone \
+  --depth 3  \
+  --filter=blob:none  \
+  --sparse \
+  https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome \
+;
+cd Groningen-Microbiome
+git sparse-checkout set Projects/Telomere_analysis/Single_cell_analysis
+cd Projects/Telomere_analysis/Single_cell_analysis/
 ```
 
-**2.** Set common environmental variables:  
+**2.** Set common environmental variables:
 ```
-dataset=wg2_onek1k_subset  
-input_directory=wg2-cell_type_classification
-output_directory=QC_statistics_examples
+input_directory=path/to/in_dir
+output_directory=/path/to/out_dir
 ```
 
-**3.** Running the add-on script with different parameters:  
+2.1. Approach I variables:
+
+```
+cell_level=approach_I  
+cell_type=CD8T_memory
+covariates_file=covariates.approach_I.tab
+```
+
+2.2. Approach II variables:
+
+```
+cell_level=approach_II 
+cell_type=CD8Tcells
+covariates_file=covariates.approach_II.tab
+```
+
+*Of note*: 
+* If you want to use our testing dataset, you do not need to specify the `input_directory` variable. In this case, it will be the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
+
+**2.** Set optional environmental variables:
+
+2.1. Approach I variables:
+
+```
+top_3_genes=top3genes.approach_I.tab
+```
+
+2.2. Approach II variables:
+
+```
+top_3_genes=top3genes.approach_II.tab
+```
+
+**3.** Running the *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* scripts:
+As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, we will only need to define the `output_directory` environmental variable.
+```
+output_directory=out_dir.top3genes
+```
+
 
 3.1. Summarize the QC statistics at the dataset level after:
 
@@ -213,4 +257,14 @@ You can decompress them by:
 tar -xvf QC_statistics_examples.tar.gz
 tar -xvf QC_statistics_examples.files.tar.gz
 ```
+
+## Running time and memory requirements
+* [add-on script](QC_statistics.R): To speed up the running time and improve the memory requirements of the **[add-on script]**(QC_statistics.R), we recommend to submit each of the commands in **3.1 and 3.2** of the **Running the add-on script** section as an independent job on your HPC infrastructure (i.e., run each job as an element of a job array). The running time and memory requirements will depend on:  
+1. The **size** of your dataset. Notice that the test dataset is a significantly down-sized and sub-sampled version of the whole dataset (# of cells=1,207 and # of donors=13). 
+2. Whether you already have the **metadata slot** ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)) of the seurat object provided by WG2 pipeline, or you only have the **whole seurat object** [reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/reduced_data.RDS) provided by WG2 pipeline. If possible, you should use the WG2 seurat object's metadata slot ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)).
+
+*Of note*: We have run this [add-on script](QC_statistics.R) on a larger dataset provided in [Oelen et al, 2020](https://www.biorxiv.org/content/10.1101/2021.06.04.447088v1) (V2 dataset: # of cells=480,503 and # of donors=88) taking as the main input the metadata slot of the seurat object provided by WG2 pipeline using the following SLURM parameters: `--cpus-per-task=48` and `--nodes=1`. 
+
+* [extra script](QC_extract_files.R) (optional): The time and memory requirements to run this script are minimal. It is used to to extract the main outputs generated by the [add-on script](QC_statistics.R). The QC threshold selection committee will use them to have define the final criteria. 
+
 
