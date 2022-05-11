@@ -1,11 +1,11 @@
 # Single-Cell Differential Expression Analysis (sc-DEA) with Telomere Length
 We provide three main scripts for the scDEA with telomere length: 
 
-**1**. dea_MAST_glmer_TL.R: to perform the sc-DEA with telomere length per cell type at the high (approach I) or low (approach II) resolution level. 
+**1. dea_MAST_glmer_TL.R:** to perform the sc-DEA with telomere length per cell type at the high (approach I) or low (approach II) resolution level. 
 
-**2**. dea_MAST_statistics.R: to summarize the sc-DEA with telomere length results at the cell type resolution level (approach I or approach II). 
+**2. dea_MAST_statistics.R:** to summarize the sc-DEA with telomere length results at the cell type resolution level (approach I or approach II). 
 
-**3**. Downstream_SC_DE.R: to peform the downstream analysis on the sc-DEA with telomere length from the approach II.
+**3. Downstream_SC_DE.R:** to peform the downstream analysis on the sc-DEA with telomere length from the approach II.
 
 *Of note*: The functions used in *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* are defined in an [accessory script](scripts/accessory_functions.R).
 
@@ -16,7 +16,7 @@ If you have any questions or issues, feel free to open an issue or directly emai
 ## Required Software
 * **R** >=4.0.0 version: You need to install the packages loaded in the [accessory script](scripts/accessory_functions.R).
 
-*Of note*: To install the [MAST R package](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0844-5), please use the following command to ensure the MAST version is >= 1.16.0: 
+*Of note*: To install the [MAST R package](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0844-5), please use the following command to ensure you install the MAST version >= 1.16.0: 
 
 ``` 
 devtools::install_github("RGLab/MAST")
