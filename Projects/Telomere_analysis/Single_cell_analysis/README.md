@@ -91,7 +91,7 @@ A tsv file that has in the:
 * It is assumed that the covariates names are columns of the metadata slot of the seurat object.
 * The covariates information files provided for the test datasets are the following:
 
-* Approach I: [covariates.approach_I.tab]((Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_I.tab)
+* Approach I: [covariates.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_I.tab)
 
 | covariate  | type | 
 | ------------- | ------------- | 
@@ -102,7 +102,7 @@ A tsv file that has in the:
 | donor | random  | 
 | lane | random  | 
 
-* Approach II: [covariates.approach_II.tab]((Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_II.tab)
+* Approach II: [covariates.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_II.tab)
 
 | covariate  | type | 
 | ------------- | ------------- | 
