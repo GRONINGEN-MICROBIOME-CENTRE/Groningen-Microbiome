@@ -1,11 +1,11 @@
-# Single-Cell Differential Expression Analysis (sc-DEA) with Telomere Length
-We provide three main scripts for the scDEA with telomere length: 
+# Single-Cell Differential Expression Analysis (sc-DEA) with Telomere Length (TL)
+We provide three main scripts for the scDEA with TL: 
 
-**1. [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R):** to perform the sc-DEA with telomere length per cell type at the high (approach I) or low (approach II) resolution level. 
+**1. [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R):** to perform the sc-DEA with TL per cell type at the high (approach I) or low (approach II) resolution level. 
 
-**2. [dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_statistics.R):** to summarize the sc-DEA with telomere length results at the cell type resolution level (approach I or approach II). 
+**2. [dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_statistics.R):** to summarize the sc-DEA with TL results at the cell type resolution level (approach I or approach II). 
 
-**3. [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R):** to peform the downstream analysis on the sc-DEA with telomere length from the approach II.
+**3. [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R):** to peform the downstream analysis on the sc-DEA with TL from the approach II.
 
 *Of note*: The functions used in *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
@@ -41,43 +41,130 @@ cd Projects/Telomere_analysis/Single_cell_analysis/
 *Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory. 
 
 ### Test Data
-We have provided a **cell-type-specific example dataset** for each of the **two approaches**: CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246). 
+We have provided a **cell-type-specific example dataset** for each of the **two approaches**: CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246), together with some other inputs required to run the sc-DEA with TL [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R). These files are hosted in the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
 
+Here is the structure of the **input directory (path/to/in_dir)** for [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R). You can find this same structure in the input directory example in [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/):
 
-Here is the structure of the [input directory for the test dataset](/wg2-cell_type_classification/wg2_onek1k_subset/). This input directory (*/wg2-cell_type_classification/wg2_onek1k_subset/*) should have the same structure as the WG2 pipeline output directory. We will need only the files in the [step4_reduce](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/) directory:
+**input directory (path/to/in_dir)**    
+├── approach_I  
+│   └── CD8T_memory.rds  
+├── approach_II  
+│   └── CD8Tcells.rds  
+├── covariates.approach_II.tab  
+├── covariates.approach_I.tab  
+├── top10genes.approach_II.tab  
+├── top10genes.approach_I.tab  
+├── top3genes.approach_II.tab  
+└── top3genes.approach_I.tab  
 
-**wg2-cell_type_classification**    
+*Of note*: Some of the files are strictly required, but some of them are optional:
+**Required**: 
+* You should have a directory for each of the cell type classification levels (e.g., approach_I and approach_II directories) containing the seurat object for a specific cell type (e.g., approach_I > CD8T_memory.rds, and approach_II > CD8Tcells.rds).
+* You should have a tab separated file with the covariates considered in the scDEA model (e.g., covariates.approach_I.tab and covariates.approach_II.tab). The covariates names has to be the same in the metadata slot of the seurat object. The details of this file will be explained in the next section.
+
+**Optional**: 
+* Since the scDEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in you cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). The details of this file will be explained in the next section.
+
+### Required Data
+**input directory (path/to/in_dir)**    
+├── approach_I  
+│   └── CD8T_memory.rds  
+├── approach_II  
+│   └── CD8Tcells.rds  
+├── covariates.approach_II.tab  
+├── covariates.approach_I.tab    
+
+#### QC-MAD combinations ([qc_mad.tab](qc_mad.tab))
+A tsv file that has in the:
+* 1st column: QC metrics. By default, number of UMIs (*nCount_RNA*) and % of mitochondrial genes (*percent.mt*).
+* 2nd column: Upper or lower threshold. By default, lower for *nCount_RNA* and upper for *percent.mt*.
+* 3rd and 4rd columns: minimum and maximum MADs. By default, *minimum*=1 and *maximum*=5.
+
+*Of note*:
+* Tab separated
+* It is assumed that the QC metrics are calculated in the seurat object as a result from WG1 pipeline, and thus, they are columns of the metadata slot of the seurat object.
+* This file must have this header. 
+* The QC-MAD combinations file provided for the test dataset is the [qc_mad.tab](/qc_mad.tab) file:
+
+| QC_metric  | bound | MAD_min  | MAD_max |
+| ------------- | ------------- | ------------- | ------------- |
+| nCount_RNA  | lower  | 1  | 5 |
+| percent.mt  | upper  | 1  | 5 |
+
+#### Azimuth l1-l2 pairing file ([azimuth_l1_l2.csv](/azimuth_l1_l2.csv))
+A csv file that has in the:
+* 1st column: Azimuth's level 1 cell type classification (L1).
+* 2nd column: Azimuth's level 2 cell type classification (L2).
+
+### Optional Data
+**input directory (path/to/in_dir)**    
+├── top10genes.approach_II.tab  
+├── top10genes.approach_I.tab  
+├── top3genes.approach_II.tab  
+└── top3genes.approach_I.tab
+
+#### Metadata variables ([metadata_variables.tab](/metadata_variables.tab))
+A tsv file that has in the:
+* 1st column: Metadata variable name. 
+* 2nd column: Metadata variable type. 
+* 3rd and 4rd columns: minimum and maximum MADs. By default, *minimum*=1 and *maximum*=5.
+
+*Of note*:
+* Tab separated.
+* It is assumed that the metadata variable names are columns of the metadata file or metadata slot of the seurat object.
+* This file must have this header.
+* By default, the QC statistics will be summarized at the whole dataset. You can choose to summarize them by metadata variable.
+* The metadata variables file provided for the test dataset is the [metadata_variables.tab](/metadata_variables.tab) file: 
+
+| md_var  | type |  
+| ------------- | ------------- |  
+| Pool  | donor  |  
+| Assignment  | donor  |  
+| predicted.celltype.l2  | cell  |  
+| scpred_prediction  | cell  |  
+| predicted.celltype.l1  | cell  |  
+
+## Running the [add-on script](QC_statistics.R)
+*Of note*: The functions called in the [add-on script](QC_statistics.R) are defined in an [external script](scripts/QC_functions.R).
+
+**1.** If you have not done it yet, the first step would be to clone this repository and change your current working directory.    
+```
+git clone https://github.com/aidarripoll/wg1-qc_filtering.git  
+cd wg1-qc_filtering
+```
+
+**2.** Set common environmental variables:  
+```
+dataset=wg2_onek1k_subset  
+input_directory=wg2-cell_type_classification
+output_directory=QC_statistics_examples
+```
+
+**3.** Running the add-on script with different parameters:  
+
+3.1. Summarize the QC statistics at the dataset level after:
+
+* Calculating the QC statistics at the dataset level:
+```
+Rscript QC_statistics.R --dataset $dataset --in_dir $input_directory --out_dir $output_directory
+```
+
+* Calculating the QC statistics at the batch metadata variable (i.e., Pool) level:
+```
+batch_variable=Pool  
+Rscript QC_statistics.R --dataset $dataset --level $batch_variable --in_dir $input_directory --out_dir $output_directory 
+```
+
+The output for each of the parameters settings is the summary statistics (*tag.rds*):
+QC_statistics_examples  
 └── wg2_onek1k_subset  
-    ├── cell_classification.sif  
-    ├── map_hierscpred.R  
-    ├── schier_workaroung.sh  
-    ├── step1_split  
-    │   └── OneK1K-test_dataset.RDS  
-    ├── step2_azimuth  
-    │   ├── OneK1K-test_dataset.RDS  
-    │   ├── OneK1K-test_dataset_ref_spca.png  
-    │   └── OneK1K-test_dataset_ref_umap.png  
-    ├── step3_hierscpred  
-    │   └── OneK1K-test_dataset.RDS  
-    ├── **step4_reduce**   
-    │   ├── **metadata.reduced_data.RDS**    
-    │   └── **reduced_data.RDS**    
-    └── step5_compare  
-        ├── comparison_contingency_table.tsv  
-        ├── comparison_heatmap_counts.pdf  
-        └── comparison_heatmap_prop.pdf  
-        
-The main input for the [add-on script](QC_statistics.R) is the metadata slot ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)) of the seurat object provided by WG2 pipeline ([reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/reduced_data.RDS)). The WG2 pipeline is peforming the cell type classification of the non-QC filtered singlets predicted by WG1 pipeline.
-
-* **Recommended:** We recommend you to use the WG2 seurat object's metadata slot ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)). It will improve the running time and memory of the script. 
-
-* **Alternative:** You can also use the WG2 seurat object ([reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/reduced_data.RDS)). However, it will slow down the running time and memory of the script as we will need to read the full seurat object which can be very large depending on the number of cells (e.g., ~77K cells, 8.9G). 
-
-*Of note*: 
-* At this moment, the WG2 pipeline is not providing the ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)) yet. Although you can run the [add-on script](QC_statistics.R) using the whole seurat object, we encourage you to save the metadata slot with the name *metadata.reduced_data.RDS* in the step4_reduce/ directory provided by WG2 pipeline before running the [add-on script](QC_statistics.R) to improve the running time and memory of the script. 
-
-* In case your dataset contains V2 and V3 chemistries, you should create different metadata or seurat objects files in order to run this [add-on script](QC_statistics.R) separately. If this had been the case of this test dataset, you would have ended up with two different datasets (e.g., wg2_onek1k_subset.V2 and wg2_onek1k_subset.V3), meaning that the [add-on script](QC_statistics.R) would have been run separately in each of these two datasets.
-
+    └── nCount_RNA_lower_1_5.percent.mt_upper_1_5  
+        └── **by_dataset**   
+            ├── dataset  
+            │   └── **tag.rds**  
+            └── Pool  
+                └── **tag.rds**  
+                
 # Example outputs
 
 To reproduce the supplementary tables for the example cell types: CD8T memory cells **Table_S7.1 (approach I)** and CD8T cells **Table_S7.2 (approach II)**, you should run the following commands:
