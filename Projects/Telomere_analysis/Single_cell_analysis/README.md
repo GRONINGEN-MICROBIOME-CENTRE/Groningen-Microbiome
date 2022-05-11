@@ -206,35 +206,66 @@ top_3_genes=top3genes.approach_II.tab
 ```
 
 **3.** Running the *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* scripts:
-As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, we will only need to define the `output_directory` environmental variable.
+As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, we will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
 ```
 output_directory=out_dir.top3genes
 ```
 
+3.1. Perform the sc-DEA with TL per cell type at the high (approach I) or low (approach II) resolution level:
 
-3.1. Summarize the QC statistics at the dataset level after:
-
-* Calculating the QC statistics at the dataset level:
+* Approach I:
 ```
-Rscript QC_statistics.R --dataset $dataset --in_dir $input_directory --out_dir $output_directory
-```
-
-* Calculating the QC statistics at the batch metadata variable (i.e., Pool) level:
-```
-batch_variable=Pool  
-Rscript QC_statistics.R --dataset $dataset --level $batch_variable --in_dir $input_directory --out_dir $output_directory 
+cell_level=approach_I  
+cell_type=CD8T_memory
+covariates_file=covariates.approach_I.tab
+Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs covariates_file --genes top_3_genes --out_dir $output_directory
 ```
 
-The output for each of the parameters settings is the summary statistics (*tag.rds*):
-QC_statistics_examples  
-└── wg2_onek1k_subset  
-    └── nCount_RNA_lower_1_5.percent.mt_upper_1_5  
-        └── **by_dataset**   
-            ├── dataset  
-            │   └── **tag.rds**  
-            └── Pool  
-                └── **tag.rds**  
-                
+* Approach II:
+```
+cell_level=approach_II  
+cell_type=CD8Tcells
+covariates_file=covariates.approach_II.tab
+Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs covariates_file --genes top_3_genes --out_dir $output_directory
+```
+
+3.2. Summarizing the sc-DEA with TL results at the cell type resolution level (approach I or approach II):
+
+* Approach I:
+```
+cell_level=approach_I  
+Rscript dea_MAST_statistics.R --in_dir $output_directory --cell_level $cell_level
+```
+
+* Approach II:
+```
+cell_level=approach_II  
+Rscript dea_MAST_statistics.R --in_dir $output_directory --cell_level $cell_level
+```
+
+The outputs for each of the parameters settings are:
+**out_dir.top3genes/**
+├── approach_I  
+│   ├── CD8T_memory  
+│   │   ├── de_glmer.nagq0.rds  
+│   │   ├── de_glmer_stats.nagq0.rds  
+│   │   └── pbmc_sca.rds  
+│   ├── dea.list_formatted.nagq0.rds  
+│   └── Table_S7.1.csv  
+└── approach_II  
+    ├── CD8Tcells  
+    │   ├── de_glmer.nagq0.rds  
+    │   ├── de_glmer_stats.nagq0.rds  
+    │   └── pbmc_sca.rds  
+    ├── dea.list_formatted.nagq0.rds  
+    └── Table_S7.2.csv  
+ 
+*Of note*: 
+* By default, the [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) script set the `--nagq0` argument to TRUE. In brief, it mitigate model fails to converge by passing nAGQ=0 to the fitting function zlm (fitArgsD=list(nAGQ=0)). See our previous [MAST github issue](https://github.com/RGLab/MAST/issues/148) and the [lme4 package documentation](https://www.rdocumentation.org/packages/lme4/versions/1.1-25/topics/glmer) for further details. In this case, the output filenames will contain the 'nagq0' tag. 
+* The `output_directory` will contain subidrectories for each of the cell type classification levels (e.g., approach_I and approach_II directories) containing for each cell type (e.g., approach_I > CD8T_memory or approach_II > CD8Tcells) the outputs from *3.1*: pbmc_sca.rds  and de_glmer.nagq0.rds (intermediate files) and de_glmer_stats.nagq0.rds (final output)
+* The `output_directory` will contain subidrectories for each of the cell type classification levels (e.g., approach_I and approach_II directories) with the outputs from *3.2*: dea.list_formatted.nagq0.rds (used as input in [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R)) and Table_S7.1.csv/Table_S7.2.csv (supplementary tables S7.1 and S7.2 in the manuscript ([Table_S7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). 
+
+
 # Example outputs
 
 To reproduce the supplementary tables for the example cell types: CD8T memory cells **Table_S7.1 (approach I)** and CD8T cells **Table_S7.2 (approach II)**, you should run the following commands:
