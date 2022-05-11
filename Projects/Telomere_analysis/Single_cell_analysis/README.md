@@ -1,13 +1,13 @@
 # Single-Cell Differential Expression Analysis (sc-DEA) with Telomere Length
 We provide three main scripts for the scDEA with telomere length: 
 
-**1. dea_MAST_glmer_TL.R:** to perform the sc-DEA with telomere length per cell type at the high (approach I) or low (approach II) resolution level. 
+**1. [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R):** to perform the sc-DEA with telomere length per cell type at the high (approach I) or low (approach II) resolution level. 
 
-**2. dea_MAST_statistics.R:** to summarize the sc-DEA with telomere length results at the cell type resolution level (approach I or approach II). 
+**2. [dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_statistics.R):** to summarize the sc-DEA with telomere length results at the cell type resolution level (approach I or approach II). 
 
-**3. Downstream_SC_DE.R:** to peform the downstream analysis on the sc-DEA with telomere length from the approach II.
+**3. [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R):** to peform the downstream analysis on the sc-DEA with telomere length from the approach II.
 
-*Of note*: The functions used in *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* are defined in an [accessory script](scripts/accessory_functions.R).
+*Of note*: The functions used in *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
 ## Contact
 If you have any questions or issues, feel free to open an issue or directly email Aida Ripoll-Cladellas (aida.ripoll@bsc.es) or Sergio Andreu-Sánchez (sergioandreusanchez@gmail.com). 
@@ -24,17 +24,25 @@ packageVersion("MAST") #>=1.16.0
 ```
 
 ## Required Input
-This section explains the input data and it’s structure to run the three main scripts.
-
-*Of note*: To follow better the explanations in the **Required Input** section, you can clone this repository and change your current working directory.   
+This section explains the input data and it’s structure to run the three main scripts. To follow the explanations in the **Required Input** section, you can clone this repository and change your current working directory.   
 
 ```
-git clone https://github.com/aidarripoll/wg1-qc_filtering.git  
-cd wg1-qc_filtering
+git clone \
+  --depth 3  \
+  --filter=blob:none  \
+  --sparse \
+  https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome \
+;
+cd Groningen-Microbiome
+git sparse-checkout set Projects/Telomere_analysis/Single_cell_analysis
+cd Projects/Telomere_analysis/Single_cell_analysis/
 ```
+
+*Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory. 
 
 ### Test Data
-We have provided a **test dataset** *(wg2_onek1k_subset)* that contains one pool of a 10x run from the [**OneK1K** dataset](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-021-02293-3). Notice that it is a significantly down-sized and sub-sampled version of the whole dataset. In this test dataset, the total number of cells is 1,207 from 13 donors.
+We have provided a **cell-type-specific example dataset** for each of the **two approaches**: CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246). 
+
 
 Here is the structure of the [input directory for the test dataset](/wg2-cell_type_classification/wg2_onek1k_subset/). This input directory (*/wg2-cell_type_classification/wg2_onek1k_subset/*) should have the same structure as the WG2 pipeline output directory. We will need only the files in the [step4_reduce](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/) directory:
 
@@ -69,3 +77,27 @@ The main input for the [add-on script](QC_statistics.R) is the metadata slot ([m
 * At this moment, the WG2 pipeline is not providing the ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)) yet. Although you can run the [add-on script](QC_statistics.R) using the whole seurat object, we encourage you to save the metadata slot with the name *metadata.reduced_data.RDS* in the step4_reduce/ directory provided by WG2 pipeline before running the [add-on script](QC_statistics.R) to improve the running time and memory of the script. 
 
 * In case your dataset contains V2 and V3 chemistries, you should create different metadata or seurat objects files in order to run this [add-on script](QC_statistics.R) separately. If this had been the case of this test dataset, you would have ended up with two different datasets (e.g., wg2_onek1k_subset.V2 and wg2_onek1k_subset.V3), meaning that the [add-on script](QC_statistics.R) would have been run separately in each of these two datasets.
+
+# Example outputs
+
+To reproduce the supplementary tables for the example cell types: CD8T memory cells **Table_S7.1 (approach I)** and CD8T cells **Table_S7.2 (approach II)**, you should run the following commands:
+
+* CD8T memory cells **Table_S7.1 (approach I):**
+
+* CD8T cells **Table_S7.2 (approach II)**:
+
+
+
+We have provided the two output directories for the test data *(wg2_onek1k_subset)* in a tar.gz format:
+
+* [QC_statistics_examples.tar.gz](QC_statistics_examples.tar.gz): Outputs from running the commands in **3.1, 3.2 and 3.3** as part of **Running the add-on script** section.
+
+* [QC_statistics_examples.files.tar.gz](QC_statistics_examples.files.tar.gz): Outputs from running the commands in **3.1 and 3.2** as part of **Running the add-on script** section, and also running the **alternative** option in the **Discussion in the QC Threshold Selection Committee** section.
+
+
+You can decompress them by:
+```
+tar -xvf QC_statistics_examples.tar.gz
+tar -xvf QC_statistics_examples.files.tar.gz
+```
+
