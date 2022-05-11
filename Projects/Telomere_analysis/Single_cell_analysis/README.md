@@ -207,6 +207,7 @@ genes_subset=top3genes
 
 **3.** Running the *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* scripts:
 As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, we will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
+
 ```
 output_directory=out_dir.top3genes
 genes_subset=top3genes
@@ -219,7 +220,7 @@ genes_subset=top3genes
 cell_level=approach_I  
 cell_type=CD8T_memory
 covariates_file=covariates.approach_I.tab
-Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs covariates_file --genes $genes_subset --out_dir $output_directory
+Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $genes_subset --out_dir $output_directory
 ```
 
 * Approach II:
@@ -243,6 +244,9 @@ Rscript dea_MAST_statistics.R --in_dir $output_directory --cell_level $cell_leve
 cell_level=approach_II  
 Rscript dea_MAST_statistics.R --in_dir $output_directory --cell_level $cell_level
 ```
+
+*Of note*:
+* The top N genes filename must be: $genes_subset.$cell_level.tab (e.g., top3genes.approach_I.tab or top3genes.approach_II.tab)
 
 The outputs for each of the parameters settings are:
 **out_dir.top3genes/**
