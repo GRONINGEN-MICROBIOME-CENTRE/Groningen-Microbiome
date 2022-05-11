@@ -218,6 +218,7 @@ output_directory=out_dir.top3genes
 cell_level=approach_I  
 cell_type=CD8T_memory
 covariates_file=covariates.approach_I.tab
+top_3_genes=top3genes.approach_I.tab
 Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs covariates_file --genes top_3_genes --out_dir $output_directory
 ```
 
@@ -226,6 +227,7 @@ Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --co
 cell_level=approach_II  
 cell_type=CD8Tcells
 covariates_file=covariates.approach_II.tab
+top_3_genes=top3genes.approach_II.tab
 Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs covariates_file --genes top_3_genes --out_dir $output_directory
 ```
 
