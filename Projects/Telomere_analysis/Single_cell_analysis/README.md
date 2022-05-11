@@ -63,9 +63,9 @@ Here is the structure of the **input directory (path/to/in_dir)** for [dea_MAST_
 * You should have a tab separated file with the covariates considered in the scDEA model (e.g., covariates.approach_I.tab and covariates.approach_II.tab). The covariates names has to be the same in the metadata slot of the seurat object. The details of this file will be explained in the next section.
 
 **Optional**: 
-* Since the scDEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in you cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). The details of this file will be explained in the next section.
+* Since the scDEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). The details of this file will be explained in the next section.
 
-### Required Data
+### Required Data 
 **input directory (path/to/in_dir)**    
 ├── approach_I  
 │   └── CD8T_memory.rds  
@@ -74,27 +74,45 @@ Here is the structure of the **input directory (path/to/in_dir)** for [dea_MAST_
 ├── covariates.approach_II.tab  
 ├── covariates.approach_I.tab    
 
-#### QC-MAD combinations ([qc_mad.tab](qc_mad.tab))
-A tsv file that has in the:
-* 1st column: QC metrics. By default, number of UMIs (*nCount_RNA*) and % of mitochondrial genes (*percent.mt*).
-* 2nd column: Upper or lower threshold. By default, lower for *nCount_RNA* and upper for *percent.mt*.
-* 3rd and 4rd columns: minimum and maximum MADs. By default, *minimum*=1 and *maximum*=5.
+#### Cell-type-specific seurat object
+A subset of the whole sc-RNAseq dataset which corresponds to a seurat object for a specific cell type. It should be located in a directory for each of the cell type classification levels (e.g., approach_I and approach_II directories). 
 
 *Of note*:
-* Tab separated
-* It is assumed that the QC metrics are calculated in the seurat object as a result from WG1 pipeline, and thus, they are columns of the metadata slot of the seurat object.
+* It must be a seurat object saved in .rds format, and named as ${cell_type}.rds (e.g., approach_I > CD8T_memory.rds, and approach_II > CD8Tcells.rds).
+
+#### Covariates information file
+A tsv file that has in the:
+* 1st column: Covariates name. 
+* 2nd column: Covariates type. 
+
+*Of note*:
+* Tab separated.
 * This file must have this header. 
-* The QC-MAD combinations file provided for the test dataset is the [qc_mad.tab](/qc_mad.tab) file:
+* It is assumed that the covariates names are columns of the metadata slot of the seurat object.
+* The covariates information files provided for the test datasets are the following:
 
-| QC_metric  | bound | MAD_min  | MAD_max |
-| ------------- | ------------- | ------------- | ------------- |
-| nCount_RNA  | lower  | 1  | 5 |
-| percent.mt  | upper  | 1  | 5 |
+* Approach I: [covariates.approach_I.tab]((Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_I.tab)
 
-#### Azimuth l1-l2 pairing file ([azimuth_l1_l2.csv](/azimuth_l1_l2.csv))
-A csv file that has in the:
-* 1st column: Azimuth's level 1 cell type classification (L1).
-* 2nd column: Azimuth's level 2 cell type classification (L2).
+| covariate  | type | 
+| ------------- | ------------- | 
+| TL  | contrast  |
+| cngeneson | fixed  | 
+| Sex | fixed  | 
+| Age | fixed  | 
+| donor | random  | 
+| lane | random  | 
+
+* Approach II: [covariates.approach_II.tab]((Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_II.tab)
+
+| covariate  | type | 
+| ------------- | ------------- | 
+| TL  | contrast  |
+| cngeneson | fixed  | 
+| Sex | fixed  | 
+| Age | fixed  | 
+| celltype.l2 | fixed  | 
+| donor | random  | 
+| lane | random  | 
 
 ### Optional Data
 **input directory (path/to/in_dir)**    
@@ -103,26 +121,34 @@ A csv file that has in the:
 ├── top3genes.approach_II.tab  
 └── top3genes.approach_I.tab
 
-#### Metadata variables ([metadata_variables.tab](/metadata_variables.tab))
+#### Top N single-cell differentially expressed genes (DEGs)
+Since the scDEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). 
+
 A tsv file that has in the:
-* 1st column: Metadata variable name. 
-* 2nd column: Metadata variable type. 
-* 3rd and 4rd columns: minimum and maximum MADs. By default, *minimum*=1 and *maximum*=5.
+* 1st column: Top N gene names. 
 
 *Of note*:
 * Tab separated.
-* It is assumed that the metadata variable names are columns of the metadata file or metadata slot of the seurat object.
-* This file must have this header.
-* By default, the QC statistics will be summarized at the whole dataset. You can choose to summarize them by metadata variable.
-* The metadata variables file provided for the test dataset is the [metadata_variables.tab](/metadata_variables.tab) file: 
+* This file do not have to incorporte a header.
+* It is assumed that the gene names are in the seurat object after the pre-processing gene-level filtering performed in [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R)
+* The top N DEGs files provided for the test datasets are the following:
 
-| md_var  | type |  
-| ------------- | ------------- |  
-| Pool  | donor  |  
-| Assignment  | donor  |  
-| predicted.celltype.l2  | cell  |  
-| scpred_prediction  | cell  |  
-| predicted.celltype.l1  | cell  |  
+* Approach I: Top 3 ([top3genes.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_I.tab)) or top 10 ([top10genes.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/top10genes.approach_I.tab)) DEGs in CD8T memory cells. See the supplementary table S7.1 in the manuscript ([Table_S7.1](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). For example, ([top3genes.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_I.tab)):
+
+|   |  | 
+| ------------- | ------------- | 
+| DNAJA1  |  
+| MTFP1 |  
+| CDC42SE1 |   
+
+* Approach II: Top 3 ([top3genes.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_I.tab)) or top 10 ([top10genes.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/top10genes.approach_I.tab)) DEGs in CD8T memory cells. See the supplementary table S7.2 in the manuscript ([Table_S7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). For example, ([top3genes.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_II.tab)):
+
+|   |  | 
+| ------------- | ------------- | 
+| TMSB10  |  
+| GNLY |  
+| TAGAP |   
+
 
 ## Running the [add-on script](QC_statistics.R)
 *Of note*: The functions called in the [add-on script](QC_statistics.R) are defined in an [external script](scripts/QC_functions.R).
