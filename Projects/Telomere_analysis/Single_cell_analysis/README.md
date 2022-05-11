@@ -196,19 +196,20 @@ covariates_file=covariates.approach_II.tab
 2.1. Approach I variables:
 
 ```
-top_3_genes=top3genes.approach_I.tab
+genes_subset=top3genes
 ```
 
 2.2. Approach II variables:
 
 ```
-top_3_genes=top3genes.approach_II.tab
+genes_subset=top3genes
 ```
 
 **3.** Running the *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* scripts:
 As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, we will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
 ```
 output_directory=out_dir.top3genes
+genes_subset=top3genes
 ```
 
 3.1. Perform the sc-DEA with TL per cell type at the high (approach I) or low (approach II) resolution level:
@@ -218,8 +219,7 @@ output_directory=out_dir.top3genes
 cell_level=approach_I  
 cell_type=CD8T_memory
 covariates_file=covariates.approach_I.tab
-top_3_genes=top3genes.approach_I.tab
-Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs covariates_file --genes top_3_genes --out_dir $output_directory
+Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs covariates_file --genes $genes_subset --out_dir $output_directory
 ```
 
 * Approach II:
@@ -227,8 +227,7 @@ Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --co
 cell_level=approach_II  
 cell_type=CD8Tcells
 covariates_file=covariates.approach_II.tab
-top_3_genes=top3genes.approach_II.tab
-Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $top_3_genes --out_dir $output_directory
+Rscript dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $genes_subset --out_dir $output_directory
 ```
 
 3.2. Summarizing the sc-DEA with TL results at the cell type resolution level (approach I or approach II):
