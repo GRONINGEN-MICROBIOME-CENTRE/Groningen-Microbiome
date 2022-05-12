@@ -43,7 +43,7 @@ cd Projects/Telomere_analysis/Single_cell_analysis/
 ### Test Data
 We have provided a **cell-type-specific example dataset** for each of the **two approaches**: CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246), together with some other inputs required to run the sc-DEA with TL [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R). These files are hosted in the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
 
-Here is the structure of the **input directory (path/to/in_dir)** for [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R). You can find this same structure in the input directory example in [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/):
+Here, you can find the structure of the **input directory (path/to/in_dir)** for [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R). You can find the same structure in the input directory example in [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/):
 
 **input directory (path/to/in_dir)**    
 ├── approach_I  
@@ -57,13 +57,13 @@ Here is the structure of the **input directory (path/to/in_dir)** for [dea_MAST_
 ├── top3genes.approach_II.tab  
 └── top3genes.approach_I.tab  
 
-*Of note*: Some of the files are strictly required, but some of them are optional:
+*Of note*: Some of the files are **strictly required**, but some of them are **optional**:
 **Required**: 
 * You should have a directory for each of the cell type classification levels (e.g., approach_I and approach_II directories) containing the seurat object for a specific cell type (e.g., approach_I > CD8T_memory.rds, and approach_II > CD8Tcells.rds).
-* You should have a tab separated file with the covariates considered in the scDEA model (e.g., covariates.approach_I.tab and covariates.approach_II.tab). The covariates names has to be the same in the metadata slot of the seurat object. The details of this file will be explained in the next section.
+* You should have a tsv separated file with the covariates considered in the scDEA model (e.g., covariates.approach_I.tab and covariates.approach_II.tab). The details of this file will be explained in the next section.
 
 **Optional**: 
-* Since the scDEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). The details of this file will be explained in the next section.
+* Since the scDEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of genes anc cells in your cell-type-specific seurat object. Thus, we provide several tsv files to test [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). The details of this file will be explained in the next section.
 
 ### Required Data 
 **input directory (path/to/in_dir)**    
@@ -75,7 +75,7 @@ Here is the structure of the **input directory (path/to/in_dir)** for [dea_MAST_
 ├── covariates.approach_I.tab    
 
 #### Cell-type-specific seurat object
-A subset of the whole sc-RNAseq dataset which corresponds to a seurat object for a specific cell type. It should be located in a directory for each of the cell type classification levels (e.g., approach_I and approach_II directories). 
+A subset of the whole sc-RNAseq dataset which corresponds to a **seurat object** for a **specific cell type**. It should be located in a directory for each of the cell type classification levels (e.g., approach_I and approach_II directories). 
 
 *Of note*:
 * It must be a seurat object saved in .rds format, and named as ${cell_type}.rds (e.g., approach_I > CD8T_memory.rds, and approach_II > CD8Tcells.rds).
@@ -86,7 +86,7 @@ A tsv file that has in the:
 * 2nd column: Covariates type. 
 
 *Of note*:
-* Tab separated.
+* Tsv separated.
 * This file must have this header. 
 * It is assumed that the covariates names are columns of the metadata slot of the seurat object (except from *cngeneson* which is internally calculated in the [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) script). 
 * The covariates information files provided for the test datasets are the following:
@@ -133,13 +133,15 @@ A tsv file that has in the:
 └── top3genes.approach_I.tab
 
 #### Top N single-cell differentially expressed genes (DEGs)
-Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). 
+Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object.
+
+As an example, we provide several tsv files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). In this case, we are picking the top 3 or top 10 DEGs in CD8T memory cells (approach I) or CD8T cells (approach II) found in the supplementary tables in the manuscript ([Table_S7.1 and Table S_7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)).
 
 A tsv file that has in the:
-* 1st column: Top N gene names. 
+* 1st column: Gene names. 
 
 *Of note*:
-* Tab separated.
+* Tsv separated.
 * This file do not have to incorporte a header.
 * It is assumed that the gene names are in the seurat object after the pre-processing gene-level filtering performed in [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R)
 * The top N DEGs files provided for the test datasets are the following:
@@ -162,7 +164,7 @@ A tsv file that has in the:
 
 
 ## Running the sc-DEA with TL
-*Of note*: The functions used in *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
+*Of note*: The functions used in [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) and [dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_statistics.R)are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
 **1.** If you have not done it yet, the first step would be to clone the objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome repository](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome). 
 ```
@@ -183,6 +185,10 @@ input_directory=path/to/in_dir
 output_directory=/path/to/out_dir
 ```
 
+*Of note*: 
+* If you want to use our testing dataset, you **do not need** to specify the `input_directory` variable. In this case, it will be the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
+
+
 2.1. Approach I variables:
 
 ```
@@ -199,12 +205,9 @@ cell_type=CD8Tcells
 covariates_file=covariates.approach_II.tab
 ```
 
-*Of note*: 
-* If you want to use our testing dataset, you do not need to specify the `input_directory` variable. In this case, it will be the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
-
 **2.** Set optional environmental variables:
 
-Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of genes and cells in your cell-type-specific seurat object. As a test, you can run the sc-DEA with TL only a specific subset of genes for both of the approaches. 
+Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of genes and cells in your cell-type-specific seurat object. As a test, you can run the sc-DEA with TL only a specific subset of genes for both of the approaches. For further details you can revisit the previous section "Top N single-cell differentially expressed genes (DEGs)".
 
 ```
 genes_subset=top3genes
@@ -215,7 +218,7 @@ genes_subset=top3genes
 
 
 **3.** Running the [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) and [dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_statistics.R) scripts:
-As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, we will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
+As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, you will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
 
 ```
 output_directory=out_dir.top3genes
