@@ -88,7 +88,7 @@ A tsv file that has in the:
 *Of note*:
 * Tab separated.
 * This file must have this header. 
-* It is assumed that the covariates names are columns of the metadata slot of the seurat object.
+* It is assumed that the covariates names are columns of the metadata slot of the seurat object (except from *cngeneson* which is internally calculated in the [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) script). 
 * The covariates information files provided for the test datasets are the following:
 
 * Approach I: [covariates.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_I.tab)
@@ -114,6 +114,17 @@ A tsv file that has in the:
 | donor | random  | 
 | lane | random  | 
 
+*Of note*:
+* Biological variables:
+*TL* = telomere length
+*Sex, Age* = donor metadata
+*donor* = donor ID
+*celltype.l2* = high level cell-type classification (e.g., Azimuth's prediction). You can find a detailed explanation in the methods of the [manuscript](https://www.biorxiv.org/content/10.1101/2021.12.14.472541v1).
+
+* Technical variables:
+*cngeneson* = cellular detection rate (recommended by the [MAST authors](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0844-5))
+*lane* = sequencing lane (batch effect)
+
 ### Optional Data
 **input directory (path/to/in_dir)**    
 ├── top10genes.approach_II.tab  
@@ -122,7 +133,7 @@ A tsv file that has in the:
 └── top3genes.approach_I.tab
 
 #### Top N single-cell differentially expressed genes (DEGs)
-Since the sc.-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). 
+Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object. Thus, we provide several tab files to try [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). 
 
 A tsv file that has in the:
 * 1st column: Top N gene names. 
@@ -193,19 +204,17 @@ covariates_file=covariates.approach_II.tab
 
 **2.** Set optional environmental variables:
 
-2.1. Approach I variables:
+Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of genes and cells in your cell-type-specific seurat object. As a test, you can run the sc-DEA with TL only a specific subset of genes for both of the approaches. 
 
 ```
 genes_subset=top3genes
 ```
 
-2.2. Approach II variables:
+*Of note*:
+* The subset genes filename must be: $genes_subset.$cell_level.tab (e.g., top3genes.approach_I.tab or top3genes.approach_II.tab)
 
-```
-genes_subset=top3genes
-```
 
-**3.** Running the *dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* scripts:
+**3.** Running the [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) and [dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_statistics.R) scripts:
 As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, we will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
 
 ```
@@ -245,13 +254,10 @@ cell_level=approach_II
 Rscript dea_MAST_statistics.R --in_dir $output_directory --cell_level $cell_level
 ```
 
-*Of note*:
-* The top N genes filename must be: $genes_subset.$cell_level.tab (e.g., top3genes.approach_I.tab or top3genes.approach_II.tab)
-
-The outputs for each of the parameters settings are:
-**out_dir.top3genes/**
-├── approach_I  
-│   ├── CD8T_memory  
+The outputs for each of the parameters settings are:  
+**out_dir.top3genes/**  
+├── approach_I      
+│   ├── CD8T_memory    
 │   │   ├── de_glmer.nagq0.rds  
 │   │   ├── de_glmer_stats.nagq0.rds  
 │   │   └── pbmc_sca.rds  
@@ -267,40 +273,24 @@ The outputs for each of the parameters settings are:
  
 *Of note*: 
 * By default, the [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) script set the `--nagq0` argument to TRUE. In brief, it mitigate model fails to converge by passing nAGQ=0 to the fitting function zlm (fitArgsD=list(nAGQ=0)). See our previous [MAST github issue](https://github.com/RGLab/MAST/issues/148) and the [lme4 package documentation](https://www.rdocumentation.org/packages/lme4/versions/1.1-25/topics/glmer) for further details. In this case, the output filenames will contain the 'nagq0' tag. 
+* By default, the [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R) script set the `--freq` argument to 0.1. It means that we will only test genes that are found in at least 0.1 of the cells since we won’t have any power to conclude much about less frequent genes (recommended by the [MAST authors](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0844-5))
 * The `output_directory` will contain subidrectories for each of the cell type classification levels (e.g., approach_I and approach_II directories) containing for each cell type (e.g., approach_I > CD8T_memory or approach_II > CD8Tcells) the outputs from *3.1*: pbmc_sca.rds  and de_glmer.nagq0.rds (intermediate files) and de_glmer_stats.nagq0.rds (final output)
-* The `output_directory` will contain subidrectories for each of the cell type classification levels (e.g., approach_I and approach_II directories) with the outputs from *3.2*: dea.list_formatted.nagq0.rds (used as input in [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R)) and Table_S7.1.csv/Table_S7.2.csv (supplementary tables S7.1 and S7.2 in the manuscript ([Table_S7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). 
+* The `output_directory` will contain subidrectories for each of the cell type classification levels (e.g., approach_I and approach_II directories) with the outputs from *3.2*: dea.list_formatted.nagq0.rds (used as input in [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R)) and Table_S7.1.csv/Table_S7.2.csv ([supplementary tables S7.1 and S7.2 in the manuscript](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). 
 
 
 # Example outputs
+We have provided the output directory for the test data in a tar.gz format:
 
-To reproduce the supplementary tables for the example cell types: CD8T memory cells **Table_S7.1 (approach I)** and CD8T cells **Table_S7.2 (approach II)**, you should run the following commands:
-
-* CD8T memory cells **Table_S7.1 (approach I):**
-
-* CD8T cells **Table_S7.2 (approach II)**:
-
-
-
-We have provided the two output directories for the test data *(wg2_onek1k_subset)* in a tar.gz format:
-
-* [QC_statistics_examples.tar.gz](QC_statistics_examples.tar.gz): Outputs from running the commands in **3.1, 3.2 and 3.3** as part of **Running the add-on script** section.
-
-* [QC_statistics_examples.files.tar.gz](QC_statistics_examples.files.tar.gz): Outputs from running the commands in **3.1 and 3.2** as part of **Running the add-on script** section, and also running the **alternative** option in the **Discussion in the QC Threshold Selection Committee** section.
-
-
+** [out_dir.top3genes.tar.gz](Projects/Telomere_analysis/Single_cell_analysis/out_dir.top3genes.tar.gz): Outputs from running the commands in **section 3.** (*dea_MAST_glmer_TL.R* and *dea_MAST_statistics.R* scripts):
 You can decompress them by:
 ```
-tar -xvf QC_statistics_examples.tar.gz
-tar -xvf QC_statistics_examples.files.tar.gz
+tar -xvf out_dir.top3genes.tar.gz
 ```
 
 ## Running time and memory requirements
-* [add-on script](QC_statistics.R): To speed up the running time and improve the memory requirements of the **[add-on script]**(QC_statistics.R), we recommend to submit each of the commands in **3.1 and 3.2** of the **Running the add-on script** section as an independent job on your HPC infrastructure (i.e., run each job as an element of a job array). The running time and memory requirements will depend on:  
-1. The **size** of your dataset. Notice that the test dataset is a significantly down-sized and sub-sampled version of the whole dataset (# of cells=1,207 and # of donors=13). 
-2. Whether you already have the **metadata slot** ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)) of the seurat object provided by WG2 pipeline, or you only have the **whole seurat object** [reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/reduced_data.RDS) provided by WG2 pipeline. If possible, you should use the WG2 seurat object's metadata slot ([metadata.reduced_data.RDS](/wg2-cell_type_classification/wg2_onek1k_subset/step4_reduce/metadata.reduced_data.RDS)).
 
-*Of note*: We have run this [add-on script](QC_statistics.R) on a larger dataset provided in [Oelen et al, 2020](https://www.biorxiv.org/content/10.1101/2021.06.04.447088v1) (V2 dataset: # of cells=480,503 and # of donors=88) taking as the main input the metadata slot of the seurat object provided by WG2 pipeline using the following SLURM parameters: `--cpus-per-task=48` and `--nodes=1`. 
+* [dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_glmer_TL.R): To speed up the running time and improve the memory requirements when you use **all the genes** (not only a subset using the parameter `genes_subset`), we recommend to submit each of the commands in **section 3** as an independent job on your HPC infrastructure (i.e., run each job as an element of a job array). The running time and memory requirements will depend on:  
+1. The **number of cells** in your dataset. In this case, CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246).
+2. The **number of genes** tested, after applying some internal filters by the same script. In this case, CD8T memory cells for approach I (n =  2,343) and CD8T cells for approach II (n = 2,378).
 
-* [extra script](QC_extract_files.R) (optional): The time and memory requirements to run this script are minimal. It is used to to extract the main outputs generated by the [add-on script](QC_statistics.R). The QC threshold selection committee will use them to have define the final criteria. 
-
-
+* [dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/dea_MAST_statistics.R): The time and memory requirements to run this script are minimal. It is used to extract the files for: [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R) (`$cell_level` > dea.list_formatted.nagq0.rds) and [supplementary tables S7.1 and S7.2 in the manuscript](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true) (approach_I > Table_S7.1.csv and approach_II > Table_S7.2.csv).
