@@ -173,7 +173,7 @@ A tsv file that has in the:
 ## Running the sc-DEA with TL
 *Of note*: The functions used in [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R)are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
-**1.** If you have not done it yet, the first step would be to clone the objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository.
+**1. Clone this Github repository:** If you have not done it yet, the first step would be to clone the objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository.
 
 ```
 git clone \
@@ -196,17 +196,13 @@ git clone https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome
 cd Groningen-Microbiome/Projects/Telomere_analysis/Single_cell_analysis/
 ```
 
-**2.** Set common environmental variables:
+**2. Set required environmental variables:**
 ```
 input_directory=path/to/in_dir
 output_directory=/path/to/out_dir
 ```
 
-*Of note*: 
-* If you want to use our testing dataset, you **do not need** to specify the `input_directory` variable. In this case, it will be the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
-
-
-2.1. Approach I variables:
+**2.1.** Approach I variables:
 
 ```
 cell_level=approach_I  
@@ -214,7 +210,7 @@ cell_type=CD8T_memory
 covariates_file=covariates.approach_I.tab
 ```
 
-2.2. Approach II variables:
+**2.2.** Approach II variables:
 
 ```
 cell_level=approach_II 
@@ -222,7 +218,7 @@ cell_type=CD8Tcells
 covariates_file=covariates.approach_II.tab
 ```
 
-**2.** Set optional environmental variables:
+**2. Set optional environmental variables:**
 
 Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of genes and cells in your cell-type-specific seurat object. As a test, you can run the sc-DEA with TL only a specific subset of genes for both of the approaches. For further details you can revisit the previous section "Top N single-cell differentially expressed genes (DEGs)".
 
@@ -230,11 +226,13 @@ Since the sc-DEA with TL is peformed at the gene-wise level across all the expre
 genes_subset=top3genes
 ```
 
-*Of note*:
+*Of note*: 
+* If you want to use our testing dataset, you **do not need** to specify the `input_directory` variable. In this case, it will be the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/). 
 * The subset genes filename must be: $genes_subset.$cell_level.tab (e.g., *top3genes.approach_I.tab or top3genes.approach_II.tab*)
+* To run an example with our testing datasets (provided in [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/)), please follow **section 3**.
 
+**3. Run the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R) scripts:**
 
-**3.** Running the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R) scripts:
 As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, you will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
 
 ```
@@ -242,7 +240,7 @@ output_directory=out_dir.top3genes
 genes_subset=top3genes
 ```
 
-3.1. Perform the sc-DEA with TL per cell type at the high (approach I) or low (approach II) resolution level:
+**3.1.** Perform the sc-DEA with TL per cell type at the high (approach I) or low (approach II) resolution level:
 
 * Approach I:
 ```
@@ -260,7 +258,7 @@ covariates_file=covariates.approach_II.tab
 Rscript 01.dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $genes_subset --out_dir $output_directory
 ```
 
-3.2. Summarizing the sc-DEA with TL results at the cell type resolution level (approach I or approach II):
+**3.2.** Summarizing the sc-DEA with TL results at the cell type resolution level (approach I or approach II):
 
 * Approach I:
 ```
@@ -273,6 +271,8 @@ Rscript 02.dea_MAST_statistics.R --in_dir $output_directory --cell_level $cell_l
 cell_level=approach_II  
 Rscript 02.dea_MAST_statistics.R --in_dir $output_directory --cell_level $cell_level
 ```
+
+*Of note*:
 
 The outputs for each of the parameters settings are:  
 **out_dir.top3genes/**  
@@ -291,7 +291,6 @@ The outputs for each of the parameters settings are:
     ├── dea.list_formatted.nagq0.rds  
     └── Table_S7.2.csv  
  
-*Of note*: 
 * By default, the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) script set the `--nagq0` argument to TRUE. In brief, it mitigate model fails to converge by passing nAGQ=0 to the fitting function zlm (fitArgsD=list(nAGQ=0)). See our previous [MAST github issue](https://github.com/RGLab/MAST/issues/148) and the [lme4 package documentation](https://www.rdocumentation.org/packages/lme4/versions/1.1-25/topics/glmer) for further details. In this case, the output filenames will contain the 'nagq0' tag. 
 * By default, the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) script set the `--freq` argument to 0.1. It means that we will only test genes that are found in at least 0.1 of the cells since we won’t have any power to conclude much about less frequent genes (recommended by the [MAST authors](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-015-0844-5))
 * The `output_directory` will contain subidrectories for each of the cell type classification levels (e.g., approach_I and approach_II directories) containing for each cell type (e.g., approach_I > CD8T_memory or approach_II > CD8Tcells) the outputs from *3.1*: pbmc_sca.rds  and de_glmer.nagq0.rds (intermediate files) and de_glmer_stats.nagq0.rds (final output)
