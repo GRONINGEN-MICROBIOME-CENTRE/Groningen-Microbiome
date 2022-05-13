@@ -173,7 +173,8 @@ A tsv file that has in the:
 ## Running the sc-DEA with TL
 *Of note*: The functions used in [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R)are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
-**1.** If you have not done it yet, the first step would be to clone the objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome repository](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome). 
+**1.** If you have not done it yet, the first step would be to clone the objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository.
+
 ```
 git clone \
   --depth 3  \
@@ -184,6 +185,15 @@ git clone \
 cd Groningen-Microbiome
 git sparse-checkout set Projects/Telomere_analysis/Single_cell_analysis
 cd Projects/Telomere_analysis/Single_cell_analysis/
+```
+
+*Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository.
+
+If this option is not working for you, you could clone the whole [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository and change your current working directory. However, clonning the whole repository could take a larger amount of time/memory.   
+
+```
+git clone https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome
+cd Groningen-Microbiome/Projects/Telomere_analysis/Single_cell_analysis/
 ```
 
 **2.** Set common environmental variables:
