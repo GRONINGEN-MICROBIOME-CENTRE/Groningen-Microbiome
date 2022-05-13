@@ -82,10 +82,10 @@ Here, you can find the structure of the **input directory (path/to/in_dir)** for
 ├── covariates.approach_I.tab    
 
 #### Cell-type-specific seurat object
-A subset of the whole sc-RNAseq dataset which corresponds to a **seurat object** for a **specific cell type**. It should be located in a directory for each of the cell type classification levels (e.g., approach_I and approach_II directories). 
+A subset of the whole sc-RNAseq dataset which corresponds to a **seurat object** for a **specific cell type**. It should be located in a directory for each of the cell type classification levels (e.g., *approach_I* and *approach_II* directories). 
 
 *Of note*:
-* It must be a seurat object saved in .rds format, and named as ${cell_type}.rds (e.g., approach_I > CD8T_memory.rds, and approach_II > CD8Tcells.rds).
+* It must be a seurat object saved in .rds format, and named as ${cell_type}.rds (e.g., *approach_I > CD8T_memory.rds*, and *approach_II > CD8Tcells.rds*).
 
 #### Covariates information file
 A tsv file that has in the:
@@ -98,7 +98,7 @@ A tsv file that has in the:
 * It is assumed that the covariates names are columns of the metadata slot of the seurat object (except from *cngeneson* which is internally calculated in the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) script). 
 * The covariates information files provided for the test datasets are the following:
 
-* Approach I: [covariates.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_I.tab)
+* Approach I: *covariates.approach_I.tab*
 
 | covariate  | type | 
 | ------------- | ------------- | 
@@ -109,7 +109,7 @@ A tsv file that has in the:
 | donor | random  | 
 | lane | random  | 
 
-* Approach II: [covariates.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/covariates.approach_II.tab)
+* Approach II: *covariates.approach_II.tab*
 
 | covariate  | type | 
 | ------------- | ------------- | 
@@ -142,7 +142,7 @@ A tsv file that has in the:
 #### Top N single-cell differentially expressed genes (DEGs)
 Since the sc-DEA with TL is peformed at the gene-wise level across all the expressed genes, it can take a lot of time to run depending on the number of cells in your cell-type-specific seurat object.
 
-As an example, we provide several tsv files to try [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) only with a subset of genes (e.g., top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab). In this case, we are picking the top 3 or top 10 DEGs in CD8T memory cells (approach I) or CD8T cells (approach II) found in the supplementary tables in the manuscript ([Table_S7.1 and Table S_7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)).
+As an example, we provide several tsv files to try [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) only with a subset of genes (e.g., *top3genes.approach_I.tab, top3genes.approach_II.tab, top10genes.approach_I.tab, and top10genes.approach_II.tab*). In this case, we are picking the top 3 or top 10 DEGs in CD8T memory cells (approach I) or CD8T cells (approach II) found in the supplementary tables in the manuscript ([Table_S7.1 and Table S_7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)).
 
 A tsv file that has in the:
 * 1st column: Gene names. 
@@ -153,7 +153,7 @@ A tsv file that has in the:
 * It is assumed that the gene names are in the seurat object after the pre-processing gene-level filtering performed in [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R)
 * The top N DEGs files provided for the test datasets are the following:
 
-* Approach I: Top 3 ([top3genes.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_I.tab)) or top 10 ([top10genes.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/top10genes.approach_I.tab)) DEGs in CD8T memory cells. See the supplementary table S7.1 in the manuscript ([Table_S7.1](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). For example, ([top3genes.approach_I.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_I.tab)):
+* Approach I: Top 3 (*top3genes.approach_I.tab*) or top 10 (*top10genes.approach_I.tab*) DEGs in CD8T memory cells. See the supplementary table S7.1 in the manuscript ([Table_S7.1](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). For example, *top3genes.approach_I.tab*:
 
 |   |  | 
 | ------------- | ------------- | 
@@ -161,7 +161,7 @@ A tsv file that has in the:
 | MTFP1 |  
 | CDC42SE1 |   
 
-* Approach II: Top 3 ([top3genes.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_I.tab)) or top 10 ([top10genes.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/top10genes.approach_I.tab)) DEGs in CD8T memory cells. See the supplementary table S7.2 in the manuscript ([Table_S7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). For example, ([top3genes.approach_II.tab](Projects/Telomere_analysis/Single_cell_analysis/top3genes.approach_II.tab)):
+* Approach II: Top 3 (*top3genes.approach_II.tab*) or top 10 (*top10genes.approach_II.tab*) DEGs in CD8T memory cells. See the supplementary table S7.2 in the manuscript ([Table_S7.2](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true)). For example, (*top3genes.approach_II.tab*):
 
 |   |  | 
 | ------------- | ------------- | 
@@ -221,7 +221,7 @@ genes_subset=top3genes
 ```
 
 *Of note*:
-* The subset genes filename must be: $genes_subset.$cell_level.tab (e.g., top3genes.approach_I.tab or top3genes.approach_II.tab)
+* The subset genes filename must be: $genes_subset.$cell_level.tab (e.g., *top3genes.approach_I.tab or top3genes.approach_II.tab*)
 
 
 **3.** Running the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R) scripts:
