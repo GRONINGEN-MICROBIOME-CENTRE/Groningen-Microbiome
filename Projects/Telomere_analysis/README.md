@@ -5,9 +5,9 @@ Here the data analysis script used in (Info publication) can be found.
 Two major analyses are included:
 
 
-**1. [telomers_association.R](Projects/Telomere_analysis/telomers_association.R):** to perform the telomere exploratory analyses and telomere-metadata associations. 
+**1. [telomers_association.R](telomers_association.R):** to perform the telomere exploratory analyses and telomere-metadata associations. 
 
-**2. [Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis/):** Includes the major scripts for the single cell transcriptomic association to telomere length. 
+**2. [Single_cell_analysis](Single_cell_analysis/):** Includes the major scripts for the single cell transcriptomic association to telomere length. 
 
 
 ## Contact
@@ -20,7 +20,7 @@ If you have any questions or issues, feel free to open an issue or directly emai
 
 
 ## Required Input
-This section explains the input data. To follow the explanations in the **Required Input** section, you can clone the  [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/) directory.  
+This section explains the input data. To follow the explanations in the **Required Input** section, you can clone the  [Projects/Telomere_analysis/](Projects/Telomere_analysis/) directory.  
 
 ```
 git clone \
@@ -31,7 +31,7 @@ git clone \
 ;
 cd Groningen-Microbiome
 git sparse-checkout set Projects/Telomere_analysis/
-cd Projects/Telomere_analysis/Single_cell_analysis/
+cd Projects/Telomere_analysis/
 ```
 
 *Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/](Projects/Telomere_analysis/) directory from the [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository.
@@ -40,7 +40,7 @@ If this option is not working for you, you could clone the whole [Groningen-Micr
 
 ```
 git clone https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome
-cd Groningen-Microbiome/Projects/Telomere_analysis/Single_cell_analysis/
+cd Groningen-Microbiome/Projects/Telomere_analysis/
 ```
 
 **Required**: 
