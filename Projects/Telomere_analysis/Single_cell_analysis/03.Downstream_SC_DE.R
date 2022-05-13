@@ -6,9 +6,6 @@ library(biomaRt)
 setwd("~/Resilio Sync/LLD phenotypes for Sergio/scripts/Pathway_enrichment/")
 
 
-
-#Second file
-
 Subsampling_test = function(Test_Data, n=20){
   cHR_counts = table(Test_Data$DE, Test_Data$chromosome_name)
   Test_Data %>% filter(DE == 0) -> To_sample
