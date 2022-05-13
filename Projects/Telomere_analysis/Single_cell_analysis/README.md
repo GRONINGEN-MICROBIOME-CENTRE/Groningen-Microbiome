@@ -65,6 +65,7 @@ Here, you can find the structure of the **input directory (path/to/in_dir)** for
 └── top3genes.approach_I.tab  
 
 *Of note*: Some of the files are **strictly required**, but some of them are **optional**:
+
 **Required**: 
 * You should have a directory for each of the cell type classification levels (e.g., approach_I and approach_II directories) containing the seurat object for a specific cell type (e.g., approach_I > CD8T_memory.rds, and approach_II > CD8Tcells.rds).
 * You should have a tsv separated file with the covariates considered in the scDEA model (e.g., covariates.approach_I.tab and covariates.approach_II.tab). The details of this file will be explained in the next section.
@@ -233,11 +234,28 @@ genes_subset=top3genes
 
 **3. Run the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R) scripts:**
 
-As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources). In this case, you will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
+As a **testing example**, we will run the sc-DEA with TL only for the top 3 DEGs for both of the approaches. You could also try to run it using the top 10 DEGs, or all the genes in the seurat object (it will take a lot of time/memory resources).
 
 ```
 output_directory=out_dir.top3genes
 genes_subset=top3genes
+```
+
+*Of note*:
+
+* To directly use our testing datasets (in the cloud, downloaded when running the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) script), you need to have **internet connection** to access data located in the MOLGENIS cloud ([**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/)). In this case, you will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
+
+```
+input_directory=https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/
+```
+
+* Otherwise, you could first download the data we provided in the MOLGENIS cloud ([**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/), and then use our testing datasets (local, already downloaded) when running the ([01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) script **without internet connection**. In this case, you will also need to define the `input_directory`:
+
+```
+wget -m -p -E -k -K -np https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/
+mv downloads.molgeniscloud.org/downloads/combio_andreu_2022/* .
+rm -r downloads.molgeniscloud.org
+input_directory=$PWD
 ```
 
 **3.1.** Perform the sc-DEA with TL per cell type at the high (approach I) or low (approach II) resolution level:
