@@ -7,7 +7,7 @@ We provide three main scripts for the scDEA with TL:
 
 **3. [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R):** to peform the downstream analysis on the sc-DEA with TL from the approach II.
 
-*Of note*: The functions used in [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R)are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
+*Of note*: The functions used in [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R) are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
 ## Contact
 If you have any questions or issues, feel free to open an issue or directly email Aida Ripoll-Cladellas (aida.ripoll@bsc.es) or Sergio Andreu-Sánchez (sergioandreusanchez@gmail.com). 
@@ -330,4 +330,4 @@ tar -xvf out_dir.top3genes.tar.gz
 1. The **number of cells** in your dataset. In this case, CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246).
 2. The **number of genes** tested, after applying some internal filters by the same script. In this case, CD8T memory cells for approach I (n =  2,343) and CD8T cells for approach II (n = 2,378).
 
-* [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R): The time and memory requirements to run this script are minimal. It is used to extract the files for: [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R) (`$cell_level` > dea.list_formatted.nagq0.rds) and [supplementary tables S7.1 and S7.2 in the manuscript](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true) (approach_I > Table_S7.1.csv and approach_II > Table_S7.2.csv).
+* [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R): The time and memory requirements to run this script are minimal. It is used to extract the files for: 1) [Downstream_SC_DE.R](Projects/Telomere_analysis/Single_cell_analysis/Downstream_SC_DE.R) (`$cell_level` > *dea.list_formatted.nagq0.rds*), and 2) [supplementary tables S7.1 and S7.2 in the manuscript](https://www.biorxiv.org/content/biorxiv/early/2021/12/15/2021.12.14.472541/DC1/embed/media-1.xlsx?download=true) (approach_I > *Table_S7.1.csv* and approach_II > *Table_S7.2.csv*).
