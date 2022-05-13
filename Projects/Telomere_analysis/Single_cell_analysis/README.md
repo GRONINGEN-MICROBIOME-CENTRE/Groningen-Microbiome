@@ -24,7 +24,7 @@ packageVersion("MAST") #>=1.16.0
 ```
 
 ## Required Input
-This section explains the input data and it’s structure to run the three main scripts. To follow the explanations in the **Required Input** section, you can clone this repository and change your current working directory.   
+This section explains the input data and it’s structure to run the three main scripts. To follow the explanations in the **Required Input** section, you can clone the  [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome repository](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) and change your current working directory.   
 
 ```
 git clone \
@@ -38,7 +38,14 @@ git sparse-checkout set Projects/Telomere_analysis/Single_cell_analysis
 cd Projects/Telomere_analysis/Single_cell_analysis/
 ```
 
-*Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome repository](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome). 
+*Of note*: `git clone --filter` from git 2.19 is used to clone only objects in the [Projects/Telomere_analysis/Single_cell_analysis](Projects/Telomere_analysis/Single_cell_analysis) directory from the [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository.
+
+If this option is not working for you, you could clone the whole [Groningen-Microbiome](https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome) repository and change your current working directory. However, clonning the whole repository could take a larger amount of time/memory.   
+
+```
+git clone https://github.com/GRONINGEN-MICROBIOME-CENTRE/Groningen-Microbiome
+cd Groningen-Microbiome/Projects/Telomere_analysis/Single_cell_analysis/
+```
 
 ### Test Data
 We have provided a **cell-type-specific example dataset** for each of the **two approaches**: CD8T memory cells for approach I (n =  11,071) and CD8T cells for approach II (n =  13,246), together with some other inputs required to run the sc-DEA with TL [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R). These files are hosted in the [**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/) in the [MOLGENIS cloud](https://www.molgenis.org/).
