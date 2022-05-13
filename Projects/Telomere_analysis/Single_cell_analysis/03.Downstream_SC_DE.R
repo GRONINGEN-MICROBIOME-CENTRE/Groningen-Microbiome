@@ -225,8 +225,8 @@ Analysis = function(DA, Subsampling=F, n = 20, Significance=0.05){
 }
 
 
-dea.list_formatted <- readRDS('dea.list_formatted.rds') #read DEA output list
-dea.list <- dea.list_formatted$v2 #pick only v2 results
+
+dea.list <- readRDS('approach_II/dea.list_formatted.nagq0.rds')
 dea.list_notna <- lapply(dea.list, function(x) x[!is.na(x$logFC),]) #remove NA estimates
 
 N= names(dea.list_notna)
