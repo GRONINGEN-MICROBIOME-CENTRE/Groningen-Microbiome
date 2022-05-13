@@ -243,7 +243,7 @@ genes_subset=top3genes
 
 *Of note*:
 
-* To directly use our testing datasets (in the cloud, downloaded when running the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) script), you need to have **internet connection** to access data located in the MOLGENIS cloud ([**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/)). In this case, you will only need to define the `output_directory` environmental variable. The `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/).
+* To directly use our testing datasets (in the cloud, downloaded when running the [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) script), you need to have **internet connection** to access data located in the MOLGENIS cloud ([**combio_andreu_2022** directory](https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/)). In this case, the `input_directory` will be the default one (https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/):
 
 ```
 input_directory=https://downloads.molgeniscloud.org/downloads/combio_andreu_2022/
@@ -265,7 +265,7 @@ input_directory=$PWD
 cell_level=approach_I  
 cell_type=CD8T_memory
 covariates_file=covariates.approach_I.tab
-Rscript 01.dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $genes_subset --out_dir $output_directory
+Rscript 01.dea_MAST_glmer_TL.R --in_dir $input_directory --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $genes_subset --out_dir $output_directory
 ```
 
 * Approach II:
@@ -273,7 +273,7 @@ Rscript 01.dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type -
 cell_level=approach_II  
 cell_type=CD8Tcells
 covariates_file=covariates.approach_II.tab
-Rscript 01.dea_MAST_glmer_TL.R --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $genes_subset --out_dir $output_directory
+Rscript 01.dea_MAST_glmer_TL.R --in_dir $input_directory --cell_level $cell_level --cell_type $cell_type --covs $covariates_file --genes $genes_subset --out_dir $output_directory
 ```
 
 **3.2.** Summarizing the sc-DEA with TL results at the cell type resolution level (approach I or approach II):
