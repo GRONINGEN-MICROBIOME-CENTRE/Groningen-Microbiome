@@ -10,7 +10,7 @@ We provide three main scripts for the scDEA with TL:
 *Of note*: The functions used in [01.dea_MAST_glmer_TL.R](Projects/Telomere_analysis/Single_cell_analysis/01.dea_MAST_glmer_TL.R) and [02.dea_MAST_statistics.R](Projects/Telomere_analysis/Single_cell_analysis/02.dea_MAST_statistics.R) are defined in an [accessory script](Projects/Telomere_analysis/Single_cell_analysis/scripts/accessory_functions.R).
 
 ## Contact
-If you have any questions or issues, feel free to open an issue or directly email Aida Ripoll-Cladellas (aida.ripoll@bsc.es) or Sergio Andreu-Sánchez (sergioandreusanchez@gmail.com). 
+If you have any questions or issues, feel free to open an issue or directly email Aida Ripoll-Cladellas (aida.ripoll at bsc.es) or Sergio Andreu-Sánchez (s.andreu.sanchez at umcg.nl). 
 
 
 ## Required Software
