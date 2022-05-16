@@ -10,7 +10,7 @@ Two major analyses are included:
 **2. [Single_cell_analysis](Single_cell_analysis/):** Includes the major scripts for the single cell transcriptomic association to telomere length. 
 
 ## Contact
-If you have any questions or issues, feel free to open an issue or directly email Sergio Andreu-Sánchez (s.andreu.sanchez at umcg.nl) or Aida Ripoll-Cladellas (aida.ripoll at bsc.es).
+If you have any questions or issues, feel free to open an issue or directly email Sergio Andreu-Sánchez (s.andreu.sanchez@umcg.nl) or Aida Ripoll-Cladellas (aida.ripoll@bsc.es).
 
 
 ## Required Software
