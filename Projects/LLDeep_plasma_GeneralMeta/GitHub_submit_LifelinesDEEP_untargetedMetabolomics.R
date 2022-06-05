@@ -1,6 +1,80 @@
 ####main codes for Lifelines plasma untargeted metabolomics study (GeneralMetabolomics platform) 
 ###for questions, please contact LianminChen (lianminchen@yeah.net or lianminchen@njmu.edu.cn)
 
+############################################################  load data  #############################################################
+source('./code/manhattan_function.R')
+annotation=read.delim("./key_lld_1183meta_annotation.txt",header = T,quote = "",sep = "\t",check.names = F)
+annotation$super_class=gsub("\"","",annotation$super_class)
+meta=read.delim("./data_1442samples_LLD_baseline_1183plasma_metabolites.txt",header = T,sep = "\t")
+meta=meta[order(row.names(meta)),]
+meta_fup=read.delim("./data_342samples_LLD_fup_1183plasma_metabolites.txt",header = T,sep = "\t")
+meta_fup=meta_fup[intersect(row.names(meta),row.names(meta_fup)),]
+row.names(meta_fup)=paste(row.names(meta_fup),"_F",sep = "")
+meta_fup=meta_fup[order(row.names(meta_fup)),]
+meta_rep=read.delim("./data_314samples_239LLD_80GoNL_1183plasma_metabolites.txt",header = T,row.names = 1,sep = "\t")
+meta_rep=meta_rep[order(row.names(meta_rep)),]
+pheno=read.delim("~/Documents/UMCG/research-projects/microbiome_data/meta_data/LLD_207pheno_log_imp_1135samples.txt",header = T,sep = "\t")
+pheno_fup=read.delim("~/Documents/UMCG/manuscript/LLD_fup_paper/1_LLD_5years_data/phenotype/data_pheno_LLD_base_fup_338pairs_62pheno_18med_17disease_log_imput_min_10participants.txt",header = T,row.names = 1,sep = "\t")
+pheno_rep=read.delim("~/Documents/UMCG/research-projects/microbiome_data/meta_data/LLD_1135samples_345fup_mgs_key_raw_reads.txt",header = T,row.names = 1,sep = "\t")
+pheno_rep=pheno_rep[which(row.names(pheno_rep)%in%row.names(pheno_fup)),]
+row.names(pheno_rep)=paste(row.names(pheno_rep),"_F",sep = "")
+pheno_fup=merge(pheno_rep[,5:6],pheno_fup,by="row.names",all = F)
+row.names(pheno_fup)=pheno_fup[,1]
+colnames(pheno_fup)[3]="totalreads"
+pheno_fup=pheno_fup[,-c(1,2,4)]
+pheno_rep=read.delim("./LLD_1440samples_age_sex_bmi_smk.txt",header = T,row.names = 1,sep = "\t")
+pheno_rep=pheno_rep[row.names(meta_rep),]
+library(microbiome)
+sp=read.delim("~/Documents/work.UMCG/research-projects/microbiome_data/merged_microbime_data/LLD_1135base_338fup_558species.txt",header = T,sep = "\t",check.names = F)
+sp=sp/rowSums(sp)
+sp=sp[,colSums(sp)>0]#467
+clr=data.frame(t(abundances(t(sp),transform = "clr")),check.names = F)
+sp=sp[rowSums(sp)>0,colSums(sp>0)>nrow(sp)*0.1]#156
+sp=clr[,colnames(sp)]
+path=read.delim("~/Documents/UMCG/research-projects/microbiome_data/merged_microbime_data/LLD_1135base_338fup_467path_abundance.txt",quote = "",header = T,sep = "\t",check.names = F)
+path=path[,colSums(path)>0]#467
+clr=data.frame(t(abundances(t(path),transform = "clr")),check.names = F)
+path=path[rowSums(path)>0,colSums(path>0)>nrow(path)*0.1]#343
+path=clr[,colnames(path)]
+dsv=read.delim("~/Documents/UMCG/research-projects/microbiome_data/mgs_SVs/LLD_base_fup_SVs/01.cleanData/20200615_LLD12_deletionStructuralVariation_1471samples.tsv",header = T,sep = "\t",check.names = F)
+dsv=dsv[,colSums(is.na(dsv)==F)>nrow(dsv)*0.1]
+dsv=merge(sp[,1:2],dsv,by="row.names",all = T)
+row.names(dsv)=dsv[,1]
+dsv=dsv[,-c(1:3)]
+vsv=read.delim("~/Documents/UMCG/research-projects/microbiome_data/mgs_SVs/LLD_base_fup_SVs/01.cleanData/20200615_LLD12_variableStructuralVariation_1471samples.tsv",header = T,sep = "\t",check.names = F)
+vsv=vsv[,colSums(is.na(vsv)==F)>nrow(vsv)*0.1]
+vsv=merge(sp[,1:2],vsv,by="row.names",all = T)
+row.names(vsv)=vsv[,1]
+vsv=vsv[,-c(1:3)]
+id_base=intersect(row.names(meta),row.names(pheno))[grep("LLDeep_0186",intersect(row.names(meta),row.names(pheno)),invert = T)]
+id_fup=intersect(intersect(row.names(meta_fup),paste(id_base,"_F",sep = "")),row.names(sp))
+id_rep=row.names(meta_rep)[1:237]
+id_gonl=row.names(meta_rep)[238:314]
+meta=meta[id_base,]
+meta_fup=meta_fup[id_fup,]
+sp_fup=sp[id_fup,]
+sp=sp[id_base,]
+path_fup=path[id_fup,]
+path=path[id_base,]
+dsv_fup=dsv[intersect(row.names(dsv),id_fup),]
+dsv=dsv[intersect(row.names(dsv),id_base),]
+vsv_fup=vsv[intersect(row.names(vsv),id_fup),]
+vsv=vsv[intersect(row.names(vsv),id_base),]
+pheno=pheno[row.names(meta),]
+pheno_fup=pheno_fup[id_fup,]
+bgc=data.frame(t(read.delim("~/Documents/UMCG/research-projects/microbiome_data/mgs_BGC/LLD_base_BGC/LLD_baseline_1135samples_all_RPKMs_norm.tsv",header = T,sep = "\t",row.names = 1,check.names = F)),check.names = F)
+name=data.frame(t(read.delim("~/Documents/UMCG/research-projects/microbiome_data/mgs_BGC/LLD_base_BGC/LLD_CGR+HMP+Clos_RPKM.txt",header = T,sep = "\t",row.names = 1,check.names = F)),check.names = F)
+colnames(bgc)=colnames(name)
+name=NA
+bgc=bgc[,colSums(bgc>0)>nrow(bgc)*0.1]
+bgc=bgc[row.names(pheno),]
+bgc_fup=read.delim("~/Documents/UMCG/research-projects/microbiome_data/mgs_BGC/LLD_base_BGC/LLD_fup_338samples_all_RPKMs_norm.tsv",header = T,sep = "\t",row.names = 1,check.names = F)
+row.names(bgc_fup)=paste(row.names(bgc_fup),"_F",sep = "")
+bgc_fup=bgc_fup[row.names(sp_fup),colnames(bgc)]
+diet_score=read.delim("~/Documents/UMCG/research-projects/microbiome_data/meta_data/LLD_1447samples_diet_score.txt",header = T,sep = "\t")
+diet_score=na.omit(diet_score)
+diet_score_rep=diet_score[intersect(row.names(diet_score),row.names(meta_rep)),]
+diet_score=diet_score[intersect(row.names(diet_score),row.names(meta)),]
 
 ############################################################  statistics  #############################################################
 ###distance matrix‒based variance estimation
