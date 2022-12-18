@@ -3,7 +3,7 @@
 This project is aiming to identify intestinal gene expression and microbiota change in repsect to the heterogeneity of IBD. We also want to highlight that considering the host-microbiota interactions would reveal more novel insights into the disease putative mechanisms compared solely with transcriptomic or microbial data.
 
 ### Raw data processing
-Pipleine folder
+Pipeline folder
 
 ### Host intestinal transcriptomic and microbial characterization
 
