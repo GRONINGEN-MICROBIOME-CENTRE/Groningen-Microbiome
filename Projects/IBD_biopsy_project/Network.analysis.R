@@ -166,21 +166,13 @@ perform_enrichment <- function(input_dir, filenames, msigdb_collection_name, pat
 
 # load bacteria data and covariate
 covariate_bac=read.table("Covariate.bacteria.txt",sep = "\t",header = T,stringsAsFactors = F,row.names = 1,check.names = F)
-remove=rownames(covariate_bac)[covariate_bac$Diagnosis=="UC" & covariate_bac$Location_rough=="ileum" & covariate_bac$Inflammation=="Yes"]
 bacteria=read.table("OutputTable/CLR.genus.txt",sep = "\t",row.names = 1,header = T,check.names = F,stringsAsFactors = F)
-bacteria=bacteria[rownames(bacteria) %in% rownames(covariate_bac),]
-covariate_bac$surgery=NA
-covariate_bac$surgery=covariate_bac$resec_ileocec+covariate_bac$resec_part_colon+covariate_bac$resec_part_small
-covariate_bac$surgery[covariate_bac$surgery!=0]=1
+
 
 # load gene data and covariate
 gene=read.table(file = "OutputTable/Genes.basic.Nocorrection.protein.coding.txt",sep = "\t",row.names = 1,header = T,check.names = F)
 metadata_rna=read.table("Covariate.rna.organized.txt",sep = "\t",stringsAsFactors = F,header = T,row.names = 1)
-samples_count=intersect(rownames(gene),intersect(rownames(bacteria),rownames(metadata_rna)))
 
-gene=gene[rownames(gene) %in% samples_count,]
-bacteria=bacteria[rownames(bacteria) %in% samples_count,]
-metadata_rna=metadata_rna[rownames(metadata_rna) %in% samples_count,]
 
 # RNA data correction (age, gender, BMI, bacth, inflammation, location (no diagnosis, location == diagnosis), and medication)
 covariate_rna=metadata_rna[,c("Inflammation","Location_rough","age_at_biopsy","sex","BMI","Batch","Aminosalicylates","Thiopurines","Steroids")]
@@ -192,14 +184,13 @@ genes_correct = apply(gene,2,function(x){
   subset.data=cbind(x.subset,covariate.subset)
   colnames(subset.data)[1]="tmp.gene"
   
-  fit=lm(tmp.gene~age_at_biopsy+sex+BMI+Batch+Inflammation+Location_rough+Aminosalicylates+Thiopurines+Steroids,data=subset.data)
+  fit=glmer(tmp.gene~age_at_biopsy+sex+BMI+Batch+Inflammation+Location_rough+Aminosalicylates+Thiopurines+Steroids+ (1|ResearchID),data=subset.data)
   x.resid = resid(fit)
   x[!is.na(x)] = x.resid
   x[is.na(x)] = 0
   return(x)
 })
 genes_correct=as.data.frame(genes_correct)
-#write.table(genes_correct, file = "OutputTable/Genes.basic.correction.protein.coding.txt",row.names = T,quote = F,sep = "\t")
 
 # ==============================================================
 # Montreal B analysis
@@ -376,13 +367,6 @@ Biological_bacteria = foreach(i=1:ncol(bacteria),.combine = rbind) %do%  {
 }
 Biological_bacteria$FDR=p.adjust(Biological_bacteria$Pvalue,method = "BH")
 
-write.table(Biological_gene,file = "OutputTable/biological_gene.txt",sep = "\t",quote = F,row.names = F)
-write.table(Biological_bacteria,file = "OutputTable/biological_bacteria.txt",sep = "\t",quote = F,row.names = F)
-write.table(MontrealB_bacteria,file = "OutputTable/montrealB_bacteria.txt",sep = "\t",quote = F,row.names = F)
-write.table(MontrealB_gene,file = "OutputTable/montrealB_gene.txt",sep = "\t",quote = F,row.names = F)
-write.table(MontrealE_bacteria,file = "OutputTable/montrealE_bacteria.txt",sep = "\t",quote = F,row.names = F)
-write.table(MontrealE_gene,file = "OutputTable/montrealE_gene.txt",sep = "\t",quote = F,row.names = F)
-
 # ==============================================================
 # Montreal Network construction
 # ==============================================================
@@ -421,11 +405,6 @@ props_B1_bacteria <- netAnalyze(net_B1_bacteria, centrLCC = TRUE,
                          hubPar = "eigenvector",connectivity=F,normNatConnect=F,
                          weightDeg = FALSE, normDeg = FALSE)
 
-sink("OutputTable/props_B1_bacteria.txt")
-summary(props_B1_bacteria, numbNodes = 5L)
-sink()
-plot(props_B1_bacteria)
-
 net_B1_gene <- netConstruct(matrix_B1_gene,  
                               measure = "spearman",
                               normMethod = "none", 
@@ -433,28 +412,6 @@ net_B1_gene <- netConstruct(matrix_B1_gene,
                               sparsMethod = "threshold", 
                               thresh = 0.3,
                               verbose = 3,seed = 100)
-#props_B1_gene <- netAnalyze(net_B1_gene, centrLCC = TRUE,
-#                                  clustMethod = "cluster_fast_greedy",
-#                                  hubPar = "eigenvector",
-#                                  weightDeg = FALSE, normDeg = FALSE)
-sink("OutputTable/props_B1_gene.txt")
-summary(props_B1_gene, numbNodes = 5L)
-sink()
-props_B1_gene=read.table("OutputTable/props_montrealB.genes.extract.txt",header = T,stringsAsFactors = F)
-
-tmp.gene="AK3"
-tmp.bacteria="Faecalibacterium"
-tmp.B1=matrix_B1[,colnames(matrix_B1) %in% c(tmp.gene,tmp.bacteria)]
-tmp.B2=matrix_B2[,colnames(matrix_B2) %in% c(tmp.gene,tmp.bacteria)]
-tmp.B1$Group="B1"
-tmp.B2$Group="B2"
-tmp.data=rbind(tmp.B1,tmp.B2)
-
-ggplot(tmp.data, aes(Group,Faecalibacterium,fill=Group)) +
-  geom_boxplot()+
-  theme(legend.position="bottom")+scale_fill_npg()+
-  theme(panel.background = element_rect(fill = "white", colour = "black"))
-ggsave("OutputPlot/test.pdf",width = 4,height = 4)
 
 # view networks in B1
 cor_calculation=rcorr(as.matrix(matrix_B1),type="spearman")
@@ -673,7 +630,6 @@ tmp_B2=tmp_B2[tmp_B2$FDR<0.05,]
 tmp_B2=tmp_B2[tmp_B2$from %in% colnames(matrix_B1_gene),]
 tmp_B1$Group="B1"
 tmp_B2$Group="B2"
-#write.table(rbind(tmp_B1,tmp_B2),file = "OutputTable/B1B2.Christensenellaceae_R-7_group.geneCluster.txt",row.names = F,quote = F)
 
 tmp_B1$color[tmp_B1$cor>0]="#CCBB44"
 tmp_B1$color[tmp_B1$cor<0]="#66CCEE"
@@ -709,72 +665,6 @@ network=visNetwork(tmp_node, tmp_B2) %>%
   visLayout(improvedLayout = T) %>%
   visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T)) %>% 
   visEdges()
-visSave(network, file = "/Users/hushixian/Desktop/PhD/700 RNA+16s project/Analysis/OutputPlot/network.tmp.html")
-
-tmp.bacteria="Lachnoclostridium"
-tmp.gene="CD8A"
-tmp.bacteria=bacteria[,tmp.bacteria,drop=F]
-tmp.gene=genes_correct[,tmp.gene,drop=F]
-tmp.data=merge(tmp.bacteria,tmp.gene,by="row.names",all=F)
-tmp.data=merge(tmp.data,metadata_rna[,"MontrealB",drop=F],by.x="Row.names",by.y = "row.names",all=F)
-tmp.data=na.omit(tmp.data)
-tmp.data$MontrealB_class=NA
-tmp.data$MontrealB_class[tmp.data$MontrealB==0]="B1"
-tmp.data$MontrealB_class[tmp.data$MontrealB==3]="B1"
-tmp.data$MontrealB_class[tmp.data$MontrealB==1]="B2"
-tmp.data$MontrealB_class[tmp.data$MontrealB==4]="B2"
-tmp.data$MontrealB_class[tmp.data$MontrealB==2]="B3"
-tmp.data$MontrealB_class[tmp.data$MontrealB==5]="B3"
-tmp.data=tmp.data[tmp.data$MontrealB_class!="B3",]
-
-ggplot(tmp.data, aes(Lachnoclostridium,CD8A,fill=MontrealB_class)) +
-  geom_point(shape = 21, color = "black", size = 1)+
-  geom_smooth(method = lm,color="black",linetype="dashed")+
-  facet_wrap(~ MontrealB_class,scales="free")+
-  theme(legend.position="bottom")+theme_classic()+
-  theme(panel.background = element_rect(fill = "white", colour = "black"))+scale_fill_manual(values = c("#44BB99","#AA4499"))+
-  theme(strip.background = element_blank(), strip.text = element_blank())+guides(fill=F)
-ggsave("OutputPlot/test.pdf",width = 2.6,height = 2)
-
-#edge_B1$FDR=p.adjust(edge_B1$sig,method = "BH")
-#edge_B1=edge_B1[edge_B1$FDR<0.05,]
-
-#edge_B1=edge_B1[edge_B1$to %in% colnames(matrix_B1_bacteria),]
-#edge_B1=edge_B1[!edge_B1$from %in% colnames(matrix_B1_bacteria),]
-#edge_B1$pair=paste(edge_B1$from,edge_B1$to)
-
-#edge_B2$pair=paste(edge_B2$from,edge_B2$to)
-#edge_B2=edge_B2[edge_B2$pair %in% edge_B1$pair,]
-
-#hetero_test=as.data.frame(matrix(nrow = nrow(edge_B1),ncol = 5))
-#colnames(hetero_test)=c("from","to","B1.cor","B2.cor","Probability")
-#for(i in 1:nrow(edge_B1)){
-#  tmp.B1=edge_B1$cor[i]
-#  tmp.B2=edge_B2$cor[i]
-  
-#  hetero_test$B1.cor[i]=edge_B1$cor[i]
-#  hetero_test$B2.cor[i]=edge_B2$cor[i]
-#  hetero_test$from[i]=as.character(edge_B1$from[i])
-#  hetero_test$to[i]=as.character(edge_B1$to[i])
-#  hetero_test$Probability[i]=r.test(n=204,n2=103,r12=tmp.B1,r34=tmp.B2)$p
-#  cat(i,"\n") 
-#}
-#aa=(msigdb_enrichment(pathway_DB, pathways, hetero_test$from,hetero_test$from[hetero_test$Probability<0.05]))
-#msigdb_pathways_df <- do.call(rbind.data.frame, aa)
-
-#tmp.gene="PRKACA"
-#tmp.bacteria="Lachnospira"
-#tmp.B1=matrix_B1[,colnames(matrix_B1) %in% c(tmp.gene,tmp.bacteria)]
-#tmp.B2=matrix_B2[,colnames(matrix_B2) %in% c(tmp.gene,tmp.bacteria)]
-#tmp.B1$Group="B1"
-#tmp.B2$Group="B2"
-#tmp.data=rbind(tmp.B1,tmp.B2)
-
-#ggplot(tmp.data, aes(PRKACA,Lachnospira)) +
-#  geom_point(shape = 21, color = "#6699CC", size = 3)+
-#  geom_smooth(method = lm,color="#6699CC",linetype="dashed")+
-#  theme(legend.position="bottom")+facet_wrap(~ Group,scales = "free_x")+
-#  theme(panel.background = element_rect(fill = "white", colour = "black"))
 
 # distupted whole network using z-score
 library(dcanr)
@@ -801,156 +691,6 @@ z_scores=z_scores[rownames(z_scores) %in% colnames(matrix_B1_gene),colnames(z_sc
 sig_B1B2=setNames(melt(z_scores, na.rm=T), c('from', 'to', 'Zscore'))
 sig_B1B2$sig=2*pnorm(-abs(sig_B1B2$Zscore))
 sig_B1B2=sig_B1B2[sig_B1B2$sig<0.05,]
-
-# prediction
-library(caret)
-library(pROC)
-library(glmnet)
-outcome=metadata_rna[,"MontrealB",drop=F]
-outcome$MontrealB[outcome$MontrealB==0]="B1"
-outcome$MontrealB[outcome$MontrealB==1]="B2"
-outcome$MontrealB[outcome$MontrealB==3]="B1"
-outcome$MontrealB[outcome$MontrealB==4]="B2"
-outcome=outcome[outcome$MontrealB=="B1" | outcome$MontrealB=="B2",,drop=F]
-outcome=na.omit(outcome)
-predictors=matrix_B1B2[rownames(matrix_B1B2) %in% rownames(outcome),]
-covariate=metadata_rna[rownames(metadata_rna) %in% rownames(outcome),c("age_at_biopsy","sex","BMI","smoking_DB","Inflammation","Location_rough"),drop=F]
-covariate$Location_rough[covariate$Location_rough=="ileum"]=0
-covariate$Location_rough[covariate$Location_rough=="colon"]=1
-covariate$Location_rough=as.numeric(covariate$Location_rough)
-predictors=merge(predictors,covariate,by="row.names",all=F)
-rownames(predictors)=predictors$Row.names
-predictors$Row.names=NULL
-
-predictors=predictors[order(rownames(predictors)),]
-outcome=outcome[order(rownames(outcome)),,drop=F]
-
-outcome[outcome=="B1"]=0
-outcome[outcome=="B2"]=1
-outcome$MontrealB=as.numeric(outcome$MontrealB)
-
-set.seed(19910930)
-inTrain <- createDataPartition(y=outcome$MontrealB,p=0.7,list=F)
-trainSet_predict <- predictors[inTrain,]
-trainSet_outcome <- outcome[inTrain,,drop=F]
-trainSet=cbind(trainSet_outcome,trainSet_predict)
-
-testSet_predict <- predictors[-inTrain,]
-testSet_outcome <- outcome[-inTrain,,drop=F]
-testSet=cbind(testSet_outcome,testSet_predict)
-
-library(doParallel )
-registerDoParallel(cores = 4)
-
-# basic factors
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$MontrealB)
-feature=as.matrix(trainSet_predict[,c("age_at_biopsy","sex","BMI","smoking_DB","Inflammation","Location_rough")])
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$MontrealB)
-new_feature=as.matrix(testSet_predict[,c("age_at_biopsy","sex","BMI","smoking_DB","Inflammation","Location_rough")])
-modelroc1_train=roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot1_train=data.frame(FPR=1-modelroc1_train$specificities,TPR=modelroc1_train$sensitivities)
-modelroc1_test=roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot1_test=data.frame(FPR=1-modelroc1_test$specificities,TPR=modelroc1_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-# gene features
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$MontrealB)
-feature=as.matrix(trainSet_predict[,!colnames(trainSet_predict) %in% colnames(matrix_B1_bacteria)])
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$MontrealB)
-new_feature=as.matrix(testSet_predict[,!colnames(testSet_predict) %in% colnames(matrix_B1_bacteria)])
-modelroc2_train=roc(as.numeric(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot2_train=data.frame(FPR=1-modelroc2_train$specificities,TPR=modelroc2_train$sensitivities)
-modelroc2_test=roc(as.numeric(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot2_test=data.frame(FPR=1-modelroc2_test$specificities,TPR=modelroc2_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-# bacteria features
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$MontrealB)
-feature=as.matrix(trainSet_predict[,!colnames(trainSet_predict) %in% colnames(matrix_B1_gene)])
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$MontrealB)
-new_feature=as.matrix(testSet_predict[,!colnames(testSet_predict) %in% colnames(matrix_B1_gene)])
-modelroc3_train=roc(as.numeric(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot3_train=data.frame(FPR=1-modelroc3_train$specificities,TPR=modelroc3_train$sensitivities)
-modelroc3_test=roc(as.numeric(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot3_test=data.frame(FPR=1-modelroc3_test$specificities,TPR=modelroc3_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-# all features
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$MontrealB)
-feature=as.matrix(trainSet_predict)
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$MontrealB)
-new_feature=as.matrix(testSet_predict)
-modelroc4_train=roc(as.numeric(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot4_train=data.frame(FPR=1-modelroc4_train$specificities,TPR=modelroc4_train$sensitivities)
-modelroc4_test=roc(as.numeric(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot4_test=data.frame(FPR=1-modelroc4_test$specificities,TPR=modelroc4_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-modelroc_plot1_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation"
-modelroc_plot2_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation+Gene"
-modelroc_plot3_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation+Bacteria"
-modelroc_plot4_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation+Bacteria+Gene"
-modelroc_plot_test=rbind(modelroc_plot1_test,modelroc_plot2_test,modelroc_plot3_test,modelroc_plot4_test)
-modelroc_plot_test=modelroc_plot_test[order(modelroc_plot_test$TPR),]
-ggplot(modelroc_plot_test,aes(FPR,TPR,color=Set))+geom_line(size=1)+geom_segment(aes(x = 1, y = 1, xend = 0,yend = 0,linetype="dotted"))+
-  labs(title= "ROC curve", 
-       x = "False Positive Rate (1-Specificity)", 
-       y = "True Positive Rate (Sensitivity)")+scale_color_aaas()+
-  theme(legend.position="bottom")+
-  theme(panel.background = element_rect(fill = "white", colour = "black"))
-ggsave("OutputPlot/prediction.B1B2.pdf",width = 3,height = 3)
 
 # ==============================================================
 # Biological use Network construction
@@ -990,11 +730,6 @@ props_nonuser_bacteria <- netAnalyze(net_nonuser_bacteria, centrLCC = TRUE,
                                   hubPar = "eigenvector",connectivity=F,normNatConnect=F,
                                   weightDeg = FALSE, normDeg = FALSE)
 
-sink("OutputTable/props_nonuser_bacteria.txt")
-summary(props_nonuser_bacteria, numbNodes = 5L)
-sink()
-plot(props_nonuser_bacteria)
-
 net_nonuser_gene <- netConstruct(matrix_nonuser_gene,  
                               measure = "spearman",
                               normMethod = "none", 
@@ -1002,29 +737,6 @@ net_nonuser_gene <- netConstruct(matrix_nonuser_gene,
                               sparsMethod = "threshold", 
                               thresh = 0.3,
                               verbose = 3,seed = 100)
-#props_B1B2_gene <- netAnalyze(net_B1B2_gene, centrLCC = TRUE,
-#                              clustMethod = "cluster_fast_greedy",
-#                              hubPar = "eigenvector",
-#                              weightDeg = FALSE, normDeg = FALSE)
-#sink("OutputTable/props_biological_gene.txt")
-#summary(props_biological_gene, numbNodes = 5L)
-#sink()
-props_nonuser_gene=read.table("OutputTable/props_biological.genes.extract.txt",header = T,stringsAsFactors = F)
-
-tmp.gene="CXCL13"
-tmp.bacteria="Faecalibacterium"
-tmp.nonuser=matrix_nonuser[,colnames(matrix_nonuser) %in% c(tmp.gene,tmp.bacteria)]
-tmp.user=matrix_user[,colnames(matrix_user) %in% c(tmp.gene,tmp.bacteria)]
-tmp.nonuser$Group="Anti-TNF non-user"
-tmp.user$Group="Anti-TNF user"
-tmp.data=rbind(tmp.nonuser,tmp.user)
-
-ggplot(tmp.data, aes(Group,`CXCL13`,fill=Group)) +
-  geom_boxplot()+
-  theme(legend.position="bottom")+
-  theme(panel.background = element_rect(fill = "white", colour = "black"))+
-  scale_fill_manual(values=c( "#E69F00", "#56B4E9"))
-ggsave("OutputPlot/test.pdf",width = 4,height = 4)
 
 # view networks in nonusers
 cor_calculation=rcorr(as.matrix(matrix_nonuser),type = "spearman")
@@ -1051,7 +763,6 @@ tmp.bacteria=edge_nonuser[edge_nonuser$to %in% colnames(matrix_nonuser_bacteria)
 tmp.bacteria=tmp.bacteria[tmp.bacteria$from %in% colnames(matrix_nonuser_bacteria),]
 tmp.gene=edge_nonuser[edge_nonuser$to %in% colnames(matrix_nonuser_bacteria),]
 tmp.gene=tmp.gene[!tmp.gene$from %in% colnames(matrix_nonuser_bacteria),]
-write.table(tmp.gene,file = "OutputTable/Network.biological_nonuse.host_microbe.txt",sep = "\t",row.names = F,quote = F)
 
 edge=rbind(tmp.bacteria,tmp.gene)
 edge$width=edge$width*10
@@ -1085,7 +796,6 @@ network=visNetwork(node, edge) %>%
   visLayout(improvedLayout = T) %>%
   visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T)) %>% 
   visEdges(smooth = list(roundness = 0.3))
-visSave(network, file = "/Users/hushixian/Desktop/PhD/700 RNA+16s project/Analysis/OutputPlot/network.biological.html")
 
 #enrichment
 background_genes=colnames(gene)
@@ -1119,7 +829,6 @@ candidate_gene=unique(as.character(tmp.gene$from))
 aa=(msigdb_enrichment(pathway_DB, pathways, background_genes,candidate_gene))
 msigdb_pathways_df <- do.call(rbind.data.frame, aa)
 msigdb_pathways_df=msigdb_pathways_df[order(msigdb_pathways_df$p_val),]
-write.table(msigdb_pathways_df,file = "OutputTable/enrichment.B1B2.gene.microbe.txt",row.names = F,quote = F)
 
 # network compare
 library(psych)
@@ -1151,9 +860,6 @@ edge_user$Zscore=fisherz(edge_user$cor)
 edge_nonuser$Zscore=fisherz(edge_nonuser$cor)
 edge_user$FDR=p.adjust(edge_user$sig,method = "BH")
 edge_nonuser$FDR=p.adjust(edge_nonuser$sig,method = "BH")
-
-write.table(edge_user[edge_user$FDR<0.05 & edge_user$to %in% colnames(matrix_nonuser_bacteria),],"OutputTable/Anti-TNF-user.microbiota-gene.clusters.txt",sep = "\t",quote = F,row.names = F)
-write.table(edge_nonuser[edge_nonuser$FDR<0.05 & edge_nonuser$to %in% colnames(matrix_nonuser_bacteria),],"OutputTable/Anti-TNF-nonuser.microbiota-gene.clusters.txt",sep = "\t",quote = F,row.names = F)
 
 node_compare=matrix(nrow = ncol(matrix_nonuser_bacteria),ncol = 4)
 node_compare=as.data.frame(node_compare)
@@ -1230,26 +936,6 @@ node_enrich = foreach(i=1:length(node_compare$Bacteria[node_compare$FDR<0.05]),.
 }
 node_enrich$FDR=p.adjust(node_enrich$Pvalue,method = "BH")
 node_enrich=node_enrich[node_enrich$FDR<0.05,]
-write.table(node_enrich,file = "OutputTable/Node_enrich.biological.txt",quote = F,row.names = F) # need manual extraction, top3
-
-node_enrich=read.table("OutputTable/Node_enrich.biological.txt",sep = "\t",header = T,stringsAsFactors = F)
-node_enrich$path=factor(node_enrich$path,levels = c("path3","path2","path1"))
-node_enrich$group=factor(node_enrich$group,levels = c("nonuser","user"))
-tmp.data=node_enrich[node_enrich$Bacteria %in% c("Veillonella","Dorea","Subdoligranulum"),]
-tmp.data$odds[tmp.data$group=="nonuser"]=-tmp.data$odds[tmp.data$group=="nonuser"]
-ggplot(data=tmp.data, aes(x=Bacteria, y=odds,group=path,fill=Bacteria)) +
-  geom_bar(stat = "identity", position=position_dodge(),color="black")+
-  coord_flip()+
-  theme_bw()+
-  theme(axis.title.y=element_blank(),
-        axis.text.y=element_blank(),
-        axis.ticks.y=element_blank())+
-  theme(strip.background = element_blank(), strip.text = element_blank())+
-  theme(panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.background = element_blank())+
-  scale_fill_brewer(palette="Oranges")
-ggsave("OutputPlot/Node_enrich.biological.pdf",width = 8,height = 4)
 
 tmp.node=node_enrich[ node_enrich$Bacteria=="Ruminococcaceae_UCG-002",]
 tmp.node=tmp.node[!duplicated(tmp.node$pathway),]
@@ -1265,7 +951,6 @@ tmp_user=tmp_user[tmp_user$FDR<0.05,]
 tmp_user=tmp_user[tmp_user$from %in% colnames(matrix_nonuser_gene),]
 tmp_nonuser$Group="nonuser"
 tmp_user$Group="user"
-#write.table(rbind(tmp_nonuser,tmp_user),file = "OutputTable/nonuseruser.Veillonella.geneCluster.txt",row.names = F,quote = F)
 
 tmp_nonuser$color[tmp_nonuser$cor>0]="#CCBB44"
 tmp_nonuser$color[tmp_nonuser$cor<0]="#66CCEE"
@@ -1301,207 +986,3 @@ network=visNetwork(tmp_node, tmp_user) %>%
   visLayout(improvedLayout = T) %>%
   visOptions(highlightNearest = list(enabled = T, degree = 1, hover = T)) %>% 
   visEdges()
-visSave(network, file = "/Users/hushixian/Desktop/PhD/700 RNA+16s project/Analysis/OutputPlot/network.tmp.html")
-
-tmp.bacteria="Ruminococcaceae_UCG-002"
-tmp.gene="ACAA1"
-tmp.bacteria=bacteria[,tmp.bacteria,drop=F]
-tmp.gene=genes_correct[,tmp.gene,drop=F]
-tmp.data=merge(tmp.bacteria,tmp.gene,by="row.names",all=F)
-tmp.data=merge(tmp.data,metadata_rna[,"biological_use",drop=F],by.x="Row.names",by.y = "row.names",all=F)
-tmp.data=na.omit(tmp.data)
-tmp.data$biological_use[tmp.data$biological_use==0]="Nonuser"
-tmp.data$biological_use[tmp.data$biological_use==1]="User"
-ggplot(tmp.data, aes(`Ruminococcaceae_UCG-002`,ACAA1,fill=biological_use)) +
-  geom_point(shape = 21, color = "black", size = 1)+
-  geom_smooth(method = lm,color="black",linetype="dashed")+
-  facet_wrap(~ biological_use,scales="free")+
-  theme(legend.position="bottom")+theme_classic()+
-  theme(panel.background = element_rect(fill = "white", colour = "black"))+scale_fill_manual(values = c("#44BB99","#AA4499"))+
-  theme(strip.background = element_blank(), strip.text = element_blank())+guides(fill=F)
-ggsave("OutputPlot/test.pdf",width = 2.6,height = 2)
-
-# prediction
-library(caret)
-library(pROC)
-library(glmnet)
-outcome=metadata_rna[,"biological_use",drop=F]
-outcome=na.omit(outcome)
-predictors=matrix_biological[rownames(matrix_biological) %in% rownames(outcome),]
-covariate=metadata_rna[rownames(metadata_rna) %in% rownames(outcome),c("age_at_biopsy","sex","BMI","smoking_DB","Inflammation","Location_rough"),drop=F]
-covariate$Location_rough[covariate$Location_rough=="ileum"]=0
-covariate$Location_rough[covariate$Location_rough=="colon"]=1
-covariate$Location_rough=as.numeric(covariate$Location_rough)
-predictors=merge(predictors,covariate,by="row.names",all=F)
-rownames(predictors)=predictors$Row.names
-predictors$Row.names=NULL
-
-predictors=predictors[order(rownames(predictors)),]
-outcome=outcome[order(rownames(outcome)),,drop=F]
-
-outcome$biological_use=as.numeric(outcome$biological_use)
-
-set.seed(19910930)
-inTrain <- createDataPartition(y=outcome$biological_use,p=0.7,list=F)
-trainSet_predict <- predictors[inTrain,]
-trainSet_outcome <- outcome[inTrain,,drop=F]
-trainSet=cbind(trainSet_outcome,trainSet_predict)
-
-testSet_predict <- predictors[-inTrain,]
-testSet_outcome <- outcome[-inTrain,,drop=F]
-testSet=cbind(testSet_outcome,testSet_predict)
-
-library(doParallel )
-registerDoParallel(cores = 4)
-
-# basic factors
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$biological_use)
-feature=as.matrix(trainSet_predict[,c("age_at_biopsy","sex","BMI","smoking_DB","Inflammation","Location_rough")])
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$biological_use)
-new_feature=as.matrix(testSet_predict[,c("age_at_biopsy","sex","BMI","smoking_DB","Inflammation","Location_rough")])
-modelroc1_train=roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot1_train=data.frame(FPR=1-modelroc1_train$specificities,TPR=modelroc1_train$sensitivities)
-modelroc1_test=roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot1_test=data.frame(FPR=1-modelroc1_test$specificities,TPR=modelroc1_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-# gene features
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$biological_use)
-feature=as.matrix(trainSet_predict[,!colnames(trainSet_predict) %in% colnames(matrix_nonuser_bacteria)])
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$biological_use)
-new_feature=as.matrix(testSet_predict[,!colnames(testSet_predict) %in% colnames(matrix_nonuser_bacteria)])
-modelroc2_train=roc(as.numeric(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot2_train=data.frame(FPR=1-modelroc2_train$specificities,TPR=modelroc2_train$sensitivities)
-modelroc2_test=roc(as.numeric(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot2_test=data.frame(FPR=1-modelroc2_test$specificities,TPR=modelroc2_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-# bacteria features
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$biological_use)
-feature=as.matrix(trainSet_predict[,!colnames(trainSet_predict) %in% colnames(matrix_nonuser_gene)])
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$biological_use)
-new_feature=as.matrix(testSet_predict[,!colnames(testSet_predict) %in% colnames(matrix_nonuser_gene)])
-modelroc3_train=roc(as.numeric(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot3_train=data.frame(FPR=1-modelroc3_train$specificities,TPR=modelroc3_train$sensitivities)
-modelroc3_test=roc(as.numeric(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot3_test=data.frame(FPR=1-modelroc3_test$specificities,TPR=modelroc3_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-# all features
-a <- seq(0.1, 0.9, 0.05)
-response=as.matrix(trainSet_outcome$biological_use)
-feature=as.matrix(trainSet_predict)
-search <- foreach(i = a, .combine = rbind) %dopar% {
-  cv <- cv.glmnet(feature, response, family = "binomial", nfold = 10, type.measure = "deviance", paralle = TRUE, alpha = i)
-  data.frame(cvm = cv$cvm[cv$lambda == cv$lambda.1se], lambda.1se = cv$lambda.1se, alpha = i)
-}
-cv3 <- search[search$cvm == min(search$cvm), ]
-md3 <- glmnet(feature, response, family = "binomial", lambda = cv3$lambda.1se, alpha = cv3$alpha)
-selection=as.matrix(coef(md3))
-selection=selection[selection[,1]!=0,,drop=F]
-print(selection[-1,])
-new_response=as.matrix(testSet_outcome$biological_use)
-new_feature=as.matrix(testSet_predict)
-modelroc4_train=roc(as.numeric(response), as.numeric(predict(md3, feature, type = "response")))
-modelroc_plot4_train=data.frame(FPR=1-modelroc4_train$specificities,TPR=modelroc4_train$sensitivities)
-modelroc4_test=roc(as.numeric(new_response), as.numeric(predict(md3, new_feature, type = "response")))
-modelroc_plot4_test=data.frame(FPR=1-modelroc4_test$specificities,TPR=modelroc4_test$sensitivities)
-roc(as.vector(response), as.numeric(predict(md3, feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-roc(as.vector(new_response), as.numeric(predict(md3, new_feature, type = "response")), percent=F, boot.n=1000, ci.alpha=0.9, plot=TRUE, grid=TRUE, show.thres=TRUE, legacy.axes = TRUE, reuse.auc = TRUE,
-    print.auc = TRUE, print.thres.col = "blue", ci=TRUE )
-
-modelroc_plot1_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation"
-modelroc_plot2_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation+Gene"
-modelroc_plot3_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation+Bacteria"
-modelroc_plot4_test$Set="Age+Gender+BMI+Smoking+Inflammation+TissueLocation+Bacteria+Gene"
-modelroc_plot_test=rbind(modelroc_plot1_test,modelroc_plot2_test,modelroc_plot3_test,modelroc_plot4_test)
-modelroc_plot_test=modelroc_plot_test[order(modelroc_plot_test$TPR),]
-ggplot(modelroc_plot_test,aes(FPR,TPR,color=Set))+geom_line(size=2)+geom_segment(aes(x = 1, y = 1, xend = 0,yend = 0,linetype="dotted"))+
-  labs(title= "ROC curve", 
-       x = "False Positive Rate (1-Specificity)", 
-       y = "True Positive Rate (Sensitivity)")+theme_minimal()+scale_color_aaas()+
-  theme(legend.position="bottom")
-ggsave("OutputPlot/prediction.biological.pdf")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
