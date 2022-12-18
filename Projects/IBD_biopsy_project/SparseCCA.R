@@ -147,7 +147,6 @@ covariate_rna$Inflammation[is.na(covariate_rna$Inflammation)]=median(covariate_r
 covariate_rna$smoking_DB[is.na(covariate_rna$smoking_DB)]=median(covariate_rna$smoking_DB[!is.na(covariate_rna$smoking_DB)])
 
 inflammation=gene[,colnames(gene) %in% inflammation,drop=F]
-write.table(inflammation,"sparseCCA/Inflammation.genes.corrected.txt",row.names = T,quote = F,sep = "\t")
 
 # ======================================================================================================================================
 # (don't consider inflammation, location and others, microbial community is not influenced much)
@@ -155,16 +154,7 @@ write.table(inflammation,"sparseCCA/Inflammation.genes.corrected.txt",row.names 
 
 bacteria=read.table("OutputTable/CLR.bacteria.txt",row.names = 1,sep = "\t",header = T,stringsAsFactors = F)
 covariate_bac=read.table("OutputTable/Covariate_bac.organized.txt",sep = "\t",header = T,stringsAsFactors = T,row.names = 1)
-bacteria=bacteria[rownames(bacteria) %in% rownames(covariate_bac),]
-covariate_bac=covariate_bac[rownames(covariate_bac) %in% rownames(bacteria),]
 inflammation=read.table("sparseCCA/Inflammation.genes.txt",row.names = 1,sep = "\t",check.names = F,stringsAsFactors = F)
-
-# check files
-#group_cd=covariate_bac[covariate_bac$Diagnosis=="Control",]
-#bacteria=bacteria[rownames(bacteria) %in% rownames(group_cd),]
-
-bacteria=bacteria[rownames(bacteria) %in% rownames(inflammation),]
-inflammation=inflammation[rownames(inflammation) %in% rownames(bacteria),]
 
 dim(bacteria)
 dim(inflammation)
@@ -206,8 +196,8 @@ for( i in 1:length(penaltyX)){
 
       res <- CCA(X[-k,],Y[-k,], penaltyx = penaltyX[i], penaltyz = penaltyY[j], K=1, niter = 5, trace = F)
 
-      scoreXcv[k] <- X[k,]%*%res$u ## single value
-      scoreYcv[k] <- Y[k,]%*%res$v ## single value
+      scoreXcv[k] <- X[k,]%*%res$u 
+      scoreYcv[k] <- Y[k,]%*%res$v
     }
     ## correlation between scores for X and Y for all held out samples.
     corr_all[i,j] = cor(scoreXcv,scoreYcv) 
@@ -269,17 +259,14 @@ scoresXcv <- matrix(nrow = nrow(X), ncol = cca.k)
 scoresYcv <-  matrix(nrow = nrow(Y), ncol = cca.k)
 corr_pval <- c()
 corr_r <- c()
-for(i in 1:nrow(inflammation)){ #n = no. of samples
-  #compute weights with sample i held out:
-  res <- CCA(X[-i,],Y[-i,], penaltyx=bestpenaltyX, penaltyz=bestpenaltyY, K=cca.k, trace = F) ## default niter = 15 which is spit out when trace = T (default)
-  ###compute scores for i'th sample for each component (pair of canonical variables)
+for(i in 1:nrow(inflammation)){ 
+  res <- CCA(X[-i,],Y[-i,], penaltyx=bestpenaltyX, penaltyz=bestpenaltyY, K=cca.k, trace = F) 
   for(j in 1:cca.k){
     print(paste0("i = ", i," K = ", j)); flush.console()
     scoresXcv[i,j] <- X[i,]%*%res$u[,j]
     scoresYcv[i,j] <- Y[i,]%*%res$v[,j]
   }
 }
-## Test for each components
 for(j in 1:cca.k){
   # plot(scoresXcv,scoresYcv)
   corr <- cor.test(scoresXcv[,j],scoresYcv[,j])
@@ -327,95 +314,6 @@ write.table(cca[[3]], file = paste0("sparseCCA/CCA_var_microbes.txt"), sep="\t",
 ## only spit out significant components
 sig <- which(corr_padj < 0.1)
 dirname <- paste0("sparseCCA/sig_gene_taxa_components_",bestpenaltyX,"_", bestpenaltyY,"_padj/")
-## This will return FALSE if the directory already exists or is uncreatable, 
-## and TRUE if it didn't exist but was succesfully created.
 ifelse(!dir.exists(dirname), dir.create(dirname), FALSE)
 save_CCA_components(cca[[1]],sig,dirname)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
