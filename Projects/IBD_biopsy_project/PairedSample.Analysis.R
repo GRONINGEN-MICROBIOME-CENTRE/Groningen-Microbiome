@@ -27,16 +27,7 @@ library("ape")
 library(dendextend)
 
 bacteria=read.table("OutputTable/CLR.genus.txt",sep = "\t",row.names = 1,header = T,check.names = F,stringsAsFactors = F)
-bacteria=bacteria[,colSums(bacteria!=0)>(0.05*nrow(bacteria))]
 covariate_bac=read.table("OutputTable/Covariate_bac.organized.txt",sep = "\t",header = T,stringsAsFactors = T,row.names = 1)
-bacteria=bacteria[rownames(bacteria) %in% rownames(covariate_bac),]
-covariate_bac=covariate_bac[rownames(covariate_bac) %in% rownames(bacteria),]
-covariate_bac=covariate_bac[order(rownames(covariate_bac)),]
-bacteria=bacteria[order(rownames(bacteria)),]
-
-# remove outliers dominated by single bacteria Lachnoclostridium (>95%, no bacteridetes or firmicutes)
-bacteria=bacteria[!rownames(genus) %like% "1056",]
-bacteria=bacteria[!rownames(genus) %like% "680",]
 
 pair_tissue=read.table("OutputTable/Paired.multipleLcation.noninflamed.txt",sep = "\t",header = T,stringsAsFactors = F)
 pair_inflammation_colon=read.table("OutputTable/Paired.multipleInflammation.colon.txt",sep = "\t",header = T,stringsAsFactors = F)
@@ -54,10 +45,6 @@ dend <- as.dendrogram(hc)
 groupCodes=pca_analysis$ResearchID
 colorCodes <- distinctColorPalette(368)
 labels_colors(dend) <- colorCodes[groupCodes][order.dendrogram(dend)]
-
-pdf("OutputPlot/Tree.plot.pdf",width = 12,height = 12)
-circlize_dendrogram(dend)
-dev.off()
 
 distmat <- (as.matrix(beta_diversity))
 distmat=data.frame(as.table(distmat))[lower.tri(distmat, diag = F), ]
@@ -77,10 +64,6 @@ distmat$group[distmat$Var1ID!=distmat$Var2ID & distmat$Var1Group=="colon" & dist
 distmat$group[distmat$Var1ID!=distmat$Var2ID & distmat$Var1Group=="ileum" & distmat$Var2Group=="ileum"]="BetweenIndividual.ileum"
 distmat=na.omit(distmat)
 
-ggplot(distmat, aes(x=group, y=Freq,fill=group)) + 
-  geom_boxplot()+
-  scale_fill_manual(values=c("#EE8866","#AA4499","#44BB99"))+theme_classic()+guides(fill=F)
-ggsave("OutputPlot/Individual.location.pdf",width = 2.4,height = 1.8)
 wilcox.test(distmat$Freq[distmat$group=="WithinIndividual"],distmat$Freq[distmat$group=="BetweenIndividual.colon"])
 wilcox.test(distmat$Freq[distmat$group=="WithinIndividual"],distmat$Freq[distmat$group=="BetweenIndividual.ileum"])
 wilcox.test(distmat$Freq[distmat$group=="BetweenIndividual.colon"],distmat$Freq[distmat$group=="BetweenIndividual.ileum"])
@@ -107,11 +90,6 @@ distmat$group[distmat$Var1ID!=distmat$Var2ID & distmat$Var1Group=="No" & distmat
 distmat$group[distmat$Var1ID!=distmat$Var2ID & distmat$Var1Group=="Yes" & distmat$Var2Group=="Yes"]="BetweenIndividual.Inf"
 distmat=na.omit(distmat)
 
-ggplot(distmat, aes(x=group, y=Freq,fill=group)) + 
-  geom_boxplot()+
-  scale_fill_manual(values=c("#EE8866","#AA4499","#44BB99"))+theme_classic()+guides(fill=F)
-ggsave("OutputPlot/Individual.colon.inflamed.vs.noninf.pdf",width = 2.4,height = 1.8)
-
 # individual difference, vs. inflammation difference (ileum)
 bacteria_ileum=bacteria[rownames(bacteria) %in% pair_inflammation_ileum$BiopsyID,,]
 beta_diversity=vegdist((bacteria_ileum),method = "euclidean")
@@ -133,11 +111,6 @@ distmat$group[distmat$Var1ID==distmat$Var2ID]="WithinIndividual"
 distmat$group[distmat$Var1ID!=distmat$Var2ID & distmat$Var1Group=="No" & distmat$Var2Group=="No"]="BetweenIndividual.nonInf"
 distmat$group[distmat$Var1ID!=distmat$Var2ID & distmat$Var1Group=="Yes" & distmat$Var2Group=="Yes"]="BetweenIndividual.Inf"
 distmat=na.omit(distmat)
-
-ggplot(distmat, aes(x=group, y=Freq,fill=group)) + 
-  geom_boxplot()+
-  scale_fill_manual(values=c("#EE8866","#AA4499","#44BB99"))+theme_classic()+guides(fill=F)
-ggsave("OutputPlot/Individual.ileum.inflamed.vs.noninf.pdf",width = 2.4,height = 1.8)
 
 # tissue location, colon vs ileum, in noninflamed tissue
 tmp1=covariate_bac[rownames(covariate_bac) %in% pair_tissue$BiopsyID,]
@@ -281,54 +254,4 @@ result3 = foreach(i=1:ncol(bacteria1),.combine = rbind) %do%  {
   
 }
 result3$FDR=p.adjust(result3$PairedPvalue,method = "BH")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
