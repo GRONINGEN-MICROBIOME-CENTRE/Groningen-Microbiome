@@ -24,4 +24,7 @@ HMP2.R
 
 All the analysis have been adjusted for potential confounders if neccessary, including age, sex, BMI, tissue location and inflammation, medication use, (aminosalicylates, thiopurines and steroids),sample batch and surgery (for 16S data only). The issue multiple samples from one patient is taken into account by introducing a random effect (1|ID) into the generalized linear mixed model.
 
+### Data deposite
+All the data is at EGA (https://ega-archive.org/studies/EGAS00001002702).
+### Analysis support
 Please contact dhu.sxhu@hotmail.com
