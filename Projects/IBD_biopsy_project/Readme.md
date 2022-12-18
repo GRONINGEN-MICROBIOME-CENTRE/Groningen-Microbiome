@@ -2,6 +2,9 @@
 
 This project is aiming to identify intestinal gene expression and microbiota change in repsect to the heterogeneity of IBD. We also want to highlight that considering the host-microbiota interactions would reveal more novel insights into the disease putative mechanisms compared solely with transcriptomic or microbial data.
 
+### Raw data processing
+Pipleine folder
+
 ### Host intestinal transcriptomic and microbial characterization
 
 1) ProjectCode.RNAseq.R
@@ -18,5 +21,7 @@ This project is aiming to identify intestinal gene expression and microbiota cha
 
 ### Replicaiton work in HMP2
 HMP2.R
+
+All the analysis have been adjusted for potential confounders if neccessary, including age, sex, BMI, tissue location and inflammation, medication use, (aminosalicylates, thiopurines and steroids),sample batch and surgery (for 16S data only). The issue multiple samples from one patient is taken into account by introducing a random effect (1|ID) into the generalized linear mixed model.
 
 Please contact dhu.sxhu@hotmail.com
