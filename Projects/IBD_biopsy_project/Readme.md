@@ -9,7 +9,7 @@ Pipeline folder
 
 1) ProjectCode.RNAseq.R
 2) ProjectCode.16S.R
-3) HALLA.R
+3) HALLA.R (https://github.com/biobakery/halla_legacy)
 4) PairedSample.Analysis.R
 
 ### Host-microbiota interactions
