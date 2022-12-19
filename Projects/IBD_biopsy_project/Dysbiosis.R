@@ -119,7 +119,7 @@ p=ggplot(pca_analysis) +
 dys_genus = foreach(i=1:ncol(bacteria),.combine = rbind) %do%  {
   tmp.genus=bacteria[,i,drop=F]
   tmp.data=merge(dysbiosis_all,tmp.genus,by.x="ID",by.y="row.names",all=F)
-  tmp.test( Dysbiosis ~ tmp.data[,4] + (1|ResearchID),  data=tmp.data)
+  tmp.test=glmer( Dysbiosis ~ tmp.data[,4] + (1|ResearchID),  data=tmp.data)
   
   return.string=data.frame(Bacteria=colnames(bacteria)[i],Cor=tmp.test$estimate,Pvalue=tmp.test$p.value)
 }
@@ -177,7 +177,7 @@ modelfit_taxa = foreach(i=1:ncol(genes_correct),.combine = rbind) %do%  {
   for(n in 1:ncol(bacteria)){
     tmp.test=tmp.data[,c(1:4,n+4)]
     colnames(tmp.test)=c("ID","Dys","Group","Gene","Bac")
-    tmp.model=glm(Gene ~ Bac + (1|ResearchID),data = tmp.test)
+    tmp.model=glmer(Gene ~ Bac + (1|ResearchID),data = tmp.test)
     tmp.model=as.data.frame(summary(tmp.model)$coefficients)
     
     tmp.result$Taxa[n]=colnames(tmp.data)[n+4]
@@ -226,7 +226,6 @@ modelfit = foreach(i=1:ncol(genes_correct),.combine = rbind) %do%  {
   tmp.gene=colnames(genes_correct)[i]
   tmp.data=merge(genes_correct[,tmp.gene,drop=F],bacteria,by="row.names",all=F)
   tmp.data=merge(dysbiosis_all,tmp.data,by.y="Row.names",by.x="ID",all=F)
-  #tmp.data$Dysbiosis=sample(tmp.data$Dysbiosis)
   
   tmp.result=as.data.frame(matrix(nrow = ncol(bacteria),ncol = 8))
   colnames(tmp.result)=c("Gene","Taxa","Beta_taxa","Beta_dys","Beta_interact","P_taxa","P_dys","P_interact")
@@ -251,15 +250,6 @@ modelfit = foreach(i=1:ncol(genes_correct),.combine = rbind) %do%  {
   return.string=as.data.frame(tmp.result)
 }
 
-modelfit$FDR_interact=p.adjust(modelfit$P_interact,method = "BH")
-#modelfit0$FDR_taxa=p.adjust(modelfit0$P_taxa,method = "BH")
-modelfit_shannon$FDR=p.adjust(modelfit_shannon$Pvalue,method = 'BH')
-modelfit00$FDR=p.adjust(modelfit00$Pvalue,method = "BH")
-modelfit_taxa$FDR=p.adjust(modelfit_taxa$P,method = "BH")
-
-library(visNetwork)
-library(geomnet)
-library(igraph)
 # network of non-interaction results
 edge=modelfit0[modelfit0$FDR_taxa<0.05,c(1:3)]
 colnames(edge)=c("from","to","width")
@@ -288,7 +278,6 @@ network=visNetwork(node, edge, width = 3000,height = 1500) %>%
   visEdges(smooth = list(roundness = 0.3)) %>%
   visLayout(randomSeed = 1111)
 network
-visSave(network, file = "/Users/hushixian/Desktop/PhD/700 RNA+16s project/Analysis/OutputPlot/network.no.interaction.html")
 tmp.genus="Faecalibacterium"
 tmp.gene="CREB3L3"
 tmp.data=merge(tmp.data,genes_correct[,tmp.gene,drop=F],by.x="ID",by.y="row.names",all=F)
@@ -297,32 +286,6 @@ ggplot(tmp.data, aes(Faecalibacterium,CREB3L3)) +
   geom_smooth(method = lm,color="#6699CC",linetype="dashed")+
   theme(legend.position="bottom")+
   theme(panel.background = element_rect(fill = "white", colour = "black"))
-ggsave("OutputPlot/tmpplot.pdf",width = 5,height = 4)
-
-library(pheatmap)
-library(reshape2)
-tmp.gene=modelfit0$Gene[modelfit0$FDR_taxa<0.05]
-tmp.bac=modelfit0$Taxa[modelfit0$FDR_taxa<0.05]
-associations_cor=acast(modelfit0[modelfit0$Gene %in% tmp.gene & modelfit0$Taxa %in% tmp.bac,], Gene~Taxa, value.var="Beta_taxa")
-associations_sig=acast(modelfit0[modelfit0$Gene %in% tmp.gene & modelfit0$Taxa %in% tmp.bac,], Gene~Taxa, value.var="FDR_taxa")
-heatmap.data=(associations_cor)
-heatmap.data.lable=(associations_sig)
-heatmap.data.lable[heatmap.data.lable<0.05 & heatmap.data.lable>0]="*"
-heatmap.data.lable[heatmap.data.lable<0.1 & heatmap.data.lable>0]="*"
-heatmap.data.lable[heatmap.data.lable>0.05]=""
-
-paletteLength <- 50
-myColor <- colorRampPalette(c("#4393C3", "white", "#FEDA8B"))(paletteLength)
-myBreaks <- c(seq(min(heatmap.data), 0, length.out=ceiling(paletteLength/2) + 1), 
-              seq(max(heatmap.data)/paletteLength, max(heatmap.data), length.out=floor(paletteLength/2)))
-
-
-pdf("OutputPlot//host-microbe.association.pdf",width = 5,height = 10)
-pheatmap(heatmap.data,cluster_cols = T, cluster_rows = T,
-         show_rownames=T, show_colnames=T,
-         cellheight = 8,cellwidth = 10,fontsize_number=12,fontsize_row=6,fontsize_col = 8,
-         display_numbers = heatmap.data.lable,color = myColor,breaks=myBreaks)
-dev.off()
 
 # =================================================================================
 # context-specific analysis
