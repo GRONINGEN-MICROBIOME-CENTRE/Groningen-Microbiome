@@ -23,113 +23,27 @@ library(reshape2)
 
 RNAseq=read.table("RNAseq/Merged.normalized.txt",row.names = 1,header = T,stringsAsFactors = F,check.names = F,sep = "\t")
 gene=as.data.frame((RNAseq))
-
-annotation=read.table("annotation.file.txt",sep = "\t",stringsAsFactors = F,header = T)
-gene=gene[,colnames(gene) %in% annotation$Gene]
-annotation=annotation[annotation$Gene %in% colnames(gene),]
-gene=gene[,order(colnames(gene))]
-annotation=annotation[order(annotation$Gene),]
-colnames(gene)=annotation$id
-gene=as.data.frame(t(gene))
-
 deconvolution=xCellAnalysis(gene)
-deconvolution=as.data.frame(deconvolution)
-deconvolution=as.data.frame(t(deconvolution))
-write.table(deconvolution,file = "OutputTable/Deconvolution.txt",sep = "\t",row.names = T,quote = F)
-
 
 # ====================================================================================================
 # start analysis
 # ====================================================================================================
 covariate_rna=read.table("Covariate.rna.txt",sep = "\t",header = T,stringsAsFactors = F,row.names = 1,check.names = F)
 deconvolution=read.table("OutputTable/Deconvolution.txt",sep = "\t",check.names = F,stringsAsFactors = F,header = T)
-rownames(deconvolution)=gsub("X","",rownames(deconvolution))
-deconvolution_sub=deconvolution[,c("cDC",	"Macrophages M1",	"NK cells",	"pDC",	"Macrophages M2",
-                                   "CD4+ naive T-cells",	"CD4+ Tcm",	"CD8+ naive T-cells",	"CD8+ Tcm",	
-                                   "Tgd cells",	"Th2 cells",	"Tregs",	"Th1 cells",
-                                   "NKT",	"CD8+ Tem",	"CD4+ Tem",	"Class-switched memory B-cells",
-                                   "Plasma cells",	"naive B-cells",	"Memory B-cells",	"Basophils",
-                                   "Mast cells",	"Neutrophils",	"Eosinophils",	"Endothelial cells",
-                                   "Epithelial cells",	"Fibroblasts"),drop=F]
-deconvolution_sub=deconvolution_sub[rownames(deconvolution_sub) %in% rownames(covariate_rna),]
-covariate_rna=covariate_rna[rownames(covariate_rna) %in% rownames(deconvolution_sub),]
-covariate_rna$Inflammation[covariate_rna$Inflammation=="Light"]="No"
-
-covariate_rna$Inflammation[covariate_rna$Inflammation=="Yes"]=3
-covariate_rna$Inflammation[covariate_rna$Inflammation=="No" & covariate_rna$Cohort=="Control"]=1
-covariate_rna$Inflammation[covariate_rna$Inflammation=="No"]=2
-covariate_rna$BMI[is.na(covariate_rna$BMI)]=median(covariate_rna$BMI[!is.na(covariate_rna$BMI)])
 
 # PCA
 beta_diversity=vegdist((deconvolution_sub),method = "euclidean")
 pca_analysis=as.data.frame(cmdscale(beta_diversity,k=8))
 pca_analysis=merge(pca_analysis,covariate_rna,all = F,by="row.names")
 
-pca_analysis[pca_analysis==""]=NA
-ggplot (pca_analysis, aes(V1,V2,fill=Diagnosis,alpha=0.5)) + 
-  geom_point(shape = 21, size = 2) + theme_bw() +
-  guides(size=F)+
-  stat_ellipse(type = "norm")+
-  scale_fill_nejm()+
-  theme(legend.position = 'top')+guides(alpha=F)
-ggsave("OutputPlot/Inflammation.diagnosis.PCA.pdf",width = 3,height = 3)
-ggplot (pca_analysis, aes(V1,V2,fill=Inflammation,alpha=0.5)) + 
-  geom_point(shape = 21, size = 2) + theme_bw() +
-  guides(size=F)+
-  scale_fill_aaas()+
-  stat_ellipse(type = "norm")+
-  theme(legend.position = 'top')+guides(alpha=F)
-ggsave("OutputPlot/Inflammation.cell.PCA.pdf",width = 3,height = 3)
-ggplot (pca_analysis, aes(V1,V2,fill=Location_rough,alpha=0.5)) + 
-  geom_point(shape = 21, size = 2)+ theme_bw() +
-  guides(size=F)+
-  scale_fill_simpsons()+
-  stat_ellipse(type = "norm")+
-  theme(legend.position = 'top')+guides(alpha=F)
-ggsave("OutputPlot/Location.cell.PCA.pdf",width = 3,height = 3)
-ggplot (pca_analysis, aes(V1,V2,fill=Batch,alpha=0.5)) + 
-  geom_point(shape = 21, size = 2) + theme_bw() +
-  guides(size=F)+
-  scale_fill_nejm()+
-  stat_ellipse(type = "norm")+
-  theme(legend.position = 'top')
-ggsave("OutputPlot/Location.batch.PCA.pdf",width = 3,height = 3)
-
-# cluster
-annotation=covariate_rna[,c("Diagnosis","Inflammation","Location_rough","resec_ileocec")]
-annotation$resec_ileocec=as.character(annotation$resec_ileocec)
-annotation$Inflammation[annotation$Inflammation=="Light"]="No"
-heatmap.data=as.data.frame((deconvolution))
-heatmap.data=heatmap.data[,!colnames(heatmap.data) %in% "MPP"]
-heatmap.data=heatmap.data[rownames(heatmap.data) %in% rownames(annotation),]
-my_colour = list(Diagnosis = c(Control = "#4EB265", CD = "#E8601C", UC="grey"),Inflammation=c(Yes="#BB5566",No="#004488"),
-  Location_rough=c(ileum="#AAAA00",colon="lightblue"),resec_ileocec=c("1"="darkred","0"="#DDDDDD"))
-
-pdf("OutputPlot/heatmap.cell.pdf",width = 20,height = 15)
-pheatmap((heatmap.data),cluster_cols = T, cluster_rows = T,scale = "column",
-         show_rownames=F, show_colnames=T,
-         annotation_row  =annotation,annotation_colors = my_colour,
-         cellheight = 0.5,cellwidth = 2,fontsize_number=5,fontsize_row=10,fontsize_col = 3,
-         color = colorRampPalette(c("navy", "white", "firebrick3"))(100))
-dev.off()
-
 # cell type basic correction, + Th1/Th2 cell ratio
-basic_factors=covariate_rna[,c("age_at_biopsy","sex","BMI","Aminosalicylates","Thiopurines","Steroids","Batch","Biological_use")]
-str(basic_factors)
-which(is.na(basic_factors))
-which(is.na(deconvolution_sub))
-
-deconvolution_sub=deconvolution_sub[order(rownames(deconvolution_sub)),]
-basic_factors=basic_factors[order(rownames(basic_factors)),]
-stopifnot(all(rownames(deconvolution_sub) == rownames(basic_factors)))
-
 deconvolution_sub = apply(deconvolution_sub,2,function(x){
   x.subset = x[!is.na(x)]
   covariate.subset = basic_factors[!is.na(x),,drop = FALSE]
   subset.data=cbind(x.subset,covariate.subset)
   colnames(subset.data)[1]="cell"
   
-  fit=lm(cell~age_at_biopsy+sex+BMI+Aminosalicylates+Thiopurines+Steroids+Batch+Biological_use,data=subset.data)
+  fit=glmer(cell~age_at_biopsy+sex+BMI+Aminosalicylates+Thiopurines+Steroids+Batch+Biological_use +(1|ResearchID),data=subset.data)
   x.resid = resid(fit)
   x[!is.na(x)] = x.resid
   x[is.na(x)] = 0
@@ -141,13 +55,6 @@ deconvolution_sub$ThCellRatio=deconvolution_sub$`Th1 cells`/deconvolution_sub$`T
 # compare CDi vs. UCi
 covariate1=covariate_rna[covariate_rna$Diagnosis=="CD" | covariate_rna$Diagnosis=="UC",]
 covariate1=covariate1[covariate1$Location_rough=="colon",]
-covariate1=covariate1[covariate1$Inflammation=="3",]
-covariate1=covariate1[,c("Diagnosis","Inflammation","Location_rough")]
-which(is.na(covariate1))
-deconvolution_sub1=deconvolution_sub[rownames(deconvolution_sub) %in% rownames(covariate1),]
-deconvolution_sub1=deconvolution_sub1[order(rownames(deconvolution_sub1)),]
-covariate1=covariate1[order(rownames(covariate1)),]
-
 nn=0
 result0 = foreach(i=1:ncol(deconvolution_sub1),.combine = rbind) %do%  {
   tmp.genus=colnames(deconvolution_sub1)[i]
@@ -168,7 +75,6 @@ result0 = foreach(i=1:ncol(deconvolution_sub1),.combine = rbind) %do%  {
                            diagnosis.se=coefs.fit$Std..Error[rownames(coefs.fit)=="DiagnosisUC"])
 }
 result0$FDR=p.adjust(result0$diagnosis.P,method = "BH")
-write.table(result0,file = "OutputTable/Cell.CDi.UC.txt",sep = "\t",quote = F,row.names = F)
 
 compare=matrix(nrow = ncol(deconvolution_sub),ncol = 2)
 compare=as.data.frame(compare)
@@ -206,24 +112,10 @@ for(i in 1:nrow(compare)){
 compare_all=na.omit(compare_all)
 compare_all$Cell=factor(compare_all$Cell,levels = rev(unique(compare$CellType)))
 
-ggplot (compare_all,aes(x= Cell, y=Score, fill=Group))+
-  geom_boxplot(alpha=0.8,outlier.shape = NA)+
-  geom_point(aes(color = Group),alpha=0.1,position = position_jitterdodge(dodge.width = 0.75, jitter.width = 0.5),size=1)+
-  theme_bw()+
-  scale_color_manual(values=c("#BB5566","#004488"))+
-  scale_fill_manual(values=c("#BB5566","#004488"))+
-  theme(axis.text.x = element_text(angle = 90,hjust = 1))+
-  xlab("CellTypes")+ylab("EnrichmentScore")+
-  coord_flip()+guides(fill=F)+guides(color=F)
-ggsave("OutputPlot/Cell.compare.pdf",width = 8,height = 8)
-
 # ====================================================================================================
 # cell-host, use relative abundance instead of 0/1
 # ====================================================================================================
 bacteria=read.table("OutputTable/CLR.bacteria.txt",stringsAsFactors = F,header = T,sep = "\t",row.names = 1)
-basic_factors=covariate_rna[,c("Inflammation","Location_rough")]
-basic_factors$Inflammation=as.numeric(basic_factors$Inflammation)
-
 result1=matrix(nrow = 1,ncol = 4)
 result1=as.data.frame(result1)
 colnames(result1)=c("Bacteria","Cells","Pvalue","Estimate")
@@ -265,32 +157,10 @@ for (i in 1:ncol(bacteria)){
 result1=result1[-1,]
 result1$FDR=p.adjust(result1$Pvalue,method = "BH")
 
-bac="Subdoligranulum"
-cell="Eosinophils"
-tmp.data=merge(deconvolution_sub[,cell,drop=F],bacteria[,bac,drop=F],all=F,by="row.names")
-
-ggplot(tmp.data, aes(tmp.data[,bac], (tmp.data[,cell]))) +
-  geom_point(shape = 21, 
-             color = "black", size = 2)+
-  geom_smooth(method = lm)+
-  scale_color_jama()+
-  theme_bw()+ theme(legend.position="bottom")+guides(fill=F)
-
 # ====================================== ########## ============================================
 # ====================================== predictors ============================================
 # ====================================== ########## ============================================
 bacteria=read.table("OutputTable/CLR.bacteria.txt",stringsAsFactors = F,header = T,sep = "\t",row.names = 1)
-
-library (hdi)
-library(tidyverse)
-library (dplyr)
-library(glmnet)
-library(glmnetUtils)
-library(crayon)
-library(caret)
-library(pROC)
-library(plyr)
-library(readr)
 lasso_fit=function(feature,outcome){
   if(length(colnames(feature))==0){
     result=data.frame(Protein=colnames(outcome),Feature="No",Lasso.beta=0)
@@ -309,7 +179,7 @@ lasso_fit=function(feature,outcome){
 }
 
 # ====================================================================================
-# models
+# models (residules after correcting for repearted measurements)
 # model 1: cell ~ factor_group1: basic factors (age, sex, BMI, batch)
 # model 2: cell ~ factor_group2: medication (Aminosalicylates, Thiopurines, Steroids, Biological_use)
 # model 3: cell ~ factor_group3: Inflammation 
@@ -317,25 +187,6 @@ lasso_fit=function(feature,outcome){
 # model 5: cell ~ factor_group5: bacteria
 # model 6: cell ~ factor_group6: full model with all factors
 # ====================================================================================
-
-deconvolution_sub.correct=deconvolution[,c("cDC",	"Macrophages M1",	"NK cells",	"pDC",	"Macrophages M2",
-                                           "CD4+ naive T-cells",	"CD4+ Tcm",	"CD8+ naive T-cells",	"CD8+ Tcm",	
-                                           "Tgd cells",	"Th2 cells",	"Tregs",	"Th1 cells",
-                                           "NKT",	"CD8+ Tem",	"CD4+ Tem",	"Class-switched memory B-cells",
-                                           "Plasma cells",	"naive B-cells",	"Memory B-cells",	"Basophils",
-                                           "Mast cells",	"Neutrophils",	"Eosinophils",	"Endothelial cells",
-                                           "Epithelial cells",	"Fibroblasts"),drop=F]
-deconvolution_sub.correct=deconvolution_sub.correct[rownames(deconvolution_sub.correct) %in% rownames(covariate_rna),]
-basic_factors=covariate_rna[,c("age_at_biopsy","sex","BMI","Aminosalicylates","Thiopurines","Steroids","Batch","Biological_use","Inflammation","Location_rough")]
-basic_factors$Inflammation=as.numeric(basic_factors$Inflammation)
-str(basic_factors)
-which(is.na(basic_factors))
-basic_factors$Batch[basic_factors$Batch=="batch1"]=1
-basic_factors$Batch[basic_factors$Batch=="batch2"]=2
-basic_factors$Location_rough[basic_factors$Location_rough=="colon"]=1
-basic_factors$Location_rough[basic_factors$Location_rough=="ileum"]=0
-basic_factors$Location_rough=as.numeric(basic_factors$Location_rough)
-basic_factors$Batch=as.numeric(basic_factors$Batch)
 
 factor_group1=basic_factors[,c("age_at_biopsy","sex","BMI","Batch")]
 factor_group2=basic_factors[,c("Aminosalicylates","Thiopurines","Steroids","Biological_use")]
