@@ -123,30 +123,9 @@ save_CCA_components <- function(CCA.out, CCA.K, dirname){
 
 # import inflammation-related
 inflammation=read.table("OutputTable/RNAseq.inflammation.compare.txt",sep = "\t",header = T)
-inflammation=inflammation[inflammation$FDR<0.05,]
-inflammation=Reduce(intersect, list(inflammation$Gene[inflammation$group==1],inflammation$Gene[inflammation$group==2],inflammation$Gene[inflammation$group==3]))
-
 # import clr gene table
 gene=read.table("OutputTable/Genes.basic.correction.protein.coding.txt",sep = "\t",header = T,row.names = 1)
 covariate_rna=read.table("Covariate.rna.txt",sep = "\t",header = T,stringsAsFactors = F,row.names = 1,check.names = F)
-gene=gene[rownames(gene) %in% rownames(covariate_rna),]
-covariate_rna=covariate_rna[rownames(covariate_rna) %in% rownames(gene),]
-
-gene=gene[order(rownames(gene)),]
-covariate_rna=covariate_rna[order(rownames(covariate_rna)),]
-covariate_rna$Inflammation[covariate_rna$Inflammation=="Light"]="No"
-
-covariate_rna$Inflammation[covariate_rna$Inflammation=="Yes"]=3
-covariate_rna$Inflammation[covariate_rna$Inflammation=="No" & covariate_rna$Diagnosis=="CD"]=2
-covariate_rna$Inflammation[covariate_rna$Inflammation=="No" & covariate_rna$Diagnosis=="UC"]=2
-covariate_rna$Inflammation[covariate_rna$Inflammation=="No" & covariate_rna$Diagnosis=="Control"]=1
-covariate_rna$Inflammation=as.numeric(covariate_rna$Inflammation)
-
-covariate_rna$BMI[is.na(covariate_rna$BMI)]=median(covariate_rna$BMI[!is.na(covariate_rna$BMI)])
-covariate_rna$Inflammation[is.na(covariate_rna$Inflammation)]=median(covariate_rna$Inflammation[!is.na(covariate_rna$Inflammation)])
-covariate_rna$smoking_DB[is.na(covariate_rna$smoking_DB)]=median(covariate_rna$smoking_DB[!is.na(covariate_rna$smoking_DB)])
-
-inflammation=gene[,colnames(gene) %in% inflammation,drop=F]
 
 # ======================================================================================================================================
 # (don't consider inflammation, location and others, microbial community is not influenced much)
@@ -172,9 +151,6 @@ for(i in 1:ncol(inflammation)){
 }
 keep=which(keep>2)
 inflammation=inflammation[,keep]
-
-bacteria=bacteria[order(rownames(bacteria)),]
-inflammation=inflammation[order(rownames(inflammation)),]
 stopifnot(all(rownames(inflammation) == rownames(bacteria)))
 
 ## select tuning parameters using grid-search
