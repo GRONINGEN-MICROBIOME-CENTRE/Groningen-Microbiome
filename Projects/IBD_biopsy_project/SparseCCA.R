@@ -124,11 +124,11 @@ save_CCA_components <- function(CCA.out, CCA.K, dirname){
 # import inflammation-related
 inflammation=read.table("OutputTable/RNAseq.inflammation.compare.txt",sep = "\t",header = T)
 # import clr gene table
-gene=read.table("OutputTable/Genes.basic.correction.protein.coding.txt",sep = "\t",header = T,row.names = 1)
+gene=read.table("OutputTable/Genes.factor_corrected.txt",sep = "\t",header = T,row.names = 1)
 covariate_rna=read.table("Covariate.rna.txt",sep = "\t",header = T,stringsAsFactors = F,row.names = 1,check.names = F)
 
 # ======================================================================================================================================
-# (don't consider inflammation, location and others, microbial community is not influenced much)
+# all the data are used after factors correction
 # ======================================================================================================================================
 
 bacteria=read.table("OutputTable/CLR.bacteria.txt",row.names = 1,sep = "\t",header = T,stringsAsFactors = F)
