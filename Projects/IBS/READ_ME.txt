@@ -10,10 +10,3 @@ Diagnosis RomeIII questionnaire
   # - variable IBS stating yes or no for IBS
   # - variable Subtype specifying the IBS subtype C/D/M/U
   # - variable FGID listing all functional gastrointestinal disorders from this questionnaire: IBS, IBS strict, functional constipation, functional diarrhea, functional bloating
-
-# name of dataframe: RO 
-# If containing no sex information: Add a column sex to this data R0$sex with labels  male and female
-# Variable names questions: ROME1 to ROME26 
-
-
-## score questions based on numeric values in LL catalogue ( https://catalogue.lifelines.nl/menu/main/protocolviewer) 
