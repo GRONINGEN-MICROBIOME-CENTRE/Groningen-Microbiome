@@ -3,17 +3,15 @@
 #SampleID	Metaphlan_Analysis
 #estimated_reads_mapped_to_known_clades:8362300
 #clade_name	clade_taxid	relative_abundance	coverage	estimated_number_of_reads_from_the_clade
-UNKNOWN	-1	27.87472	0	14323831
+UNKNOWN	-1	68.16434	-	17904789
 k__Bacteria	2	31.52851	2.66557	8361496
 k__Viruses	10239	0.30714	0.02597	804
-k__Eukaryota	2759	6.96868	0.712331	3580957
 k__Bacteria|p__Bacteroidetes	2|976	19.65727	1.66192	5595844
 k__Bacteria|p__Firmicutes	2|1239	10.84281	0.9167	2570946
 k__Bacteria|p__Actinobacteria	2|201174	0.98789	0.08352	185107
 k__Viruses|p__Viruses_unclassified	10239|	0.30714	0.02597	804
 k__Bacteria|p__Verrucomicrobia	2|74201	0.02403	0.00203	5669
 k__Bacteria|p__Proteobacteria	2|1224	0.01652	0.0014	3930
-k__Eukaryota|p__Chordata	2759|7711	6.96868	0.712331	3580957
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia	2|976|200643	19.65727	1.66192	5595844
 k__Bacteria|p__Firmicutes|c__Clostridia	2|1239|186801	10.23901	0.86565	2445215
 k__Bacteria|p__Actinobacteria|c__Actinobacteria	2|201174|1760	0.68298	0.05774	128681
@@ -26,7 +24,6 @@ k__Bacteria|p__Verrucomicrobia|c__Verrucomicrobiae	2|74201|203494	0.02403	0.0020
 k__Bacteria|p__Proteobacteria|c__Betaproteobacteria	2|1224|28216	0.01617	0.00137	3871
 k__Bacteria|p__Firmicutes|c__Negativicutes	2|1239|909932	0.00374	0.00032	537
 k__Bacteria|p__Proteobacteria|c__Proteobacteria_unclassified	2|1224|	0.00035	3e-05	59
-k__Eukaryota|p__Chordata|c__Mammalia	2759|7711|40674	6.96868	0.712331	3580957
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales	2|976|200643|171549	19.65727	1.66192	5595844
 k__Bacteria|p__Firmicutes|c__Clostridia|o__Clostridiales	2|1239|186801|186802	10.23901	0.86565	2445215
 k__Bacteria|p__Actinobacteria|c__Actinobacteria|o__Bifidobacteriales	2|201174|1760|85004	0.68298	0.05774	128681
@@ -38,7 +35,6 @@ k__Bacteria|p__Verrucomicrobia|c__Verrucomicrobiae|o__Verrucomicrobiales	2|74201
 k__Bacteria|p__Proteobacteria|c__Betaproteobacteria|o__Burkholderiales	2|1224|28216|80840	0.01617	0.00137	3871
 k__Bacteria|p__Firmicutes|c__Negativicutes|o__Veillonellales	2|1239|909932|1843489	0.00374	0.00032	537
 k__Bacteria|p__Proteobacteria|c__Proteobacteria_unclassified|o__Proteobacteria_unclassified	2|1224||	0.00035	3e-05	59
-k__Eukaryota|p__Chordata|c__Mammalia|o__Carnivora	2759|7711|40674|33554	6.96868	0.712331	3580957
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Rikenellaceae	2|976|200643|171549|171550	8.02613	0.67857	1747768
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Bacteroidaceae	2|976|200643|171549|815	6.457	0.54591	2321557
 k__Bacteria|p__Firmicutes|c__Clostridia|o__Clostridiales|f__Lachnospiraceae	2|1239|186801|186802|186803	4.36793	0.36929	1249792
@@ -63,7 +59,6 @@ k__Viruses|p__Viruses_unclassified|c__Viruses_unclassified|o__Caudovirales|f__Po
 k__Bacteria|p__Firmicutes|c__Bacilli|o__Lactobacillales|f__Streptococcaceae	2|1239|91061|186826|1300	0.00858	0.00073	1335
 k__Bacteria|p__Firmicutes|c__Negativicutes|o__Veillonellales|f__Veillonellaceae	2|1239|909932|1843489|31977	0.00374	0.00032	537
 k__Bacteria|p__Proteobacteria|c__Proteobacteria_unclassified|o__Proteobacteria_unclassified|f__Proteobacteria_unclassified	2|1224|||	0.00035	3e-05	59
-k__Eukaryota|p__Chordata|c__Mammalia|o__Carnivora|f__Ursidae	2759|7711|40674|33554	6.96868	0.712331	3580957
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Rikenellaceae|g__Alistipes	2|976|200643|171549|171550|239759	8.02613	0.67857	1747768
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Bacteroidaceae|g__Bacteroides	2|976|200643|171549|815|816	6.457	0.54591	2321557
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Prevotellaceae|g__Prevotella	2|976|200643|171549|171552|838	4.21351	0.35623	1194511
@@ -106,8 +101,6 @@ k__Bacteria|p__Firmicutes|c__Clostridia|o__Clostridiales|f__Ruminococcaceae|g__R
 k__Bacteria|p__Firmicutes|c__Erysipelotrichia|o__Erysipelotrichales|f__Erysipelotrichaceae|g__Holdemanella	2|1239|526524|526525|128827|1573535	0.00121	0.0001	256
 k__Bacteria|p__Firmicutes|c__Clostridia|o__Clostridiales|f__Ruminococcaceae|g__Ruminococcaceae_unclassified	2|1239|186801|186802|541000|	0.00114	0.0001	311
 k__Bacteria|p__Proteobacteria|c__Proteobacteria_unclassified|o__Proteobacteria_unclassified|f__Proteobacteria_unclassified|g__Proteobacteria_unclassified	2|1224||||	0.00035	3e-05	59
-k__Eukaryota|p__Chordata|c__Mammalia|o__Carnivora|f__Ursidae|g__Ursus	2759|7711|40674|33554|9639|9639	6.96868	0.712331	3580957
-k__Eukaryota|p__Chordata|c__Mammalia|o__Carnivora|f__Ursidae|g__Ursus|s__Ursus_arctos	2759|7711|40674|33554|9639|9639|9644	6.96868	0.712331	3580957
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Rikenellaceae|g__Alistipes|s__Alistipes_putredinis	2|976|200643|171549|171550|239759|28117	6.7494	0.57063	1404577
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Prevotellaceae|g__Prevotella|s__Prevotella_copri	2|976|200643|171549|171552|838|165179	3.29053	0.2782	1016259
 k__Bacteria|p__Firmicutes|c__Clostridia|o__Clostridiales|f__Ruminococcaceae|g__Faecalibacterium|s__Faecalibacterium_prausnitzii	2|1239|186801|186802|541000|216851|853	3.09021	0.26126	779007
@@ -193,4 +186,3 @@ k__Bacteria|p__Firmicutes|c__Clostridia|o__Clostridiales|f__Ruminococcaceae|g__R
 k__Bacteria|p__Actinobacteria|c__Coriobacteriia|o__Coriobacteriales|f__Coriobacteriaceae|g__Collinsella|s__Collinsella_stercoris	2|201174|84998|84999|84107|102106|147206	0.00106	9e-05	221
 k__Bacteria|p__Bacteroidetes|c__Bacteroidia|o__Bacteroidales|f__Bacteroidaceae|g__Bacteroides|s__Bacteroides_stercoris	2|976|200643|171549|815|816|46506	0.00098	8e-05	328
 k__Bacteria|p__Proteobacteria|c__Proteobacteria_unclassified|o__Proteobacteria_unclassified|f__Proteobacteria_unclassified|g__Proteobacteria_unclassified|s__Proteobacteria_bacterium_CAG_139	2|1224|||||1262986	0.00035	3e-05	59
-k__Eukaryota|p__Chordata|c__Mammalia|o__Carnivora|f__Ursidae|g__Ursus|s__Ursus_arctos|t__Ursus_arctos_Nederlandiensis	2759|7711|40674|33554|9639|9639|9644	6.96868	0.712331	3580957
